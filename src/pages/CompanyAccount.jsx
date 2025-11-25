@@ -1,0 +1,776 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { motion } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+export default function CompanyAccount() {
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [showContributorForm, setShowContributorForm] = useState(false);
+  const [editingContributor, setEditingContributor] = useState(null);
+  const queryClient = useQueryClient();
+
+  const [transactionForm, setTransactionForm] = useState({
+    type: "contribution",
+    contributor_name: "",
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    payment_method: "cash",
+    description: "",
+    notes: "",
+    reference_number: "",
+  });
+
+  const [contributorForm, setContributorForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "partner",
+    is_active: true,
+    notes: "",
+  });
+
+  const { data: transactions = [] } = useQuery({
+    queryKey: ['companyTransactions'],
+    queryFn: () => base44.entities.CompanyTransaction.list('-date'),
+  });
+
+  const { data: contributors = [] } = useQuery({
+    queryKey: ['contributors'],
+    queryFn: () => base44.entities.Contributor.list('name'),
+  });
+
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: () => base44.entities.Expense.list('-date'),
+  });
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ['orders'],
+    queryFn: () => base44.entities.Order.list('-created_date'),
+  });
+
+  const createTransaction = useMutation({
+    mutationFn: (data) => base44.entities.CompanyTransaction.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['contributors'] });
+      resetTransactionForm();
+    },
+  });
+
+  const deleteTransaction = useMutation({
+    mutationFn: (id) => base44.entities.CompanyTransaction.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
+    },
+  });
+
+  const createContributor = useMutation({
+    mutationFn: (data) => base44.entities.Contributor.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contributors'] });
+      resetContributorForm();
+    },
+  });
+
+  const updateContributor = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Contributor.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contributors'] });
+      resetContributorForm();
+    },
+  });
+
+  const deleteContributor = useMutation({
+    mutationFn: (id) => base44.entities.Contributor.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contributors'] });
+    },
+  });
+
+  // Calculate balances
+  const totalContributions = transactions
+    .filter(t => t.type === 'contribution')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  const totalWithdrawals = transactions
+    .filter(t => t.type === 'withdrawal')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  // Expenses paid from company cash
+  const expensesFromCompanyCash = expenses
+    .filter(e => e.payment_source === 'company_cash')
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  // Expenses paid from company bank account
+  const expensesFromCompanyAccount = expenses
+    .filter(e => e.payment_source === 'company_account')
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  // Total company expenses (both cash and account)
+  const companyExpenses = expensesFromCompanyCash + expensesFromCompanyAccount;
+
+  // Cash from customer orders (delivered orders paid in cash)
+  const cashFromOrders = orders
+    .filter(o => o.payment_method === 'cash' && o.status === 'delivered')
+    .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+  // Cash contributions to the company
+  const cashContributions = transactions
+    .filter(t => t.type === 'contribution' && t.payment_method === 'cash')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  // Cash withdrawals from the company
+  const cashWithdrawals = transactions
+    .filter(t => t.type === 'withdrawal' && t.payment_method === 'cash')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  // Available company cash = cash from orders + cash contributions - cash withdrawals - expenses paid with cash
+  const availableCash = cashFromOrders + cashContributions - cashWithdrawals - expensesFromCompanyCash;
+
+  // Company total balance (all sources)
+  const companyBalance = totalContributions - totalWithdrawals - companyExpenses + cashFromOrders;
+
+  // Update contributor totals
+  const contributorTotals = contributors.map(contributor => {
+    const contributed = transactions
+      .filter(t => t.type === 'contribution' && t.contributor_name === contributor.name)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const withdrawn = transactions
+      .filter(t => t.type === 'withdrawal' && t.contributor_name === contributor.name)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    return {
+      ...contributor,
+      total_contributed: contributed,
+      total_withdrawn: withdrawn,
+      net_contribution: contributed - withdrawn,
+    };
+  });
+
+  const handleTransactionSubmit = (e) => {
+    e.preventDefault();
+    createTransaction.mutate(transactionForm);
+  };
+
+  const handleContributorSubmit = (e) => {
+    e.preventDefault();
+    if (editingContributor) {
+      updateContributor.mutate({ id: editingContributor.id, data: contributorForm });
+    } else {
+      createContributor.mutate(contributorForm);
+    }
+  };
+
+  const handleEditContributor = (contributor) => {
+    setEditingContributor(contributor);
+    setContributorForm(contributor);
+    setShowContributorForm(true);
+  };
+
+  const handleDeleteTransaction = (id) => {
+    if (confirm('¿Estás seguro de eliminar esta transacción? / Are you sure you want to delete this transaction?')) {
+      deleteTransaction.mutate(id);
+    }
+  };
+
+  const handleDeleteContributor = (id) => {
+    if (confirm('¿Estás seguro de eliminar este contribuyente? / Are you sure you want to delete this contributor?')) {
+      deleteContributor.mutate(id);
+    }
+  };
+
+  const resetTransactionForm = () => {
+    setTransactionForm({
+      type: "contribution",
+      contributor_name: "",
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      payment_method: "cash",
+      description: "",
+      notes: "",
+      reference_number: "",
+    });
+    setShowTransactionForm(false);
+  };
+
+  const resetContributorForm = () => {
+    setContributorForm({
+      name: "",
+      email: "",
+      phone: "",
+      role: "partner",
+      is_active: true,
+      notes: "",
+    });
+    setEditingContributor(null);
+    setShowContributorForm(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Wallet className="w-10 h-10" />
+            <div>
+              <h1 className="text-4xl font-bold">Cuenta de la Empresa</h1>
+              <p className="text-gray-300 mt-1">Company Account & Contributors</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <Card className="border-0 shadow-lg border-t-4 border-t-green-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Balance Total
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold ${companyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${companyBalance.toFixed(2)}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">MXN total empresa</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg border-t-4 border-t-yellow-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                💵 Efectivo Disponible
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold ${availableCash >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                ${availableCash.toFixed(2)}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                +${cashFromOrders.toFixed(2)} ventas efectivo
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Contribuciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">${totalContributions.toFixed(2)}</div>
+              <p className="text-xs text-gray-500 mt-1">{transactions.filter(t => t.type === 'contribution').length} transacciones</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <TrendingDown className="w-4 h-4" />
+                Gastos Empresa
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600">${companyExpenses.toFixed(2)}</div>
+              <p className="text-xs text-gray-500 mt-1">
+                💵${expensesFromCompanyCash.toFixed(2)} | 🏦${expensesFromCompanyAccount.toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Contribuyentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">{contributors.filter(c => c.is_active).length}</div>
+              <p className="text-xs text-gray-500 mt-1">{contributors.length} total</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cash Flow Summary */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              💵 Resumen de Efectivo / Cash Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-green-50 rounded-lg">
+                <p className="text-sm text-gray-600">Ventas en Efectivo</p>
+                <p className="text-xl font-bold text-green-600">+${cashFromOrders.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">{orders.filter(o => o.payment_method === 'cash' && o.status === 'delivered').length} pedidos</p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600">Contribuciones Efectivo</p>
+                <p className="text-xl font-bold text-blue-600">+${cashContributions.toFixed(2)}</p>
+              </div>
+              <div className="p-4 bg-orange-50 rounded-lg">
+                <p className="text-sm text-gray-600">Retiros Efectivo</p>
+                <p className="text-xl font-bold text-orange-600">-${cashWithdrawals.toFixed(2)}</p>
+              </div>
+              <div className="p-4 bg-red-50 rounded-lg">
+                <p className="text-sm text-gray-600">Gastos en Efectivo</p>
+                <p className="text-xl font-bold text-red-600">-${expensesFromCompanyCash.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs defaultValue="transactions" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="transactions">Transacciones / Transactions</TabsTrigger>
+            <TabsTrigger value="contributors">Contribuyentes / Contributors</TabsTrigger>
+          </TabsList>
+
+          {/* Transactions Tab */}
+          <TabsContent value="transactions" className="space-y-6">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowTransactionForm(!showTransactionForm)}
+                className="bg-red-600 hover:bg-red-700 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Nueva Transacción / New Transaction
+              </Button>
+            </div>
+
+            {/* Transaction Form */}
+            {showTransactionForm && (
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-2xl">Nueva Transacción / New Transaction</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleTransactionSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="type">Tipo / Type *</Label>
+                          <Select
+                            value={transactionForm.type}
+                            onValueChange={(value) => setTransactionForm({ ...transactionForm, type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="contribution">
+                                💰 Contribución / Contribution
+                              </SelectItem>
+                              <SelectItem value="withdrawal">
+                                💸 Retiro / Withdrawal
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="contributor">Contribuyente / Contributor *</Label>
+                          <Select
+                            value={transactionForm.contributor_name}
+                            onValueChange={(value) => setTransactionForm({ ...transactionForm, contributor_name: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {contributors.map(c => (
+                                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Monto / Amount (MXN) *</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required
+                            value={transactionForm.amount}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, amount: parseFloat(e.target.value) })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="date">Fecha / Date *</Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            required
+                            value={transactionForm.date}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, date: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="payment_method">Método / Method *</Label>
+                          <Select
+                            value={transactionForm.payment_method}
+                            onValueChange={(value) => setTransactionForm({ ...transactionForm, payment_method: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Efectivo / Cash</SelectItem>
+                              <SelectItem value="transfer">Transferencia / Transfer</SelectItem>
+                              <SelectItem value="check">Cheque / Check</SelectItem>
+                              <SelectItem value="other">Otro / Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="reference">Número de Referencia / Reference Number</Label>
+                          <Input
+                            id="reference"
+                            value={transactionForm.reference_number}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, reference_number: e.target.value })}
+                            placeholder="Ej: REF123456"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="description">Descripción / Description</Label>
+                          <Input
+                            id="description"
+                            value={transactionForm.description}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
+                            placeholder="Breve descripción..."
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="notes">Notas / Notes</Label>
+                          <Textarea
+                            id="notes"
+                            value={transactionForm.notes}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, notes: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 justify-end">
+                        <Button type="button" variant="outline" onClick={resetTransactionForm}>
+                          Cancelar / Cancel
+                        </Button>
+                        <Button type="submit" disabled={createTransaction.isPending} className="bg-red-600 hover:bg-red-700">
+                          Guardar / Save
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Transactions List */}
+            <div className="space-y-4">
+              {transactions.length > 0 ? (
+                transactions.map((transaction) => (
+                  <motion.div key={transaction.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <Card className="border-0 shadow hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-start gap-3 mb-3">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                transaction.type === 'contribution' ? 'bg-green-100' : 'bg-red-100'
+                              }`}>
+                                {transaction.type === 'contribution' ? (
+                                  <TrendingUp className="w-6 h-6 text-green-600" />
+                                ) : (
+                                  <TrendingDown className="w-6 h-6 text-red-600" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-bold text-lg">{transaction.contributor_name}</h3>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  <Badge className={transaction.type === 'contribution' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                    {transaction.type === 'contribution' ? 'Contribución' : 'Retiro'}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    {format(new Date(transaction.date), 'dd MMM yyyy', { locale: es })}
+                                  </Badge>
+                                  <Badge variant="outline" className="capitalize">
+                                    {transaction.payment_method}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+
+                            {transaction.description && (
+                              <p className="text-sm text-gray-700 mb-2">{transaction.description}</p>
+                            )}
+                            {transaction.reference_number && (
+                              <p className="text-xs text-gray-500">Ref: {transaction.reference_number}</p>
+                            )}
+                            {transaction.notes && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-700">{transaction.notes}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-end gap-3">
+                            <div className={`text-3xl font-bold ${
+                              transaction.type === 'contribution' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {transaction.type === 'contribution' ? '+' : '-'}${transaction.amount?.toFixed(2)}
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteTransaction(transaction.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <Card className="border-0 shadow">
+                  <CardContent className="text-center py-20">
+                    <Wallet className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500 text-lg">No hay transacciones registradas</p>
+                    <p className="text-gray-400 text-sm">No transactions recorded</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Contributors Tab */}
+          <TabsContent value="contributors" className="space-y-6">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowContributorForm(!showContributorForm)}
+                className="bg-red-600 hover:bg-red-700 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Nuevo Contribuyente / New Contributor
+              </Button>
+            </div>
+
+            {/* Contributor Form */}
+            {showContributorForm && (
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-2xl">
+                      {editingContributor ? 'Editar Contribuyente / Edit Contributor' : 'Nuevo Contribuyente / New Contributor'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleContributorSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Nombre / Name *</Label>
+                          <Input
+                            id="name"
+                            required
+                            value={contributorForm.name}
+                            onChange={(e) => setContributorForm({ ...contributorForm, name: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="role">Rol / Role *</Label>
+                          <Select
+                            value={contributorForm.role}
+                            onValueChange={(value) => setContributorForm({ ...contributorForm, role: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="owner">👑 Dueño / Owner</SelectItem>
+                              <SelectItem value="partner">🤝 Socio / Partner</SelectItem>
+                              <SelectItem value="investor">💼 Inversionista / Investor</SelectItem>
+                              <SelectItem value="employee">👤 Empleado / Employee</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={contributorForm.email}
+                            onChange={(e) => setContributorForm({ ...contributorForm, email: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Teléfono / Phone</Label>
+                          <Input
+                            id="phone"
+                            value={contributorForm.phone}
+                            onChange={(e) => setContributorForm({ ...contributorForm, phone: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="c_notes">Notas / Notes</Label>
+                          <Textarea
+                            id="c_notes"
+                            value={contributorForm.notes}
+                            onChange={(e) => setContributorForm({ ...contributorForm, notes: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="is_active"
+                            checked={contributorForm.is_active}
+                            onChange={(e) => setContributorForm({ ...contributorForm, is_active: e.target.checked })}
+                            className="w-4 h-4"
+                          />
+                          <Label htmlFor="is_active" className="cursor-pointer">
+                            Contribuyente Activo / Active Contributor
+                          </Label>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 justify-end">
+                        <Button type="button" variant="outline" onClick={resetContributorForm}>
+                          Cancelar / Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          disabled={createContributor.isPending || updateContributor.isPending}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {editingContributor ? 'Actualizar / Update' : 'Guardar / Save'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Contributors List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {contributorTotals.length > 0 ? (
+                contributorTotals.map((contributor) => (
+                  <motion.div key={contributor.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <Card className={`border-0 shadow hover:shadow-lg transition-shadow ${
+                      !contributor.is_active ? 'opacity-60' : ''
+                    }`}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-xl font-bold text-purple-600">
+                                {contributor.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-lg">{contributor.name}</h3>
+                              <Badge className="capitalize">{contributor.role}</Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => handleEditContributor(contributor)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteContributor(contributor.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {contributor.email && (
+                          <p className="text-sm text-gray-600 mb-1">📧 {contributor.email}</p>
+                        )}
+                        {contributor.phone && (
+                          <p className="text-sm text-gray-600 mb-3">📱 {contributor.phone}</p>
+                        )}
+
+                        <div className="space-y-2 pt-4 border-t">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Contribuido / Contributed:</span>
+                            <span className="font-semibold text-green-600">+${contributor.total_contributed.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Retirado / Withdrawn:</span>
+                            <span className="font-semibold text-red-600">-${contributor.total_withdrawn.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t">
+                            <span className="font-semibold">Balance Neto / Net:</span>
+                            <span className={`font-bold ${contributor.net_contribution >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              ${contributor.net_contribution.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {contributor.notes && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-700">{contributor.notes}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <Card className="border-0 shadow md:col-span-2">
+                  <CardContent className="text-center py-20">
+                    <Users className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500 text-lg">No hay contribuyentes registrados</p>
+                    <p className="text-gray-400 text-sm">No contributors registered</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
