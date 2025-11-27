@@ -63,12 +63,21 @@ export default function Orders() {
     }
   };
 
-  const handleCompleteOrder = async (order, paymentMethod) => {
+  const handleCompleteOrder = async (order) => {
+    const paymentMethod = prompt(
+      '¿Cómo pagó el cliente? / How did the customer pay?\n\n1 = Efectivo / Cash\n2 = Tarjeta / Card\n\nIngrese 1 o 2:',
+      order.payment_method === 'card' ? '2' : '1'
+    );
+    
+    if (!paymentMethod) return;
+    
+    const method = paymentMethod === '2' ? 'card' : 'cash';
+    
     updateOrder.mutate({
       id: order.id,
       data: {
         status: 'delivered',
-        payment_method: paymentMethod,
+        payment_method: method,
         payment_status: 'paid'
       }
     });
