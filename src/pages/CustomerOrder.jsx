@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 export default function CustomerOrder() {
   const [cart, setCart] = useState([]);
-  const [step, setStep] = useState("menu"); // menu, checkout, payment, success
+  const [step, setStep] = useState("menu"); // menu, orderType, checkout, payment, success
   const [customerInfo, setCustomerInfo] = useState({
     customer_name: "",
     customer_phone: "",
@@ -21,8 +21,9 @@ export default function CustomerOrder() {
     special_instructions: "",
     payment_method: "cash",
     card_payment_type: "on_delivery", // 'on_delivery' or 'online'
-    order_type: "delivery", // 'pickup' or 'delivery'
+    order_type: "delivery", // 'dine-in', 'pickup' or 'delivery'
   });
+  const [dineInName, setDineInName] = useState("");
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -235,10 +236,36 @@ export default function CustomerOrder() {
       special_instructions: "",
       payment_method: "cash",
       card_payment_type: "on_delivery",
-      order_type: "delivery", // Reset order type
+      order_type: "delivery",
     });
+    setDineInName("");
     setPaymentConfirmed(false);
     setCreatedOrder(null);
+  };
+
+  const handleDineInSubmit = (e) => {
+    e.preventDefault();
+    const orderData = {
+      customer_name: dineInName || "Cliente en sitio",
+      customer_phone: "",
+      delivery_address: "",
+      special_instructions: customerInfo.special_instructions,
+      payment_method: "cash",
+      payment_status: "pending",
+      order_type: "dine-in",
+      items: cart.map(item => ({
+        menu_item_id: item.is_custom ? null : item.id,
+        item_name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        removed_ingredients: item.removed_ingredients || [],
+        extras: item.extras || [],
+        is_custom: item.is_custom || false,
+      })),
+      total_amount: getSubtotal(),
+      status: "pending",
+    };
+    createOrder.mutate(orderData);
   };
 
   // Success Screen
@@ -528,6 +555,127 @@ export default function CustomerOrder() {
                     </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // Order Type Selection Screen
+  if (step === "orderType") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 p-4">
+        <div className="max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="border-0 shadow-2xl">
+              <CardHeader className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-t-xl">
+                <CardTitle className="text-2xl">¿Dónde comerás? / Where will you eat?</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                {/* Dine-in Option */}
+                <button
+                  onClick={() => {
+                    setCustomerInfo({ ...customerInfo, order_type: 'dine-in' });
+                  }}
+                  className={`w-full p-6 border-2 rounded-xl flex items-center gap-4 transition-all ${
+                    customerInfo.order_type === 'dine-in'
+                      ? 'border-orange-600 bg-orange-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-4xl">🍽️</div>
+                  <div className="text-left flex-1">
+                    <p className="font-bold text-xl">Comer Aquí / Dine-In</p>
+                    <p className="text-gray-600">Comer en el restaurante / Eat at the restaurant</p>
+                  </div>
+                </button>
+
+                {/* Takeout/Delivery Option */}
+                <button
+                  onClick={() => {
+                    setCustomerInfo({ ...customerInfo, order_type: 'delivery' });
+                    setStep("checkout");
+                  }}
+                  className="w-full p-6 border-2 border-gray-300 hover:border-gray-400 rounded-xl flex items-center gap-4 transition-all"
+                >
+                  <div className="text-4xl">🚚</div>
+                  <div className="text-left flex-1">
+                    <p className="font-bold text-xl">Para Llevar o Domicilio</p>
+                    <p className="text-gray-600">Takeout or Delivery</p>
+                  </div>
+                </button>
+
+                {/* Dine-in Form */}
+                {customerInfo.order_type === 'dine-in' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-4 pt-4 border-t"
+                  >
+                    <form onSubmit={handleDineInSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dine_name">Tu Nombre (opcional) / Your Name (optional)</Label>
+                        <Input
+                          id="dine_name"
+                          value={dineInName}
+                          onChange={(e) => setDineInName(e.target.value)}
+                          placeholder="Juan"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="dine_instructions">Instrucciones Especiales / Special Instructions</Label>
+                        <Textarea
+                          id="dine_instructions"
+                          value={customerInfo.special_instructions}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, special_instructions: e.target.value })}
+                          placeholder="Sin cebolla, extra queso... / No onions, extra cheese..."
+                          rows={2}
+                        />
+                      </div>
+
+                      {/* Order Summary */}
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                        <h3 className="font-bold mb-2">Tu Pedido / Your Order</h3>
+                        {cart.map((item, idx) => {
+                          const extrasTotal = (item.extras || []).reduce((sum, extra) => sum + extra.price, 0);
+                          const itemTotal = (item.price + extrasTotal) * item.quantity;
+                          return (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span>{item.quantity}x {item.name}</span>
+                              <span className="font-semibold">${itemTotal.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="border-t pt-2 flex justify-between font-bold text-lg">
+                          <span>Total:</span>
+                          <span className="text-orange-600">${getSubtotal().toFixed(2)} MXN</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={createOrder.isPending}
+                        className="w-full bg-orange-600 hover:bg-orange-700 text-lg py-6"
+                      >
+                        {createOrder.isPending ? "Enviando... / Sending..." : "✓ Confirmar Pedido / Confirm Order"}
+                      </Button>
+                    </form>
+                  </motion.div>
+                )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => setStep("menu")}
+                  className="w-full"
+                >
+                  ← Volver al Menú / Back to Menu
+                </Button>
               </CardContent>
             </Card>
           </motion.div>
@@ -1065,11 +1213,11 @@ export default function CustomerOrder() {
                       Limpiar / Clear
                     </Button>
                     <Button
-                      onClick={() => setStep("checkout")}
+                      onClick={() => setStep("orderType")}
                       className="flex-1 md:flex-initial bg-orange-700 hover:bg-orange-800 gap-2"
                     >
                       Proceder al Pago / Checkout
-                      <span className="font-bold">${getTotal().toFixed(2)}</span>
+                      <span className="font-bold">${getSubtotal().toFixed(2)}</span>
                     </Button>
                   </div>
                 </div>
