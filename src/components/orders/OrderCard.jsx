@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Clock, Package, Truck, User, Phone, MapPin, Printer, Trash2 } from "lucide-react";
+import { Clock, Package, Truck, User, Phone, MapPin, Printer, Trash2, Banknote, CreditCard } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const statusConfig = {
   pending: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", label: "Pending" },
@@ -28,6 +34,12 @@ const orderTypeIcons = {
 
 export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDelete, onCompleteOrder }) {
   const Icon = orderTypeIcons[order.order_type] || Package;
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+
+  const handleCompleteWithPayment = (paymentMethod) => {
+    onCompleteOrder(order, paymentMethod);
+    setShowPaymentDialog(false);
+  };
 
   return (
     <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
@@ -129,7 +141,7 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
           <div className="lg:w-64 space-y-3">
             {order.status !== 'delivered' && order.status !== 'cancelled' && (
               <Button
-                onClick={() => onCompleteOrder(order)}
+                onClick={() => setShowPaymentDialog(true)}
                 className="w-full gap-2 bg-green-600 hover:bg-green-700"
               >
                 ✓ Completar Pedido / Complete Order
@@ -172,6 +184,38 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
           </div>
         </div>
       </CardContent>
+
+      {/* Payment Method Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Cómo pagó el cliente? / How did the customer pay?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-4">
+            <Button
+              onClick={() => handleCompleteWithPayment('cash')}
+              className="w-full h-16 text-lg gap-3 bg-green-600 hover:bg-green-700"
+            >
+              <Banknote className="w-6 h-6" />
+              💵 Efectivo / Cash
+            </Button>
+            <Button
+              onClick={() => handleCompleteWithPayment('card')}
+              className="w-full h-16 text-lg gap-3 bg-blue-600 hover:bg-blue-700"
+            >
+              <CreditCard className="w-6 h-6" />
+              💳 Tarjeta / Card
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentDialog(false)}
+              className="w-full"
+            >
+              Cancelar / Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
