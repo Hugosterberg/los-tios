@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit } from "lucide-react";
+import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit, Receipt, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,6 +39,28 @@ export default function CompanyAccount() {
     is_active: true,
     notes: "",
   });
+
+  // Expense form state
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState("all");
+  const [expenseForm, setExpenseForm] = useState({
+    name: "",
+    category: "ingredients",
+    amount: 0,
+    quantity: 1,
+    unit: "units",
+    is_recurring: false,
+    recurring_frequency: "monthly",
+    date: new Date().toISOString().split('T')[0],
+    notes: "",
+    supplier: "",
+    payment_source: "company_cash",
+    paid_by_company: false,
+    from_shopping_list: false,
+    contributors: [],
+  });
+  const [contributorInput, setContributorInput] = useState({ name: "", amount: 0 });
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['companyTransactions'],
@@ -96,6 +118,29 @@ export default function CompanyAccount() {
     mutationFn: (id) => base44.entities.Contributor.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
+    },
+  });
+
+  const createExpense = useMutation({
+    mutationFn: (data) => base44.entities.Expense.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      resetExpenseForm();
+    },
+  });
+
+  const updateExpense = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Expense.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      resetExpenseForm();
+    },
+  });
+
+  const deleteExpense = useMutation({
+    mutationFn: (id) => base44.entities.Expense.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
     },
   });
 
@@ -219,6 +264,107 @@ export default function CompanyAccount() {
     setShowContributorForm(false);
   };
 
+  // Expense categories and units
+  const expenseCategories = [
+    { id: "all", name: "Todos / All", color: "bg-gray-100 text-gray-800", icon: "📋" },
+    { id: "ingredients", name: "Ingredientes", color: "bg-green-100 text-green-800", icon: "🥗" },
+    { id: "rent", name: "Renta", color: "bg-blue-100 text-blue-800", icon: "🏠" },
+    { id: "utilities", name: "Servicios", color: "bg-yellow-100 text-yellow-800", icon: "💡" },
+    { id: "salaries", name: "Salarios", color: "bg-purple-100 text-purple-800", icon: "👥" },
+    { id: "equipment", name: "Equipo", color: "bg-orange-100 text-orange-800", icon: "🔧" },
+    { id: "marketing", name: "Marketing", color: "bg-pink-100 text-pink-800", icon: "📢" },
+    { id: "other", name: "Otros", color: "bg-gray-100 text-gray-800", icon: "📦" },
+  ];
+
+  const expenseUnits = [
+    { value: "kg", label: "Kg" },
+    { value: "g", label: "g" },
+    { value: "l", label: "L" },
+    { value: "ml", label: "ml" },
+    { value: "units", label: "Unidades" },
+    { value: "pieces", label: "Piezas" },
+    { value: "months", label: "Meses" },
+    { value: "other", label: "Otro" },
+  ];
+
+  const filteredExpenses = selectedExpenseCategory === "all"
+    ? expenses
+    : expenses.filter(e => e.category === selectedExpenseCategory);
+
+  const totalExpensesFiltered = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const recurringExpenses = filteredExpenses.filter(e => e.is_recurring);
+  const monthlyRecurring = recurringExpenses
+    .filter(e => e.recurring_frequency === "monthly")
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  const handleExpenseSubmit = (e) => {
+    e.preventDefault();
+    const submitData = {
+      ...expenseForm,
+      paid_by_company: expenseForm.payment_source === 'company_cash' || expenseForm.payment_source === 'company_account'
+    };
+    if (editingExpense) {
+      updateExpense.mutate({ id: editingExpense.id, data: submitData });
+    } else {
+      createExpense.mutate(submitData);
+    }
+  };
+
+  const handleEditExpense = (expense) => {
+    setEditingExpense(expense);
+    setExpenseForm({
+      ...expense,
+      contributors: expense.contributors || [],
+      payment_source: expense.payment_source || 'company_cash',
+    });
+    setShowExpenseForm(true);
+  };
+
+  const handleDeleteExpense = (id) => {
+    if (confirm('¿Eliminar este gasto? / Delete this expense?')) {
+      deleteExpense.mutate(id);
+    }
+  };
+
+  const addExpenseContributor = () => {
+    if (contributorInput.name && contributorInput.amount > 0) {
+      setExpenseForm({
+        ...expenseForm,
+        contributors: [...(expenseForm.contributors || []), { ...contributorInput }]
+      });
+      setContributorInput({ name: "", amount: 0 });
+    }
+  };
+
+  const removeExpenseContributor = (index) => {
+    setExpenseForm({
+      ...expenseForm,
+      contributors: expenseForm.contributors.filter((_, i) => i !== index)
+    });
+  };
+
+  const resetExpenseForm = () => {
+    setExpenseForm({
+      name: "",
+      category: "ingredients",
+      amount: 0,
+      quantity: 1,
+      unit: "units",
+      is_recurring: false,
+      recurring_frequency: "monthly",
+      date: new Date().toISOString().split('T')[0],
+      notes: "",
+      supplier: "",
+      payment_source: "company_cash",
+      paid_by_company: false,
+      from_shopping_list: false,
+      contributors: [],
+    });
+    setContributorInput({ name: "", amount: 0 });
+    setEditingExpense(null);
+    setShowExpenseForm(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
@@ -340,11 +486,321 @@ export default function CompanyAccount() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="transactions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="transactions">Transacciones / Transactions</TabsTrigger>
-            <TabsTrigger value="contributors">Contribuyentes / Contributors</TabsTrigger>
+        <Tabs defaultValue="expenses" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="expenses">Gastos / Expenses</TabsTrigger>
+            <TabsTrigger value="transactions">Transacciones</TabsTrigger>
+            <TabsTrigger value="contributors">Contribuyentes</TabsTrigger>
           </TabsList>
+
+          {/* Expenses Tab */}
+          <TabsContent value="expenses" className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between gap-4">
+              <div className="flex gap-2 overflow-x-auto pb-2 flex-1">
+                {expenseCategories.map((cat) => (
+                  <Button
+                    key={cat.id}
+                    variant={selectedExpenseCategory === cat.id ? "default" : "outline"}
+                    onClick={() => setSelectedExpenseCategory(cat.id)}
+                    className={`flex items-center gap-2 whitespace-nowrap ${
+                      selectedExpenseCategory === cat.id ? 'bg-red-600 hover:bg-red-700' : ''
+                    }`}
+                    size="sm"
+                  >
+                    <span>{cat.icon}</span>
+                    {cat.name}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                onClick={() => setShowExpenseForm(!showExpenseForm)}
+                className="bg-red-600 hover:bg-red-700 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Nuevo Gasto
+              </Button>
+            </div>
+
+            {/* Expense Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-0 shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                    <TrendingDown className="w-4 h-4" />
+                    Total Gastos
+                  </div>
+                  <div className="text-2xl font-bold text-red-600">${totalExpensesFiltered.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                    <CalendarIcon className="w-4 h-4" />
+                    Recurrentes Mensuales
+                  </div>
+                  <div className="text-2xl font-bold text-orange-600">${monthlyRecurring.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow">
+                <CardContent className="pt-6">
+                  <div className="text-sm text-gray-600 mb-1">Total Recurrentes</div>
+                  <div className="text-2xl font-bold text-purple-600">{recurringExpenses.length}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Expense Form */}
+            {showExpenseForm && (
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle>{editingExpense ? 'Editar Gasto' : 'Nuevo Gasto'}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleExpenseSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="exp_name">Nombre *</Label>
+                          <Input
+                            id="exp_name"
+                            required
+                            value={expenseForm.name}
+                            onChange={(e) => setExpenseForm({ ...expenseForm, name: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Categoría *</Label>
+                          <Select
+                            value={expenseForm.category}
+                            onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v })}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {expenseCategories.filter(c => c.id !== "all").map(cat => (
+                                <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Monto (MXN) *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required
+                            value={expenseForm.amount}
+                            onChange={(e) => setExpenseForm({ ...expenseForm, amount: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Fecha *</Label>
+                          <Input
+                            type="date"
+                            required
+                            value={expenseForm.date}
+                            onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cantidad</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={expenseForm.quantity}
+                            onChange={(e) => setExpenseForm({ ...expenseForm, quantity: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Unidad</Label>
+                          <Select
+                            value={expenseForm.unit}
+                            onValueChange={(v) => setExpenseForm({ ...expenseForm, unit: v })}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {expenseUnits.map(u => (
+                                <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Proveedor</Label>
+                          <Input
+                            value={expenseForm.supplier}
+                            onChange={(e) => setExpenseForm({ ...expenseForm, supplier: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="exp_recurring"
+                              checked={expenseForm.is_recurring}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, is_recurring: e.target.checked })}
+                              className="w-4 h-4"
+                            />
+                            <Label htmlFor="exp_recurring" className="cursor-pointer">Recurrente</Label>
+                          </div>
+                          {expenseForm.is_recurring && (
+                            <Select
+                              value={expenseForm.recurring_frequency}
+                              onValueChange={(v) => setExpenseForm({ ...expenseForm, recurring_frequency: v })}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">Diario</SelectItem>
+                                <SelectItem value="weekly">Semanal</SelectItem>
+                                <SelectItem value="monthly">Mensual</SelectItem>
+                                <SelectItem value="yearly">Anual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payment Source */}
+                      <div className="space-y-2">
+                        <Label>Fuente de Pago *</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'company_cash', label: '💵 Efectivo', sublabel: 'Empresa' },
+                            { id: 'company_account', label: '🏦 Cuenta', sublabel: 'Empresa' },
+                            { id: 'individual', label: '👤 Individual', sublabel: 'Persona' },
+                          ].map(ps => (
+                            <button
+                              key={ps.id}
+                              type="button"
+                              onClick={() => setExpenseForm({ ...expenseForm, payment_source: ps.id, contributors: ps.id !== 'individual' ? [] : expenseForm.contributors })}
+                              className={`p-3 border-2 rounded-lg text-center transition-all ${
+                                expenseForm.payment_source === ps.id ? 'border-red-600 bg-red-50' : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                            >
+                              <div className="font-semibold text-sm">{ps.label}</div>
+                              <div className="text-xs text-gray-500">{ps.sublabel}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {expenseForm.payment_source === 'individual' && (
+                        <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
+                          <Label>Contribuyentes Individuales</Label>
+                          <div className="flex gap-2">
+                            <Select
+                              value={contributorInput.name}
+                              onValueChange={(v) => setContributorInput({ ...contributorInput, name: v })}
+                            >
+                              <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                              <SelectContent>
+                                {contributors.map(c => (
+                                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              placeholder="Monto"
+                              value={contributorInput.amount}
+                              onChange={(e) => setContributorInput({ ...contributorInput, amount: parseFloat(e.target.value) })}
+                              className="w-24"
+                            />
+                            <Button type="button" onClick={addExpenseContributor} variant="outline" size="sm">
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          {expenseForm.contributors?.length > 0 && (
+                            <div className="space-y-1 mt-2">
+                              {expenseForm.contributors.map((c, i) => (
+                                <div key={i} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
+                                  <span>{c.name}: ${c.amount?.toFixed(2)}</span>
+                                  <Button type="button" size="icon" variant="ghost" onClick={() => removeExpenseContributor(i)} className="h-6 w-6">
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label>Notas</Label>
+                        <Textarea
+                          value={expenseForm.notes}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
+                          rows={2}
+                        />
+                      </div>
+
+                      <div className="flex gap-3 justify-end">
+                        <Button type="button" variant="outline" onClick={resetExpenseForm}>Cancelar</Button>
+                        <Button type="submit" disabled={createExpense.isPending || updateExpense.isPending} className="bg-red-600 hover:bg-red-700">
+                          {editingExpense ? 'Actualizar' : 'Guardar'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Expenses List */}
+            <div className="space-y-3">
+              {filteredExpenses.length > 0 ? (
+                filteredExpenses.map((expense) => {
+                  const cat = expenseCategories.find(c => c.id === expense.category) || expenseCategories[expenseCategories.length - 1];
+                  return (
+                    <Card key={expense.id} className="border-0 shadow hover:shadow-lg transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1">
+                            <span className="text-xl">{cat.icon}</span>
+                            <div className="flex-1">
+                              <h3 className="font-semibold">{expense.name}</h3>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                <Badge className={cat.color} variant="secondary">{cat.name}</Badge>
+                                {expense.is_recurring && <Badge variant="outline">🔄 Recurrente</Badge>}
+                                <Badge variant="outline">{format(new Date(expense.date), 'dd MMM', { locale: es })}</Badge>
+                                {expense.payment_source && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {expense.payment_source === 'company_cash' ? '💵' : expense.payment_source === 'company_account' ? '🏦' : '👤'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className="text-xl font-bold text-red-600">${expense.amount?.toFixed(2)}</div>
+                              <p className="text-xs text-gray-500">{expense.quantity} {expense.unit}</p>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => handleEditExpense(expense)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="text-red-600" onClick={() => handleDeleteExpense(expense.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card className="border-0 shadow">
+                  <CardContent className="text-center py-12">
+                    <Receipt className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-500">No hay gastos registrados</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
 
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="space-y-6">

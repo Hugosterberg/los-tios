@@ -1,10 +1,9 @@
-
-import React from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Added import for Button
-import { DollarSign, ShoppingBag, Calendar, TrendingUp, Package, Clock, CheckCircle, Globe } from "lucide-react"; // Added Globe icon
+import { DollarSign, ShoppingBag, Calendar, TrendingUp, Package, Clock, CheckCircle, Globe, Plus, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -22,7 +21,13 @@ const createPageUrl = (pageName) => {
   }
 };
 
+import ReservationList from "../components/reservations/ReservationList";
+import ReservationForm from "../components/reservations/ReservationForm";
+
 export default function Dashboard() {
+  const [showReservationForm, setShowReservationForm] = useState(false);
+  const queryClient = useQueryClient();
+
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
     queryFn: () => base44.entities.Order.list('-created_date'),
@@ -37,6 +42,23 @@ export default function Dashboard() {
     queryKey: ['menuItems'],
     queryFn: () => base44.entities.MenuItem.list(),
   });
+
+  const createReservation = useMutation({
+    mutationFn: (data) => base44.entities.Reservation.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      setShowReservationForm(false);
+    },
+  });
+
+  const updateReservation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Reservation.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    },
+  });
+
+  const todayReservations = reservations.filter(r => r.date === new Date().toISOString().split('T')[0]);
 
   // Calculate statistics
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
@@ -260,7 +282,7 @@ export default function Dashboard() {
         </div>
 
         {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Popular Items */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
@@ -315,6 +337,38 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Reservations Section */}
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-6 h-6 text-purple-600" />
+              <h2 className="text-2xl font-bold">Reservaciones</h2>
+              <span className="text-sm text-gray-500">({todayReservations.length} hoy)</span>
+            </div>
+            <Button
+              onClick={() => setShowReservationForm(!showReservationForm)}
+              className="bg-purple-600 hover:bg-purple-700 gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Reservación
+            </Button>
+          </div>
+
+          {showReservationForm && (
+            <ReservationForm
+              onSubmit={(data) => createReservation.mutate(data)}
+              onCancel={() => setShowReservationForm(false)}
+              isLoading={createReservation.isPending}
+            />
+          )}
+
+          <ReservationList
+            reservations={reservations}
+            isLoading={false}
+            onUpdateStatus={(id, status) => updateReservation.mutate({ id, data: { status } })}
+          />
         </div>
       </div>
     </div>
