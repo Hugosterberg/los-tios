@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Plus, Trash2, Edit, Check, AlertTriangle, Calendar, ArrowRight } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, Edit, Check, AlertTriangle, Calendar, ArrowRight, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -19,6 +20,11 @@ export default function ShoppingList() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("pending");
   const queryClient = useQueryClient();
+
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [purchasingItem, setPurchasingItem] = useState(null);
+  const [purchaseActualCost, setPurchaseActualCost] = useState("");
+  const [purchasePaymentSource, setPurchasePaymentSource] = useState("");
 
   const [formData, setFormData] = useState({
     item_name: "",
@@ -128,31 +134,21 @@ export default function ShoppingList() {
     }
   };
 
-  const markAsPurchased = async (item) => {
-    const actualCostInput = prompt(
-      `Ingrese el costo real pagado (opcional)\nEnter actual cost paid (optional):\n\nEstimado / Estimated: $${(item.estimated_cost || 0).toFixed(2)} MXN`,
-      item.estimated_cost || ''
-    );
+  const openPurchaseDialog = (item) => {
+    setPurchasingItem(item);
+    setPurchaseActualCost(item.estimated_cost?.toString() || "");
+    setPurchasePaymentSource("");
+    setPurchaseDialogOpen(true);
+  };
 
-    if (actualCostInput === null) return; // User cancelled
+  const confirmPurchase = async () => {
+    if (!purchasePaymentSource) {
+      alert('Selecciona un método de pago / Select a payment method');
+      return;
+    }
 
-    const actualCost = actualCostInput !== '' ? parseFloat(actualCostInput) : 0;
-
-    // Ask for payment method
-    const paymentMethod = prompt(
-      '¿Cómo se pagó? / How was it paid?\n\n1 = Efectivo Empresa / Company Cash\n2 = Cuenta Empresa / Company Account\n3 = Persona Individual / Individual\n\nIngrese 1, 2 o 3:',
-      '1'
-    );
-
-    if (paymentMethod === null) return; // User cancelled
-
-    const paymentSourceMap = {
-      '1': 'company_cash',
-      '2': 'company_account',
-      '3': 'individual'
-    };
-
-    const paymentSource = paymentSourceMap[paymentMethod] || 'company_cash';
+    const item = purchasingItem;
+    const actualCost = purchaseActualCost !== '' ? parseFloat(purchaseActualCost) : 0;
 
     let updateData = {
       ...item,
@@ -162,13 +158,11 @@ export default function ShoppingList() {
     };
 
     try {
-      // Update shopping list item
       await updateItem.mutateAsync({
         id: item.id,
         data: updateData
       });
 
-      // Map shopping list category to expense category
       const categoryMap = {
         'ingredients': 'ingredients',
         'supplies': 'other',
@@ -186,22 +180,22 @@ export default function ShoppingList() {
         date: new Date().toISOString().split('T')[0],
         supplier: item.supplier || '',
         notes: item.notes || '',
-        payment_source: paymentSource,
-        paid_by_company: paymentSource === 'company_cash' || paymentSource === 'company_account',
+        payment_source: purchasePaymentSource,
+        paid_by_company: purchasePaymentSource === 'company_cash' || purchasePaymentSource === 'company_account',
         from_shopping_list: true,
         shopping_list_id: item.id,
       };
 
       const createdExpense = await createExpense.mutateAsync(expenseData);
 
-      // Update shopping list item to mark as converted
       updateData = { ...updateData, converted_to_expense: true, expense_id: createdExpense.id };
       await updateItem.mutateAsync({
         id: item.id,
         data: updateData
       });
 
-      alert('✓ Producto marcado como comprado y gasto creado / Item marked as purchased and expense created');
+      setPurchaseDialogOpen(false);
+      setPurchasingItem(null);
     } catch (error) {
       console.error("Error:", error);
       alert('Error al procesar / Error processing');
@@ -649,7 +643,7 @@ export default function ShoppingList() {
                             {item.status === 'pending' ? (
                               <Button
                                 size="sm"
-                                onClick={() => markAsPurchased(item)}
+                                onClick={() => openPurchaseDialog(item)}
                                 className="bg-green-600 hover:bg-green-700 gap-2"
                               >
                                 <Check className="w-4 h-4" />
@@ -713,6 +707,110 @@ export default function ShoppingList() {
           )}
         </div>
       </div>
+
+      {/* Purchase Dialog */}
+      <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Marcar como Comprado / Mark as Purchased</DialogTitle>
+          </DialogHeader>
+          
+          {purchasingItem && (
+            <div className="space-y-6">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="font-bold text-lg">{purchasingItem.item_name}</h3>
+                <p className="text-sm text-gray-600">
+                  {purchasingItem.quantity} {purchasingItem.unit} • 
+                  Estimado: ${(purchasingItem.estimated_cost || 0).toFixed(2)} MXN
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Costo Real Pagado / Actual Cost Paid (MXN)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={purchaseActualCost}
+                  onChange={(e) => setPurchaseActualCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>¿Cómo se pagó? / How was it paid? *</Label>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurchasePaymentSource('company_cash')}
+                    className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
+                      purchasePaymentSource === 'company_cash'
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className="text-2xl">💵</span>
+                    <div>
+                      <p className="font-semibold">Efectivo Empresa</p>
+                      <p className="text-xs text-gray-600">Company Cash</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPurchasePaymentSource('company_account')}
+                    className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
+                      purchasePaymentSource === 'company_account'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className="text-2xl">🏦</span>
+                    <div>
+                      <p className="font-semibold">Cuenta Empresa</p>
+                      <p className="text-xs text-gray-600">Company Account</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPurchasePaymentSource('individual')}
+                    className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
+                      purchasePaymentSource === 'individual'
+                        ? 'border-purple-600 bg-purple-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className="text-2xl">👤</span>
+                    <div>
+                      <p className="font-semibold">Persona Individual</p>
+                      <p className="text-xs text-gray-600">Individual Person</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setPurchaseDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={confirmPurchase}
+                  disabled={!purchasePaymentSource || updateItem.isPending || createExpense.isPending}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
