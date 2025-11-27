@@ -1199,7 +1199,7 @@ export default function CustomerOrder() {
                     <ShoppingCart className="w-6 h-6 text-orange-700" />
                     <div>
                       <p className="font-bold text-lg">{cart.length} productos / items</p>
-                      <p className="text-sm text-gray-600">Total: <span className="font-bold text-orange-700">${getTotal().toFixed(2)} MXN</span></p>
+                      <p className="text-sm text-gray-600">Total: <span className="font-bold text-orange-700">${getSubtotal().toFixed(2)} MXN</span></p>
                     </div>
                   </div>
                   
