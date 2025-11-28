@@ -231,6 +231,13 @@ export default function CompanyAccount() {
     };
   });
 
+  // Calculate Balance Equalization (who owes whom relative to equal contribution)
+  const equityHolders = contributorTotals.filter(c => 
+    c.is_active && (c.role === 'partner' || c.role === 'owner' || c.role === 'investor')
+  );
+  const totalEquityNet = equityHolders.reduce((sum, c) => sum + c.net_contribution, 0);
+  const averageEquityNet = equityHolders.length > 0 ? totalEquityNet / equityHolders.length : 0;
+
   const handleTransactionSubmit = (e) => {
     e.preventDefault();
     if (editingTransaction) {
@@ -1207,6 +1214,62 @@ export default function CompanyAccount() {
                   </CardContent>
                 </Card>
               </motion.div>
+            )}
+
+            {/* Balance Equalization Card */}
+            {equityHolders.length > 1 && (
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-indigo-50 to-blue-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-indigo-600" />
+                    Balance entre Socios / Partners Balance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 p-4 bg-white/60 rounded-lg">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                      <span className="text-gray-600">Contribución Neta Total / Total Net:</span>
+                      <span className="font-bold">${totalEquityNet.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Promedio por Socio / Average per Partner:</span>
+                      <span className="font-bold text-indigo-600">${averageEquityNet.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {equityHolders.map(holder => {
+                      const diff = holder.net_contribution - averageEquityNet;
+                      const isAbove = diff >= 0;
+                      return (
+                        <div key={holder.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isAbove ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {holder.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{holder.name}</p>
+                              <p className="text-xs text-gray-500">
+                                Net: ${holder.net_contribution.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-bold text-sm ${isAbove ? 'text-green-600' : 'text-red-600'}`}>
+                              {isAbove ? '+' : ''}{diff.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {isAbove ? 'A favor / Credit' : 'Debe / Owes'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Contributors List */}
