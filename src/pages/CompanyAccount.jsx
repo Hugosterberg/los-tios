@@ -479,24 +479,12 @@ export default function CompanyAccount() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600">Ventas en Efectivo</p>
-                <p className="text-xl font-bold text-green-600">+${cashFromOrders.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">{orders.filter(o => o.payment_method === 'cash' && o.status === 'delivered').length} pedidos</p>
+            <div className="flex flex-col items-center justify-center py-8">
+              <p className="text-lg text-gray-600 mb-2">Total Efectivo Disponible / Total Available Cash</p>
+              <div className={`text-6xl font-bold ${availableCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${availableCash.toFixed(2)}
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600">Contribuciones Efectivo</p>
-                <p className="text-xl font-bold text-blue-600">+${cashContributions.toFixed(2)}</p>
-              </div>
-              <div className="p-4 bg-orange-50 rounded-lg">
-                <p className="text-sm text-gray-600">Retiros Efectivo</p>
-                <p className="text-xl font-bold text-orange-600">-${cashWithdrawals.toFixed(2)}</p>
-              </div>
-              <div className="p-4 bg-red-50 rounded-lg">
-                <p className="text-sm text-gray-600">Gastos en Efectivo</p>
-                <p className="text-xl font-bold text-red-600">-${expensesFromCompanyCash.toFixed(2)}</p>
-              </div>
+              <p className="text-sm text-gray-500 mt-2">MXN</p>
             </div>
           </CardContent>
         </Card>
