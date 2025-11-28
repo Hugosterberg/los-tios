@@ -171,6 +171,11 @@ export default function CompanyAccount() {
     .filter(o => o.payment_method === 'cash' && o.status === 'delivered')
     .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
+  // Card/Online from customer orders (delivered/confirmed orders paid in card)
+  const cardFromOrders = orders
+    .filter(o => o.payment_method === 'card' && (o.status === 'delivered' || o.payment_status === 'confirmed' || o.payment_status === 'paid'))
+    .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
   // Cash contributions to the company
   const cashContributions = transactions
     .filter(t => t.type === 'contribution' && t.payment_method === 'cash')
@@ -181,11 +186,22 @@ export default function CompanyAccount() {
     .filter(t => t.type === 'withdrawal' && t.payment_method === 'cash')
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
+  // Bank contributions (not cash)
+  const bankContributions = transactions
+    .filter(t => t.type === 'contribution' && t.payment_method !== 'cash')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+  // Bank withdrawals (not cash)
+  const bankWithdrawals = transactions
+    .filter(t => t.type === 'withdrawal' && t.payment_method !== 'cash')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
   // Available company cash = cash from orders + cash contributions - cash withdrawals - expenses paid with cash
   const availableCash = cashFromOrders + cashContributions - cashWithdrawals - expensesFromCompanyCash;
 
-  // Company total balance (all sources)
-  const companyBalance = totalContributions - totalWithdrawals - companyExpenses + cashFromOrders;
+  // Bank Account Balance = Bank contributions + Card Sales - Bank Withdrawals - Expenses paid with Account
+  // This separates the "Balance" (Bank) from "Cash" as requested
+  const companyBalance = bankContributions + cardFromOrders - bankWithdrawals - expensesFromCompanyAccount;
 
   // Update contributor totals
   const contributorTotals = contributors.map(contributor => {
@@ -386,14 +402,14 @@ export default function CompanyAccount() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                Balance Total
+                Saldo en Cuenta / Account Balance
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`text-3xl font-bold ${companyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${companyBalance.toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">MXN total empresa</p>
+              <p className="text-xs text-gray-500 mt-1">MXN en banco / in bank</p>
             </CardContent>
           </Card>
 
