@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function CompanyAccount() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [showContributorForm, setShowContributorForm] = useState(false);
   const [editingContributor, setEditingContributor] = useState(null);
   const queryClient = useQueryClient();
@@ -84,6 +85,15 @@ export default function CompanyAccount() {
 
   const createTransaction = useMutation({
     mutationFn: (data) => base44.entities.CompanyTransaction.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['contributors'] });
+      resetTransactionForm();
+    },
+  });
+
+  const updateTransaction = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.CompanyTransaction.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
@@ -223,7 +233,26 @@ export default function CompanyAccount() {
 
   const handleTransactionSubmit = (e) => {
     e.preventDefault();
-    createTransaction.mutate(transactionForm);
+    if (editingTransaction) {
+      updateTransaction.mutate({ id: editingTransaction.id, data: transactionForm });
+    } else {
+      createTransaction.mutate(transactionForm);
+    }
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setTransactionForm({
+      type: transaction.type,
+      contributor_name: transaction.contributor_name,
+      amount: transaction.amount,
+      date: transaction.date,
+      payment_method: transaction.payment_method,
+      description: transaction.description || "",
+      notes: transaction.notes || "",
+      reference_number: transaction.reference_number || "",
+    });
+    setShowTransactionForm(true);
   };
 
   const handleContributorSubmit = (e) => {
@@ -264,6 +293,7 @@ export default function CompanyAccount() {
       notes: "",
       reference_number: "",
     });
+    setEditingTransaction(null);
     setShowTransactionForm(false);
   };
 
@@ -823,7 +853,9 @@ export default function CompanyAccount() {
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
                 <Card className="border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle className="text-2xl">Nueva Transacción / New Transaction</CardTitle>
+                    <CardTitle className="text-2xl">
+                      {editingTransaction ? 'Editar Transacción / Edit Transaction' : 'Nueva Transacción / New Transaction'}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleTransactionSubmit} className="space-y-6">
@@ -965,8 +997,8 @@ export default function CompanyAccount() {
                         <Button type="button" variant="outline" onClick={resetTransactionForm}>
                           Cancelar / Cancel
                         </Button>
-                        <Button type="submit" disabled={createTransaction.isPending} className="bg-red-600 hover:bg-red-700">
-                          Guardar / Save
+                        <Button type="submit" disabled={createTransaction.isPending || updateTransaction.isPending} className="bg-red-600 hover:bg-red-700">
+                          {editingTransaction ? 'Actualizar / Update' : 'Guardar / Save'}
                         </Button>
                       </div>
                     </form>
@@ -1029,14 +1061,23 @@ export default function CompanyAccount() {
                             }`}>
                               {transaction.type === 'contribution' ? '+' : '-'}${transaction.amount?.toFixed(2)}
                             </div>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="text-red-600 hover:bg-red-50"
-                              onClick={() => handleDeleteTransaction(transaction.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleEditTransaction(transaction)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="text-red-600 hover:bg-red-50"
+                                onClick={() => handleDeleteTransaction(transaction.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
