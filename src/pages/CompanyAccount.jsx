@@ -890,21 +890,44 @@ export default function CompanyAccount() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="payment_method">Método / Method *</Label>
-                          <Select
-                            value={transactionForm.payment_method}
-                            onValueChange={(value) => setTransactionForm({ ...transactionForm, payment_method: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cash">Efectivo / Cash</SelectItem>
-                              <SelectItem value="transfer">Transferencia / Transfer</SelectItem>
-                              <SelectItem value="check">Cheque / Check</SelectItem>
-                              <SelectItem value="other">Otro / Other</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Label>
+                            {transactionForm.type === 'contribution' 
+                              ? 'Destino del Dinero / Money Destination *' 
+                              : 'Origen del Dinero / Money Source *'}
+                          </Label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <button
+                              type="button"
+                              onClick={() => setTransactionForm({ ...transactionForm, payment_method: 'cash' })}
+                              className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
+                                transactionForm.payment_method === 'cash'
+                                  ? 'border-green-600 bg-green-50'
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                            >
+                              <span className="text-2xl">💵</span>
+                              <div>
+                                <p className="font-semibold">Efectivo / Cash</p>
+                                <p className="text-xs text-gray-600">Caja Chica / Petty Cash</p>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setTransactionForm({ ...transactionForm, payment_method: 'transfer' })}
+                              className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
+                                transactionForm.payment_method === 'transfer'
+                                  ? 'border-blue-600 bg-blue-50'
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                            >
+                              <span className="text-2xl">🏦</span>
+                              <div>
+                                <p className="font-semibold">Banco / Bank</p>
+                                <p className="text-xs text-gray-600">Cuenta / Account</p>
+                              </div>
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-2">
