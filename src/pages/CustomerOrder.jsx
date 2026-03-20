@@ -1381,11 +1381,11 @@ export default function CustomerOrder() {
               <p className="text-gray-300 leading-relaxed text-sm">
                 The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className="text-yellow-400 font-semibold">welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🥂 Welcome drink</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍕 Pizza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍺 Beer deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🎶 Great music</span>
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🥂 Welcome drink</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍕 Pizza deals</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍺 Beer deals</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🎶 Great music</span>
               </div>
               <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
