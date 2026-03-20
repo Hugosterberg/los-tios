@@ -92,8 +92,8 @@ export default function Layout({ children, currentPageName }) {
                     item.highlight 
                       ? 'highlight-link' 
                       : location.pathname === item.url
-                        ? 'text-orange-700 bg-orange-50 active'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'text-yellow-400 bg-yellow-400/10 active'
+                        : 'text-gray-300 hover:bg-white/10'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
