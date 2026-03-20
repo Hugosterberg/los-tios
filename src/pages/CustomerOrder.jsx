@@ -1427,6 +1427,29 @@ export default function CustomerOrder() {
           <p className="font-semibold mb-3">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
           <p className="text-sm font-medium mb-1">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax.</p>
           <p className="text-sm font-bold mb-6">PLAZA MONTE ALBÁN</p>
+
+          {/* Google Maps */}
+          <div className="mb-6 rounded-2xl overflow-hidden w-full max-w-lg mx-auto shadow-lg">
+            <a href="https://www.google.com/maps/search/los+tios+puerto+escondido" target="_blank" rel="noopener noreferrer">
+              <iframe
+                title="Los Tios location"
+                width="100%"
+                height="220"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                src="https://www.google.com/maps/embed/v1/place?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax."
+              />
+            </a>
+            <a
+              href="https://www.google.com/maps/search/los+tios+puerto+escondido"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-[#1a1a1a] text-yellow-400 text-xs font-bold py-2 text-center hover:bg-black/80 transition-colors"
+            >
+              📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. →
+            </a>
+          </div>
           
           {/* Social Media Links */}
           <div className="flex justify-center items-center gap-4">
