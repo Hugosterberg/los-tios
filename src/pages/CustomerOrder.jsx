@@ -1285,14 +1285,14 @@ export default function CustomerOrder() {
       </AnimatePresence>
 
       {/* Footer */}
-      <div className="bg-[#111111] border-t border-yellow-500/30 text-white py-8 mt-16">
+      <div className="bg-yellow-400 text-[#1a1a1a] py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <img 
             src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
             alt="Los Tíos"
-            className="w-28 h-28 mx-auto mb-4 object-contain"
+            className="w-28 h-28 mx-auto mb-4 object-contain rounded-2xl"
           />
-          <p className="text-gray-400">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
+          <p className="font-semibold">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
         </div>
       </div>
     </div>
