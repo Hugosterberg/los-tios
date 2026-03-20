@@ -1061,9 +1061,8 @@ export default function CustomerOrder() {
                               </div>
                             )}
                             
-                            {item.preparation_time && (
-                              <p className="text-xs text-gray-500 mb-4">🕐 {item.preparation_time} min</p>
-                            )}
+                            {/* ADD TO CART BUTTON - uncomment below to re-enable ordering */}
+                            {/* 
                             <Button
                               onClick={() => addToCart(item)}
                               className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2"
@@ -1071,6 +1070,7 @@ export default function CustomerOrder() {
                               <Plus className="w-4 h-4" />
                               Agregar al Carrito / Add to Cart
                             </Button>
+                            */}
                           </CardContent>
                         </Card>
                       </motion.div>
