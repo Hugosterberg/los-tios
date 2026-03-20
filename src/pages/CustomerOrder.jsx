@@ -30,6 +30,7 @@ export default function CustomerOrder() {
   const [showIngredientDialog, setShowIngredientDialog] = useState(false);
   const [removedIngredients, setRemovedIngredients] = useState([]);
   const [selectedExtras, setSelectedExtras] = useState([]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const { data: menuItems = [], isLoading } = useQuery({
     queryKey: ['menuItems'],
