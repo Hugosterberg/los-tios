@@ -1371,10 +1371,9 @@ export default function CustomerOrder() {
                   { emoji: "🍺", line1: "Cerveza", line2: "deals" },
                   { emoji: "🎶", line1: "Buena", line2: "música" },
                 ].map(({ emoji, line1, line2 }) => (
-                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-0.5">
-                    <span className="text-xs">{line1}</span>
-                    <span className="text-2xl leading-none">{emoji}</span>
-                    <span className="text-xs">{line2}</span>
+                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1">
+                    <span className="text-base leading-none">{emoji}</span>
+                    <span className="text-xs text-center">{line1} {line2}</span>
                   </div>
                 ))}
               </div>
@@ -1396,10 +1395,9 @@ export default function CustomerOrder() {
                   { emoji: "🍺", line1: "Beer", line2: "deals" },
                   { emoji: "🎶", line1: "Great", line2: "music" },
                 ].map(({ emoji, line1, line2 }) => (
-                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-0.5">
-                    <span className="text-xs">{line1}</span>
-                    <span className="text-2xl leading-none">{emoji}</span>
-                    <span className="text-xs">{line2}</span>
+                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1">
+                    <span className="text-base leading-none">{emoji}</span>
+                    <span className="text-xs text-center">{line1} {line2}</span>
                   </div>
                 ))}
               </div>
