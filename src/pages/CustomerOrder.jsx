@@ -954,11 +954,13 @@ export default function CustomerOrder() {
             <div className="max-w-7xl mx-auto px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <img 
-                    src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
-                    alt="Los Tíos"
-                    className="w-20 h-20 object-contain rounded-2xl"
-                  />
+                  <a href="#top">
+                    <img 
+                      src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
+                      alt="Los Tíos"
+                      className="w-20 h-20 object-contain rounded-2xl"
+                    />
+                  </a>
                 </div>
                 {/* Desktop nav */}
                 <div className="hidden md:flex items-center gap-4">
