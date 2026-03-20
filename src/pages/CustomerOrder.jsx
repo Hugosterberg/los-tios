@@ -949,17 +949,17 @@ export default function CustomerOrder() {
   return (
     <div className="min-h-screen bg-[#1a1a1a] pb-24">
       {/* Header */}
-          <div className="bg-[#111111] text-white py-4 sticky top-0 z-40 shadow-lg border-b-2 border-yellow-500">
+          <div className="bg-yellow-400 py-4 sticky top-0 z-40 shadow-lg">
             <div className="max-w-7xl mx-auto px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <img 
                     src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                     alt="Los Tíos"
-                    className="w-20 h-20 object-contain"
+                    className="w-20 h-20 object-contain rounded-2xl"
                   />
                 </div>
-                <p className="text-yellow-400 text-sm font-medium">Ordena en Línea / Order Online</p>
+                <p className="text-[#1a1a1a] text-sm font-bold">Ordena en Línea / Order Online</p>
               </div>
             </div>
           </div>
