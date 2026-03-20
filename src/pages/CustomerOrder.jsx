@@ -1285,15 +1285,14 @@ export default function CustomerOrder() {
       </AnimatePresence>
 
       {/* Footer */}
-      <div className="bg-gradient-to-r from-orange-900 to-amber-900 text-white py-8 mt-16">
+      <div className="bg-[#111111] border-t border-yellow-500/30 text-white py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <img 
-            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68f44a82bc5054123405c7af/f68a8ed25_WhatsAppImage2025-11-24at173910_c8e4a4d0.jpg" 
+            src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
             alt="Los Tíos"
-            className="w-20 h-20 mx-auto mb-4 rounded-xl object-cover"
+            className="w-28 h-28 mx-auto mb-4 object-contain"
           />
-          <h3 className="text-2xl font-bold mb-2">{appSettings.restaurant_name}</h3>
-          <p className="text-amber-200">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
+          <p className="text-gray-400">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
         </div>
       </div>
     </div>
