@@ -1438,7 +1438,7 @@ export default function CustomerOrder() {
                 style={{ border: 0 }}
                 loading="lazy"
                 allowFullScreen
-                src="https://www.google.com/maps/embed/v1/place?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax."
+                src="https://maps.google.com/maps?q=Los+Tios+Puerto+Escondido+Av+Oaxaca+305&output=embed"
               />
             </a>
             <a
