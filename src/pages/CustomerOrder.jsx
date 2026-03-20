@@ -1041,7 +1041,7 @@ export default function CustomerOrder() {
 
               return (
                 <div key={category.id}>
-                  <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 text-yellow-400">
+                  <h2 className={`text-3xl font-bold mb-6 flex items-center gap-3 text-yellow-400 ${category.id === 'mains' ? 'justify-center' : ''}`}>
                         <span>{category.emoji}</span>
                         {category.name}
                       </h2>
