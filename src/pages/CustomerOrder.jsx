@@ -1314,7 +1314,9 @@ export default function CustomerOrder() {
             alt="Los Tíos"
             className="w-28 h-28 mx-auto mb-4 object-contain rounded-2xl"
           />
-          <p className="font-semibold mb-6">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
+          <p className="font-semibold mb-3">Pizzas auténticas hechas con amor / Authentic pizzas made with love</p>
+          <p className="text-sm font-medium mb-1">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax.</p>
+          <p className="text-sm font-bold mb-6">PLAZA MONTE ALBÁN</p>
           
           {/* Social Media Links */}
           <div className="flex justify-center items-center gap-4">
