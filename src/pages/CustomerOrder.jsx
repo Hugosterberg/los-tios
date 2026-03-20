@@ -979,20 +979,20 @@ export default function CustomerOrder() {
 
               return (
                 <div key={category.id}>
-                  <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                    <span>{category.emoji}</span>
-                    {category.name}
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {items.map((item) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.03 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Card className="overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-shadow">
+                  <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 text-yellow-400">
+                        <span>{category.emoji}</span>
+                        {category.name}
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {items.map((item) => (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.03 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                             <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424]">
                           <div className="relative h-48">
                             <img
                               src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
