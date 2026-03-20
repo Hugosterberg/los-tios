@@ -28,8 +28,8 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-gray-50">
       <style>{`
         :root {
-          --primary-600: #C2410C;
-          --primary-700: #9A3412;
+          --primary-600: #F5C400;
+          --primary-700: #D4A900;
         }
 
         .nav-link {
@@ -55,13 +55,14 @@ export default function Layout({ children, currentPageName }) {
         }
 
         .highlight-link {
-          background: linear-gradient(135deg, #C2410C 0%, #9A3412 100%);
-          color: white !important;
+          background: linear-gradient(135deg, #F5C400 0%, #D4A900 100%);
+          color: #1a1a1a !important;
+          font-weight: 600;
         }
 
         .highlight-link:hover {
-          background: linear-gradient(135deg, #9A3412 0%, #7C2D12 100%);
-          color: white !important;
+          background: linear-gradient(135deg, #D4A900 0%, #b89000 100%);
+          color: #1a1a1a !important;
         }
       `}</style>
 
