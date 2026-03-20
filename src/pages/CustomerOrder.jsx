@@ -959,7 +959,7 @@ export default function CustomerOrder() {
                     className="w-20 h-20 object-contain rounded-2xl"
                   />
                 </div>
-                <p className="text-[#1a1a1a] text-sm font-bold">Ordena en Línea / Order Online</p>
+                <a href="#menu" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Ordena en Línea / Order Online</a>
               </div>
             </div>
           </div>
