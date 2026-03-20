@@ -967,21 +967,21 @@ export default function CustomerOrder() {
       {/* Hero Banner */}
       <div className="bg-[#111111] py-12 px-4 text-center border-b border-yellow-500/20">
         <div className="max-w-3xl mx-auto space-y-6">
-          {/* English */}
+          {/* Spanish */}
           <div>
-            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-2">🇺🇸 EN</p>
-            <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
-              HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
-            </h2>
-            <p className="text-gray-400 mt-2 text-lg">Made by 4 friends who met while traveling · Served with great vibes</p>
-          </div>
-
-          <div className="border-t border-yellow-500/30 pt-6">
             <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-2">🇲🇽 ES</p>
             <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
               ¿HAMBRE? PRUEBA LA MEJOR PIZZA DE PUERTO ESCONDIDO
             </h2>
             <p className="text-gray-400 mt-2 text-lg">Hecha por 4 amigos que se conocieron viajando · Servida con muy buena vibra</p>
+          </div>
+
+          <div className="border-t border-yellow-500/30 pt-6">
+            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-2">🇺🇸 EN</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
+              HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
+            </h2>
+            <p className="text-gray-400 mt-2 text-lg">Made by 4 friends who met while traveling · Served with great vibes</p>
           </div>
         </div>
       </div>
