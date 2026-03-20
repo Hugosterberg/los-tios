@@ -1443,7 +1443,7 @@ export default function CustomerOrder() {
           <p className="text-sm font-bold mb-6">PLAZA MONTE ALBÁN</p>
 
           {/* Google Maps */}
-          <div className="mb-6 rounded-2xl overflow-hidden w-full max-w-lg mx-auto shadow-lg">
+          <div className="mb-6 rounded-2xl overflow-hidden w-full max-w-lg mx-auto shadow-lg border-[3px] border-black">
             <a href="https://www.google.com/maps/search/los+tios+puerto+escondido" target="_blank" rel="noopener noreferrer">
               <iframe
                 title="Los Tios location"
