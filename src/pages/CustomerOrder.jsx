@@ -947,22 +947,19 @@ export default function CustomerOrder() {
 
   // Menu Screen (Main)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 pb-24">
+    <div className="min-h-screen bg-[#1a1a1a] pb-24">
       {/* Header */}
-          <div className="bg-gradient-to-r from-amber-100 to-orange-100 text-gray-900 py-6 sticky top-0 z-40 shadow-lg border-b-4 border-orange-700">
+          <div className="bg-[#111111] text-white py-4 sticky top-0 z-40 shadow-lg border-b-2 border-yellow-500">
             <div className="max-w-7xl mx-auto px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <img 
-                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68f44a82bc5054123405c7af/f68a8ed25_WhatsAppImage2025-11-24at173910_c8e4a4d0.jpg" 
+                    src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                     alt="Los Tíos"
-                    className="w-16 h-16 rounded-xl object-cover shadow-md"
+                    className="w-20 h-20 object-contain"
                   />
-                  <div>
-                    <h1 className="text-3xl font-bold text-orange-800">{appSettings.restaurant_name}</h1>
-                    <p className="text-orange-600">Ordena en Línea / Order Online</p>
-                  </div>
                 </div>
+                <p className="text-yellow-400 text-sm font-medium">Ordena en Línea / Order Online</p>
               </div>
             </div>
           </div>
