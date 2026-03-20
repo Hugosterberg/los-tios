@@ -948,7 +948,7 @@ export default function CustomerOrder() {
 
   // Menu Screen (Main)
   return (
-    <div className="min-h-screen bg-[#1a1a1a] pb-24">
+    <div id="top" className="min-h-screen bg-[#1a1a1a] pb-24">
       {/* Header */}
           <div className="bg-yellow-400 py-4 sticky top-0 z-40 shadow-lg">
             <div className="max-w-7xl mx-auto px-4">
