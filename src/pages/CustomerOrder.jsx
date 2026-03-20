@@ -1034,7 +1034,7 @@ export default function CustomerOrder() {
                             )}
                             <Button
                               onClick={() => addToCart(item)}
-                              className="w-full bg-orange-700 hover:bg-orange-800 gap-2"
+                              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2"
                             >
                               <Plus className="w-4 h-4" />
                               Agregar al Carrito / Add to Cart
