@@ -1390,10 +1390,18 @@ export default function CustomerOrder() {
                 The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className="text-yellow-400 font-semibold">welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
               </p>
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🥂 Welcome drink</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍕 Pizza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍺 Beer deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🎶 Great music</span>
+                {[
+                  { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                  { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                  { emoji: "🍺", line1: "Beer", line2: "deals" },
+                  { emoji: "🎶", line1: "Great", line2: "music" },
+                ].map(({ emoji, line1, line2 }) => (
+                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-0.5">
+                    <span className="text-xs">{line1}</span>
+                    <span className="text-2xl leading-none">{emoji}</span>
+                    <span className="text-xs">{line2}</span>
+                  </div>
+                ))}
               </div>
               <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
