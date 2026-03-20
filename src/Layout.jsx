@@ -67,18 +67,18 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
 
       {/* Top Bar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-[#1a1a1a] border-b border-yellow-500/30 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
                 <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68f44a82bc5054123405c7af/f68a8ed25_WhatsAppImage2025-11-24at173910_c8e4a4d0.jpg" 
+                  src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                   alt="Los Tíos"
-                  className="w-12 h-12 rounded-xl object-cover"
+                  className="w-12 h-12 rounded-xl object-contain bg-[#1a1a1a]"
                 />
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Los Tíos</h1>
-                  <p className="text-xs text-gray-500">Sistema de Gestión</p>
+                  <h1 className="text-xl font-bold text-yellow-400">Los Tíos</h1>
+                  <p className="text-xs text-gray-400">Sistema de Gestión</p>
                 </div>
               </div>
 
