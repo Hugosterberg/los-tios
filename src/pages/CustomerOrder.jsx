@@ -1350,7 +1350,7 @@ export default function CustomerOrder() {
       </AnimatePresence>
 
       {/* Eventos */}
-      <div id="eventos" className="bg-[#1a1a1a] border-t border-yellow-500/20 py-16 px-4">
+      <div id="eventos" className="bg-[#1a1a1a] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center mb-10">
             <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
