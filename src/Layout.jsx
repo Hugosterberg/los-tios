@@ -127,7 +127,7 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white">
+          <div className="md:hidden border-t border-yellow-500/30 bg-[#1a1a1a]">
             <nav className="px-4 py-4 space-y-2">
               {navItems.map((item) => (
                 <Link
@@ -137,8 +137,8 @@ export default function Layout({ children, currentPageName }) {
                     item.highlight
                       ? 'highlight-link'
                       : location.pathname === item.url
-                        ? 'text-orange-700 bg-orange-50'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'text-yellow-400 bg-yellow-400/10'
+                        : 'text-gray-300 hover:bg-white/10'
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
