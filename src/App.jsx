@@ -20,6 +20,18 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const location = window.location;
+  const isCustomerPage = location.pathname === '/';
+
+  // Always render customer page without auth
+  if (isCustomerPage) {
+    return (
+      <Routes>
+        <Route path="/" element={<CustomerOrder />} />
+        <Route path="*" element={<CustomerOrder />} />
+      </Routes>
+    );
+  }
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -35,19 +47,18 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
       navigateToLogin();
       return null;
     }
   }
 
-  // Render the main app
+  // Render admin pages
   return (
     <Routes>
       {/* Customer-facing page - no admin layout */}
       <Route path="/" element={<CustomerOrder />} />
 
-      {/* Admin pages - with layout, accessible via /admin prefix or direct page name */}
+      {/* Admin pages - with layout */}
       <Route path="/admin" element={
         <LayoutWrapper currentPageName="Dashboard">
           {Pages["Dashboard"] ? React.createElement(Pages["Dashboard"]) : <></>}
