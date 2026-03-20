@@ -1412,7 +1412,10 @@ export default function CustomerOrder() {
       {/* Sobre nosotros */}
       <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-black text-yellow-400 text-center mb-10">Sobre nosotros / About us</h2>
+          <div className="flex flex-col items-center mb-10">
+            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Sobre nosotros</h2>
+            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide mt-2">About us</h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Spanish */}
             <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
