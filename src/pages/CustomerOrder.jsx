@@ -1364,11 +1364,11 @@ export default function CustomerOrder() {
               <p className="text-gray-300 leading-relaxed text-sm">
                 ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className="text-yellow-400 font-semibold">bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🥂 Welcome drink</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍕 Pizza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍺 Cerveza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🎶 Buena música</span>
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🥂 Welcome drink</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍕 Pizza deals</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍺 Cerveza deals</span>
+                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🎶 Buena música</span>
               </div>
               <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
