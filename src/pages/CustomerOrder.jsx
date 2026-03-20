@@ -1008,16 +1008,16 @@ export default function CustomerOrder() {
                           <CardContent className="p-6">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
-                                <h3 className="font-bold text-xl">{item.name}</h3>
+                                <h3 className="font-bold text-xl text-white">{item.name}</h3>
                                 {item.name_en && (
-                                  <p className="text-sm text-gray-600 italic">{item.name_en}</p>
+                                  <p className="text-sm text-gray-400 italic">{item.name_en}</p>
                                 )}
                               </div>
-                              <span className="text-2xl font-bold text-red-600 ml-2">${item.price?.toFixed(2)}</span>
+                              <span className="text-2xl font-bold text-yellow-400 ml-2">${item.price?.toFixed(2)}</span>
                             </div>
-                            
+
                             {item.description && (
-                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{item.description}</p>
+                              <p className="text-gray-400 text-sm mb-2 line-clamp-2">{item.description}</p>
                             )}
                             {item.description_en && (
                               <p className="text-gray-500 text-xs mb-4 line-clamp-2 italic">{item.description_en}</p>
