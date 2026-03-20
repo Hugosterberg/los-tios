@@ -1370,6 +1370,7 @@ export default function CustomerOrder() {
                 <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍺 Cerveza deals</span>
                 <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🎶 Buena música</span>
               </div>
+              <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
             {/* English */}
             <div className="bg-[#242424] rounded-2xl p-6 border border-yellow-500/30 relative overflow-hidden">
@@ -1386,6 +1387,7 @@ export default function CustomerOrder() {
                 <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🍺 Beer deals</span>
                 <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full">🎶 Great music</span>
               </div>
+              <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
           </div>
         </div>
