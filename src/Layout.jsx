@@ -107,7 +107,7 @@ export default function Layout({ children, currentPageName }) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="hidden md:flex items-center gap-2"
+                className="hidden md:flex items-center gap-2 text-gray-300 hover:text-white hover:bg-white/10"
               >
                 <LogOut className="w-4 h-4" />
                 Cerrar Sesión
