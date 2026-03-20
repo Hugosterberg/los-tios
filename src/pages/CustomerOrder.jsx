@@ -1024,6 +1024,7 @@ export default function CustomerOrder() {
               HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
             </h2>
             <p className="text-gray-400 mt-2 text-lg">Made by 4 uncles who met while traveling · Served with great vibes</p>
+            <p className="text-yellow-400/60 mt-1 text-xs font-bold tracking-widest uppercase">4 UNCLES WITH ROOTS IN MEXICO, FRANCE, SWEDEN & ITALY.</p>
           </div>
         </div>
       </div>
