@@ -974,17 +974,15 @@ export default function CustomerOrder() {
                   </a>
                 </div>
 
-                {/* Mobile hamburger using logo */}
+                {/* Mobile hamburger */}
                 <div className="md:hidden relative">
                   <button
                     onClick={() => setMobileNavOpen(prev => !prev)}
-                    className="focus:outline-none"
+                    className="flex flex-col justify-center items-center w-10 h-10 gap-1.5 bg-black/10 hover:bg-black/20 rounded-xl transition-colors focus:outline-none"
                   >
-                    <img
-                      src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png"
-                      alt="Menu"
-                      className="w-12 h-12 rounded-xl object-contain bg-[#1a1a1a]"
-                    />
+                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
+                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? 'opacity-0' : ''}`}></span>
+                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
                   </button>
                   {mobileNavOpen && (
                     <div className="absolute right-0 top-14 bg-yellow-400 rounded-2xl shadow-xl p-4 flex flex-col gap-2 min-w-[180px] z-50">
