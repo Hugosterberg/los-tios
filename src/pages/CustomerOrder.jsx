@@ -1309,8 +1309,31 @@ export default function CustomerOrder() {
         )}
       </AnimatePresence>
 
+      {/* Sobre nosotros */}
+      <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-black text-yellow-400 text-center mb-10">Sobre nosotros / About us</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Spanish */}
+            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
+              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">🇲🇽 Español</p>
+              <p className="text-gray-300 leading-relaxed">
+                Los Tios es un vibrante restaurante de pizza en Puerto Escondido que sirve deliciosas pizzas estilo napolitano en un relajado ambiente playero. Fundado por cuatro amigos con raíces en México, Francia, Italia y Suecia que se conocieron en México, Los Tios reúne inspiración internacional y la energía tranquila de Puerto Escondido. Si buscas una pizza deliciosa, buenas vibras y un lugar acogedor para pasar el rato, Los Tios es el lugar.
+              </p>
+            </div>
+            {/* English */}
+            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
+              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">🇺🇸 English</p>
+              <p className="text-gray-300 leading-relaxed">
+                Los Tios is a vibrant pizza spot in Puerto Escondido serving delicious Neapolitan-style pizza in a relaxed beach atmosphere. Founded by four friends with roots in Mexico, France, Italy and Sweden who met in Mexico, Los Tios brings together international inspiration and the laid-back energy of Puerto Escondido. If you're looking for great pizza, good vibes and a welcoming place to hang out, Los Tios is the spot.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Footer */}
-      <div className="bg-yellow-400 text-[#1a1a1a] py-8 mt-16">
+      <div className="bg-yellow-400 text-[#1a1a1a] py-8 mt-0">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <img 
             src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
