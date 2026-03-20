@@ -1189,14 +1189,14 @@ export default function CustomerOrder() {
             exit={{ opacity: 0, y: 100 }}
             className="fixed bottom-0 left-0 right-0 z-50"
           >
-            <div className="bg-white border-t-4 border-orange-700 shadow-2xl">
+            <div className="bg-[#111111] border-t-4 border-yellow-500 shadow-2xl">
               <div className="max-w-7xl mx-auto px-4 py-4">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-4 w-full md:w-auto">
-                    <ShoppingCart className="w-6 h-6 text-orange-700" />
+                    <ShoppingCart className="w-6 h-6 text-yellow-400" />
                     <div>
-                      <p className="font-bold text-lg">{cart.length} productos / items</p>
-                      <p className="text-sm text-gray-600">Total: <span className="font-bold text-orange-700">${getSubtotal().toFixed(2)} MXN</span></p>
+                      <p className="font-bold text-lg text-white">{cart.length} productos / items</p>
+                      <p className="text-sm text-gray-400">Total: <span className="font-bold text-yellow-400">${getSubtotal().toFixed(2)} MXN</span></p>
                     </div>
                   </div>
                   
