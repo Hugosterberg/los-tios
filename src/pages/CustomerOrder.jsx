@@ -1211,7 +1211,7 @@ export default function CustomerOrder() {
                     </Button>
                     <Button
                       onClick={() => setStep("orderType")}
-                      className="flex-1 md:flex-initial bg-orange-700 hover:bg-orange-800 gap-2"
+                      className="flex-1 md:flex-initial bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2"
                     >
                       Proceder al Pago / Checkout
                       <span className="font-bold">${getSubtotal().toFixed(2)}</span>
