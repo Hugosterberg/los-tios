@@ -64,6 +64,7 @@ const AuthenticatedApp = () => {
           {Pages["Dashboard"] ? React.createElement(Pages["Dashboard"]) : <></>}
         </LayoutWrapper>
       } />
+      <Route path="/CustomerOrder" element={<CustomerOrder />} />
       {Object.entries(Pages).map(([path, Page]) => (
         path !== "CustomerOrder" && (
           <Route
