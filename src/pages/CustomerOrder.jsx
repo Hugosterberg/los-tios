@@ -983,7 +983,8 @@ export default function CustomerOrder() {
             <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
               ¿HAMBRE? PRUEBA LA MEJOR PIZZA DE PUERTO ESCONDIDO
             </h2>
-            <p className="text-gray-400 mt-2 text-lg">Hecha por 4 amigos que se conocieron viajando · Servida con muy buena vibra</p>
+            <p className="text-gray-400 mt-2 text-lg">Hecha por 4 tios que se conocieron viajando · Servida con muy buena vibra</p>
+            <p className="text-yellow-400/60 mt-1 text-xs font-bold tracking-widest uppercase">4 TIOS CON RAÍCES EN MÉXICO, FRANCIA, SUECIA E ITALIA.</p>
           </div>
 
           <div className="border-t border-yellow-500/30 pt-6">
@@ -991,7 +992,7 @@ export default function CustomerOrder() {
             <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
               HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
             </h2>
-            <p className="text-gray-400 mt-2 text-lg">Made by 4 friends who met while traveling · Served with great vibes</p>
+            <p className="text-gray-400 mt-2 text-lg">Made by 4 uncles who met while traveling · Served with great vibes</p>
           </div>
         </div>
       </div>
