@@ -964,7 +964,7 @@ export default function CustomerOrder() {
             </div>
           </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div id="menu" className="max-w-7xl mx-auto px-4 py-8">
         {/* Menu */}
         {isLoading ? (
           <div className="text-center py-20">
