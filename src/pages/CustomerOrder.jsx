@@ -60,11 +60,11 @@ export default function CustomerOrder() {
   const availableItems = menuItems.filter(item => item.is_available);
 
   const categories = [
-    { id: "specials", name: "Especiales del Día", emoji: "⭐" },
-    { id: "appetizers", name: "Entradas", emoji: "🥗" },
-    { id: "mains", name: "Pizzas y Platos Fuertes", emoji: "🍕" },
-    { id: "desserts", name: "Postres", emoji: "🍰" },
-    { id: "beverages", name: "Bebidas", emoji: "🥤" },
+    { id: "specials", name: "ESPECIALES DEL DÍA", emoji: "⭐" },
+    { id: "appetizers", name: "ENTRADAS", emoji: "🥗" },
+    { id: "mains", name: "PIZZAS Y PLATOS FUERTES", emoji: "" },
+    { id: "desserts", name: "POSTRES", emoji: "🍰" },
+    { id: "beverages", name: "BEBIDAS", emoji: "🥤" },
   ];
 
   const openIngredientDialog = (item) => {
