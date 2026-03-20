@@ -1365,10 +1365,18 @@ export default function CustomerOrder() {
                 ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className="text-yellow-400 font-semibold">bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
               </p>
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🥂 Welcome drink</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍕 Pizza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🍺 Cerveza deals</span>
-                <span className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-2 rounded-full text-center">🎶 Buena música</span>
+                {[
+                  { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                  { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                  { emoji: "🍺", line1: "Cerveza", line2: "deals" },
+                  { emoji: "🎶", line1: "Buena", line2: "música" },
+                ].map(({ emoji, line1, line2 }) => (
+                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-0.5">
+                    <span className="text-xs">{line1}</span>
+                    <span className="text-2xl leading-none">{emoji}</span>
+                    <span className="text-xs">{line2}</span>
+                  </div>
+                ))}
               </div>
               <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
