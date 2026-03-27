@@ -1420,30 +1420,34 @@ export default function CustomerOrder() {
               </div>
 
               {/* Event suggestion CTA */}
-              <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed">
+              <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
+                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
                     🎉 <span className="text-yellow-400 font-bold">¿Tienes una idea para un evento con nosotros?</span><br/>
                     Tenemos posibilidad de servir pizza tanto en el restaurante como en otros lugares.
                   </p>
-                  <a
-                    href="mailto:info@lostios.mx?subject=Propuesta de evento&body=Hola equipo de Los Tios, me gustaría proponer un evento..."
-                    className="inline-flex items-center gap-2 self-start px-4 py-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-sm font-bold transition-colors"
-                  >
-                    ✉️ Contáctanos
-                  </a>
+                  <div>
+                    <a
+                      href="mailto:info@lostios.mx?subject=Propuesta de evento&body=Hola equipo de Los Tios, me gustaría proponer un evento..."
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-sm font-bold transition-colors"
+                    >
+                      ✉️ Contáctanos
+                    </a>
+                  </div>
                 </div>
-                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed">
+                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
+                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
                     🎉 <span className="text-yellow-400 font-bold">Do you have an idea for an event with us?</span><br/>
                     We can serve pizza both at the restaurant and at other locations.
                   </p>
-                  <a
-                    href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
-                    className="inline-flex items-center gap-2 self-start px-4 py-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-sm font-bold transition-colors"
-                  >
-                    ✉️ Contact us
-                  </a>
+                  <div>
+                    <a
+                      href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-sm font-bold transition-colors"
+                    >
+                      ✉️ Contact us
+                    </a>
+                  </div>
                 </div>
               </div>
 
