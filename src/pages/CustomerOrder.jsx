@@ -1688,7 +1688,6 @@ export default function CustomerOrder() {
           </div>
         </div>
       </div>
-      </div>
     </div>
   );
 }
