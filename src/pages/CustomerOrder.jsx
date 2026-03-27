@@ -1364,13 +1364,10 @@ export default function CustomerOrder() {
                 {/* Spanish */}
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   {isPast && (
-                    <div className="absolute inset-0 bg-[#1a1a1a]/60 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl">
-                      <div className="bg-black/70 backdrop-blur-sm px-5 py-3 rounded-2xl flex flex-col items-center gap-1">
-                        <span className="text-gray-300 text-xs font-bold tracking-widest uppercase">Evento pasado</span>
-                        <div className="flex items-center gap-2 text-gray-200 font-black text-lg">
-                          <span>👥</span>
-                          <span>+{attendees} personas asistieron</span>
-                        </div>
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                        <span className="text-xs">👥</span>
+                        <span className="text-gray-300 text-xs font-semibold">+{attendees} asistieron</span>
                       </div>
                     </div>
                   )}
@@ -1400,13 +1397,10 @@ export default function CustomerOrder() {
                 {/* English */}
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   {isPast && (
-                    <div className="absolute inset-0 bg-[#1a1a1a]/60 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl">
-                      <div className="bg-black/70 backdrop-blur-sm px-5 py-3 rounded-2xl flex flex-col items-center gap-1">
-                        <span className="text-gray-300 text-xs font-bold tracking-widest uppercase">Past event</span>
-                        <div className="flex items-center gap-2 text-gray-200 font-black text-lg">
-                          <span>👥</span>
-                          <span>+{attendees} people attended</span>
-                        </div>
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                        <span className="text-xs">👥</span>
+                        <span className="text-gray-300 text-xs font-semibold">+{attendees} attended</span>
                       </div>
                     </div>
                   )}
