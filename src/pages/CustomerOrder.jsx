@@ -1434,16 +1434,6 @@ export default function CustomerOrder() {
                     >
                       ✉️ Contáctanos
                     </a>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
-                        alert('Link copiado ✓');
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-gray-700/50 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copiar link
-                    </button>
                   </div>
                 </div>
                 <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
@@ -1459,16 +1449,6 @@ export default function CustomerOrder() {
                     >
                       ✉️ Contact us
                     </a>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
-                        alert('Link copied ✓');
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-gray-700/50 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy link
-                    </button>
                   </div>
                 </div>
               </div>
