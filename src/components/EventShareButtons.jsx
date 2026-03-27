@@ -26,6 +26,14 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
     });
   };
 
+  const handleInstagramStory = () => {
+    // Copy to clipboard first
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      // Open Instagram app/web
+      window.open('https://instagram.com/', '_blank');
+    });
+  };
+
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
       <div className="flex flex-wrap gap-2 items-center">
@@ -55,6 +63,16 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
               {lang === "en" ? "Copy link" : "Copiar link"}
             </>
           )}
+        </button>
+
+        <button
+          onClick={handleInstagramStory}
+          className="inline-flex items-center justify-center gap-1.5 px-3 h-7 rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-80 text-white text-[10px] font-semibold transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="block w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/>
+          </svg>
+          {lang === "en" ? "Story" : "Story"}
         </button>
       </div>
     </div>
