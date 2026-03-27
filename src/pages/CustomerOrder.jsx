@@ -1363,17 +1363,11 @@ export default function CustomerOrder() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Spanish */}
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
-                  {isPast && (
-                    <div className="absolute top-3 left-3 z-10">
-                      <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                        <span className="text-xs">👥</span>
-                        <span className="text-gray-300 text-xs font-semibold">+{attendees} asistieron</span>
-                      </div>
-                    </div>
-                  )}
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
                   <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? 'text-gray-500' : 'text-yellow-400'}`}>🇲🇽 Español</p>
-                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>DE MARZO · 4 PM HASTA TARDE</p>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>DE MARZO · 4 PM HASTA TARDE
+                    {isPast && <span className="ml-3 inline-flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full text-gray-400 normal-case tracking-normal font-semibold">👥 +{attendees} asistieron</span>}
+                  </p>
                   <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Cumpleaños del Chef<br/>& Apertura del Restaurante</h3>
                   <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
                     ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
@@ -1396,17 +1390,11 @@ export default function CustomerOrder() {
 
                 {/* English */}
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
-                  {isPast && (
-                    <div className="absolute top-3 left-3 z-10">
-                      <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                        <span className="text-xs">👥</span>
-                        <span className="text-gray-300 text-xs font-semibold">+{attendees} attended</span>
-                      </div>
-                    </div>
-                  )}
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
                   <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? 'text-gray-500' : 'text-yellow-400'}`}>🇺🇸 English</p>
-                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>MARCH · 4 PM TILL LATE</p>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>MARCH · 4 PM TILL LATE
+                    {isPast && <span className="ml-3 inline-flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full text-gray-400 normal-case tracking-normal font-semibold">👥 +{attendees} attended</span>}
+                  </p>
                   <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Chef's Birthday<br/>& Restaurant Opening</h3>
                   <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
                     The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
