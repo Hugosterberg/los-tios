@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 const iconClass = "block w-4 h-4";
 
-export default function EventShareButtons({ title, text, url }) {
+export default function EventShareButtons({ title, text, url, lang = "es" }) {
   const [copied, setCopied] = useState(false);
   const shareUrl = url || window.location.href;
   const shareText = encodeURIComponent(`${title} - ${text}`);
@@ -60,7 +60,7 @@ export default function EventShareButtons({ title, text, url }) {
 
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
-      <p className="text-xs text-gray-500 mb-2 font-semibold tracking-widest uppercase">Compartir / Share</p>
+      <p className="text-xs text-gray-500 mb-2 font-semibold tracking-widest uppercase">{lang === "en" ? "Share" : "Compartir"}</p>
       <div className="flex flex-wrap gap-2 items-center">
         {links.map((link) => (
           <a
@@ -86,7 +86,7 @@ export default function EventShareButtons({ title, text, url }) {
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
-              Copiar link
+              {lang === "en" ? "Share link" : "Copiar link"}
             </>
           )}
         </button>

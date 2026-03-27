@@ -1415,7 +1415,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="⚽ Football Night at Los Tios – March 28" text="Come watch the match, fresh pizza, cold beers & mezcal shots!" />
+                  <EventShareButtons title="⚽ Football Night at Los Tios – March 28" text="Come watch the match, fresh pizza, cold beers & mezcal shots!" lang="en" />
                 </div>
               </div>
 
@@ -1482,7 +1482,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" />
+                  <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" lang="en" />
                 </div>
               </div>
             </div>
