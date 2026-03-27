@@ -9,7 +9,7 @@ export default function EventShareButtons({ title, text, url }) {
   const links = [
     {
       label: "WhatsApp",
-      color: "bg-[#25D366] hover:bg-[#1da851]",
+      color: "bg-[#25D366]/30 hover:bg-[#25D366]/50 border border-[#25D366]/40",
       href: `https://wa.me/?text=${shareText}%20${shareUrlEncoded}`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="white">
@@ -19,7 +19,7 @@ export default function EventShareButtons({ title, text, url }) {
     },
     {
       label: "Facebook",
-      color: "bg-[#1877F2] hover:bg-[#1060c9]",
+      color: "bg-[#1877F2]/30 hover:bg-[#1877F2]/50 border border-[#1877F2]/40",
       href: `https://www.facebook.com/sharer/sharer.php?u=${shareUrlEncoded}`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="white">
@@ -29,7 +29,7 @@ export default function EventShareButtons({ title, text, url }) {
     },
     {
       label: "X / Twitter",
-      color: "bg-[#000000] hover:bg-[#333]",
+      color: "bg-white/10 hover:bg-white/20 border border-white/20",
       href: `https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrlEncoded}`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="white">
@@ -39,7 +39,7 @@ export default function EventShareButtons({ title, text, url }) {
     },
     {
       label: "Instagram",
-      color: "bg-gradient-to-br from-[#f09433] via-[#e6683c] to-[#bc1888] hover:opacity-90",
+      color: "bg-[#bc1888]/30 hover:bg-[#bc1888]/50 border border-[#bc1888]/40",
       href: `https://www.instagram.com/lostios.pxm`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="white">
@@ -67,21 +67,21 @@ export default function EventShareButtons({ title, text, url }) {
             target="_blank"
             rel="noopener noreferrer"
             title={link.label}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white transition-all ${link.color}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold text-white/70 transition-all ${link.color}`}
           >
-            {link.icon}
+            <span className="w-3 h-3 flex-shrink-0">{link.icon}</span>
             {link.label}
           </a>
         ))}
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gray-700 hover:bg-gray-600 text-white transition-all"
+          className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-white/10 hover:bg-white/20 border border-white/20 text-white/60 transition-all"
         >
           {copied ? (
             <>✓ Copiado!</>
           ) : (
             <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
