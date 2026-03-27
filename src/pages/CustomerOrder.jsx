@@ -1423,8 +1423,9 @@ export default function CustomerOrder() {
               <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                 <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
                   <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    🎉 <span className="text-yellow-400 font-bold">¿Tienes una idea para un evento con nosotros?</span><br/>
-                    Tenemos posibilidad de servir pizza tanto en el restaurante como en otros lugares.
+                    🎉 <span className="text-yellow-400 font-bold">¿Tienes una idea para un evento con nosotros?</span><br/><br/>
+                    En nuestro restaurante en Centro, Puerto Escondido, contamos con nuestro horno híbrido de gas y leña — una inversión seria para una pizza seria.<br/><br/>
+                    Bajo nuestra marca <span className="text-yellow-400 font-semibold">Los Tios Express</span> también podemos llevar hornos de pizza portátiles a casi cualquier lugar, con un resultado casi igual de increíble. ¡La masa es tan importante como el horno!
                   </p>
                   <div>
                     <a
@@ -1437,8 +1438,9 @@ export default function CustomerOrder() {
                 </div>
                 <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
                   <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    🎉 <span className="text-yellow-400 font-bold">Do you have an idea for an event with us?</span><br/>
-                    We can serve pizza both at the restaurant and at other locations.
+                    🎉 <span className="text-yellow-400 font-bold">Do you have an idea for an event with us?</span><br/><br/>
+                    At our restaurant in Centro, Puerto Escondido, we have our well-invested hybrid wood and gas oven — a serious investment for serious pizza.<br/><br/>
+                    Under our brand <span className="text-yellow-400 font-semibold">Los Tios Express</span> we can also bring portable pizza ovens almost anywhere, delivering results that are nearly just as incredible. The dough matters just as much as the oven!
                   </p>
                   <div>
                     <a
