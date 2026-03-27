@@ -1356,10 +1356,63 @@ export default function CustomerOrder() {
             <div className="max-w-5xl mx-auto">
               <div className="flex flex-col items-center mb-10">
                 <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
-                <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">
-                  {isPast ? "Eventos pasados 📸" : "Lo que viene 🔥"}
-                </p>
+                <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">Lo que viene 🔥</p>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Football Night - Spanish */}
+                <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#242424] border-yellow-500/30">
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-3xl px-4 py-2 rounded-bl-2xl leading-none">4 PM</div>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">🇲🇽 Español</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">PRÓXIMAMENTE · 4 PM HASTA TARDE</p>
+                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Noche de Fútbol en Los Tios<br/>🍕🍺</h3>
+                  <p className="leading-relaxed text-sm text-gray-300">
+                    ¡Se arma el ambiente en Los Tios! Ven a disfrutar el partido con nosotros en una noche llena de fútbol, buena vibra y pura fiesta. Tendremos pizzas recién hechas, cervezas bien frías y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el ánimo. Cada jugada se vive mejor aquí — con música, energía y toda la banda apoyando. Perfecto para venir con amigos, echar chela, gritar los goles y quedarte después del partido. No es solo ver el juego… es vivirlo. 🔥
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🍺", line1: "Chela", line2: "fría" },
+                      { emoji: "🍕", line1: "Pizza", line2: "recién hecha" },
+                      { emoji: "🥃", line1: "Shots de", line2: "mezcal" },
+                      { emoji: "⚽", line1: "Fútbol", line2: "en vivo" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 bg-yellow-400/10 text-yellow-400">
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center">{line1} {line2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
+                </div>
+
+                {/* Football Night - English */}
+                <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#242424] border-yellow-500/30">
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-3xl px-4 py-2 rounded-bl-2xl leading-none">4 PM</div>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">🇺🇸 English</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">COMING SOON · 4 PM TILL LATE</p>
+                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Football Night at Los Tios<br/>🍕🍺</h3>
+                  <p className="leading-relaxed text-sm text-gray-300">
+                    Game night hits different at Los Tios. Come watch the match with us in a high-energy atmosphere full of good vibes and great people. Expect fresh pizza, ice-cold beers, and <span className="text-yellow-400 font-semibold">mezcal shots</span> to keep the energy going. Every moment of the game feels bigger here — with music, crowd hype, and nonstop action. Bring your crew, grab a drink, cheer loud, and stay after the match to keep the party going. This isn't just watching the game… it's experiencing it. 🔥
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🍺", line1: "Cold", line2: "beer" },
+                      { emoji: "🍕", line1: "Fresh", line2: "pizza" },
+                      { emoji: "🥃", line1: "Mezcal", line2: "shots" },
+                      { emoji: "⚽", line1: "Live", line2: "football" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 bg-yellow-400/10 text-yellow-400">
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center">{line1} {line2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-yellow-500/10 my-8"></div>
+              <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">Evento pasado · Past event 📸</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Spanish */}
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
