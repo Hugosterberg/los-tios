@@ -1433,7 +1433,7 @@ export default function CustomerOrder() {
 
               {/* Event suggestion CTA */}
               <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
+                <div id="event-contact" className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
                   <p className="text-gray-300 text-sm leading-relaxed flex-1">
                     🎉 <span className="text-yellow-400 font-bold">¿Tienes una idea para un evento con nosotros?</span><br/><br/>
                     En nuestro restaurante en Centro, Puerto Escondido, contamos con nuestro horno híbrido de gas y leña, una inversión seria para una pizza seria.<br/><br/>
