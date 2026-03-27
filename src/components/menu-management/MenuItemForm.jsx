@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { X } from "lucide-react";
+import { X, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { base44 } from "@/api/base44Client";
 
 export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
   const [formData, setFormData] = useState({
@@ -28,6 +28,7 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
 
   const [ingredientInput, setIngredientInput] = useState("");
   const [extraInput, setExtraInput] = useState({ name: "", price: 0 }); // Added
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (item) {
@@ -73,6 +74,22 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
       ...formData,
       available_extras: formData.available_extras.filter((_, i) => i !== index)
     });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setFormData({ ...formData, image_url: file_url });
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Bilden kunde inte laddas upp. Försök igen.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   return (
@@ -151,13 +168,49 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image">Image URL</Label>
-              <Input
-                id="image"
-                value={formData.image_url}
-                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-              />
+              <Label htmlFor="image">Image</Label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {uploadingImage ? "Laddar upp..." : "Ladda upp bild"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {formData.image_url && (
+                  <div className="relative">
+                    <img 
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-full h-48 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image_url: "" })}
+                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full hover:bg-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <div className="relative">
+                  <Label className="text-xs text-gray-500">Eller länk till bild / Or paste image URL</Label>
+                  <Input
+                    id="image"
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
