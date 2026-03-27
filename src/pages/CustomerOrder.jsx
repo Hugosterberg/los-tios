@@ -1369,7 +1369,7 @@ export default function CustomerOrder() {
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM HASTA TARDE</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">⚽ Noche de Fútbol en Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    ¡Se arma el ambiente en Los Tios! Ven a disfrutar el partido con nosotros en una noche llena de fútbol, buena vibra y pura fiesta. Tendremos pizzas recién hechas, cervezas bien frías y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el ánimo. Cada jugada se vive mejor aquí — con música, energía y toda la banda apoyando. Perfecto para venir con amigos, echar chela, gritar los goles y quedarte después del partido. No es solo ver el juego… es vivirlo. 🔥
+                    ¡Los Tios se pone bueno! Ven a ver el partido con nosotros, con pizzas recién hechas, chelitas bien frías y <span className="text-yellow-400 font-semibold">shots de mezcal</span>. Música, ambiente y toda la banda. Perfecto para venir con amigos, gritar los goles y quedarte hasta tarde. 🔥
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1397,7 +1397,7 @@ export default function CustomerOrder() {
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM TILL LATE</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">⚽ Football Night at Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    Game night hits different at Los Tios. Come watch the match with us in a high-energy atmosphere full of good vibes and great people. Expect fresh pizza, ice-cold beers, and <span className="text-yellow-400 font-semibold">mezcal shots</span> to keep the energy going. Every moment of the game feels bigger here — with music, crowd hype, and nonstop action. Bring your crew, grab a drink, cheer loud, and stay after the match to keep the party going. This isn't just watching the game… it's experiencing it. 🔥
+                    Come watch the game at Los Tios! Fresh pizza, cold beers and <span className="text-yellow-400 font-semibold">mezcal shots</span>, good music and a great crowd. Bring your friends, cheer loud and stay late. 🔥
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1432,7 +1432,7 @@ export default function CustomerOrder() {
                   </p>
                   <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Cumpleaños del Chef<br/>& Apertura del Restaurante</h3>
                   <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
-                    ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
+                    ¡Dos razones para festejar en una sola noche! El cumpleaños de nuestro chef y la apertura oficial de Los Tios. <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>Bebida de bienvenida</span> para todos, buena música, pizzas y cerveza a buen precio. ¡Nos vemos ahí, familia! 🍕🍺🎶
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1462,7 +1462,7 @@ export default function CustomerOrder() {
                   </p>
                   <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Chef's Birthday<br/>& Restaurant Opening</h3>
                   <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
-                    The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
+                    Two reasons to celebrate in one night! Our chef's birthday and the official opening of Los Tios. <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>Welcome drink on the house</span>, good music, great pizza and cold beers. See you there, familia! 🍕🍺🎶
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
