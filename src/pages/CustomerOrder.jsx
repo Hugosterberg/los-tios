@@ -1048,7 +1048,7 @@ export default function CustomerOrder() {
                         <span>{category.emoji}</span>
                         {category.name}
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         {items.map((item) => (
                           <motion.div
                             key={item.id}
@@ -1056,9 +1056,10 @@ export default function CustomerOrder() {
                             animate={{ opacity: 1, scale: 1 }}
                             whileHover={{ scale: 1.03 }}
                             transition={{ duration: 0.2 }}
+                            className="h-full"
                           >
-                             <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424]">
-                          <div className="relative h-48">
+                             <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424] flex flex-col h-full">
+                          <div className="relative h-48 flex-shrink-0">
                             <img
                               src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
                               alt={item.name}
@@ -1070,7 +1071,7 @@ export default function CustomerOrder() {
                               </Badge>
                             )}
                           </div>
-                          <CardContent className="p-6">
+                          <CardContent className="p-6 flex flex-col flex-1">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
                                 <h3 className="font-bold text-xl text-white">{item.name}</h3>
@@ -1081,29 +1082,22 @@ export default function CustomerOrder() {
                               <span className="text-2xl font-bold text-yellow-400 ml-2">${item.price?.toFixed(2)}</span>
                             </div>
 
-                            {item.description && (
-                              <p className="text-gray-400 text-sm mb-2 line-clamp-2">{item.description}</p>
-                            )}
-                            {item.description_en && (
-                              <p className="text-gray-500 text-xs mb-4 line-clamp-2 italic">{item.description_en}</p>
-                            )}
+                            <div className="flex-1">
+                              {item.description && (
+                                <p className="text-gray-400 text-sm mb-2 line-clamp-3">{item.description}</p>
+                              )}
+                              {item.description_en && (
+                                <p className="text-gray-500 text-xs mb-4 line-clamp-3 italic">{item.description_en}</p>
+                              )}
+                            </div>
                             
                             {item.available_extras && item.available_extras.length > 0 && (
-                              <div className="mb-3 p-2 bg-blue-50 rounded-lg">
-                                <p className="text-xs text-blue-700 font-semibold">✨ Extras disponibles / Extras available</p>
+                              <div className="mt-auto pt-3">
+                                <div className="p-2 bg-blue-50 rounded-lg">
+                                  <p className="text-xs text-blue-700 font-semibold">✨ Extras disponibles / Extras available</p>
+                                </div>
                               </div>
                             )}
-                            
-                            {/* ADD TO CART BUTTON - uncomment below to re-enable ordering */}
-                            {/* 
-                            <Button
-                              onClick={() => addToCart(item)}
-                              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Agregar al Carrito / Add to Cart
-                            </Button>
-                            */}
                           </CardContent>
                         </Card>
                       </motion.div>
