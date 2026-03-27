@@ -1439,10 +1439,10 @@ export default function CustomerOrder() {
                      <Copy className="w-4 h-4" />
                      Copy link
                    </button>
-                  </div>
-                  </div>
+                   </div>
+                   </div>
 
-                  {/* Event suggestion CTA */}
+                   {/* Event suggestion CTA */}
               <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                 <div id="event-contact" className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
                   <p className="text-gray-300 text-sm leading-relaxed flex-1">
@@ -1582,17 +1582,15 @@ export default function CustomerOrder() {
                     >
                       <Copy className="w-4 h-4" />
                       Copy link
-                    </button>
-                    </div>
-                    </div>
-                    </div>
+                      </button>
+                      </div>
+                      </div>
+                      </div>
+                      </div>
+                      )}
+                      </div>
 
-                    {/* Divider */}
-                    <div className="border-t border-yellow-500/10 my-8"></div>
-                    <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">Evento pasado · Past event 📸</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-      {/* Sobre nosotros */}
+                      {/* Sobre nosotros */}
       <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center mb-10">
