@@ -959,7 +959,7 @@ export default function CustomerOrder() {
                     <img 
                       src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                       alt="Los Tíos"
-                      className="w-12 h-12 object-contain rounded-xl"
+                      className="w-20 h-20 object-contain rounded-2xl"
                     />
                   </a>
                 </div>
@@ -1007,25 +1007,25 @@ export default function CustomerOrder() {
           </div>
 
       {/* Hero Banner */}
-      <div className="bg-[#111111] py-7 px-4 text-center border-b border-yellow-500/20">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <div className="bg-[#111111] py-12 px-4 text-center border-b border-yellow-500/20">
+        <div className="max-w-3xl mx-auto space-y-6">
           {/* Spanish */}
           <div>
-            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-1">🇲🇽 ES</p>
-            <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
+            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-2">🇲🇽 ES</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
               ¿HAMBRE? PRUEBA LA MEJOR PIZZA DE PUERTO ESCONDIDO
             </h2>
-            <p className="text-gray-400 mt-1 text-sm">Hecha por 4 tios que se conocieron viajando · Servida con muy buena vibra</p>
-            <p className="text-yellow-400/60 mt-0.5 text-xs font-bold tracking-widest uppercase">4 TIOS CON RAÍCES EN MÉXICO, FRANCIA, SUECIA E ITALIA.</p>
+            <p className="text-gray-400 mt-2 text-lg">Hecha por 4 tios que se conocieron viajando · Servida con muy buena vibra</p>
+            <p className="text-yellow-400/60 mt-1 text-xs font-bold tracking-widest uppercase">4 TIOS CON RAÍCES EN MÉXICO, FRANCIA, SUECIA E ITALIA.</p>
           </div>
 
-          <div className="border-t border-yellow-500/30 pt-4">
-            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-1">🇺🇸 EN</p>
-            <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
+          <div className="border-t border-yellow-500/30 pt-6">
+            <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-2">🇺🇸 EN</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
               HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
             </h2>
-            <p className="text-gray-400 mt-1 text-sm">Made by 4 uncles who met while traveling · Served with great vibes</p>
-            <p className="text-yellow-400/60 mt-0.5 text-xs font-bold tracking-widest uppercase">4 UNCLES WITH ROOTS IN MEXICO, FRANCE, SWEDEN & ITALY.</p>
+            <p className="text-gray-400 mt-2 text-lg">Made by 4 uncles who met while traveling · Served with great vibes</p>
+            <p className="text-yellow-400/60 mt-1 text-xs font-bold tracking-widest uppercase">4 UNCLES WITH ROOTS IN MEXICO, FRANCE, SWEDEN & ITALY.</p>
           </div>
         </div>
       </div>

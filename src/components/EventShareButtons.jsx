@@ -67,15 +67,15 @@ export default function EventShareButtons({ title, text, url }) {
             target="_blank"
             rel="noopener noreferrer"
             title={link.label}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold text-white/70 transition-all ${link.color}`}
+            className={`flex items-center justify-center w-7 h-7 rounded-full transition-all ${link.color}`}
+            title={link.label}
           >
-            <span className="w-3 h-3 flex-shrink-0">{link.icon}</span>
-            {link.label}
+            <span className="w-3.5 h-3.5 flex-shrink-0">{link.icon}</span>
           </a>
         ))}
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-white/10 hover:bg-white/20 border border-white/20 text-white/60 transition-all"
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white/60 transition-all"
         >
           {copied ? (
             <>✓ Copiado!</>
