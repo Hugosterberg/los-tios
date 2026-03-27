@@ -1451,9 +1451,9 @@ export default function CustomerOrder() {
                         navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
                         alert('Link copiado ✓');
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400/40"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
-                      🔗 Compartir
+                      📋 Copiar link
                     </button>
                   </div>
                 </div>
@@ -1475,9 +1475,9 @@ export default function CustomerOrder() {
                         navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
                         alert('Link copied ✓');
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400/40"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
-                      🔗 Share
+                      📋 Copy link
                     </button>
                   </div>
                 </div>
