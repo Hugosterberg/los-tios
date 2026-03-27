@@ -1574,16 +1574,6 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" url={`${window.location.origin}/#eventos`} />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/#eventos`);
-                        alert('Link copied ✓');
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-gray-700/50 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy link
-                    </button>
                   </div>
                   </div>
                   </div>
