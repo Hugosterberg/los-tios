@@ -1358,18 +1358,6 @@ export default function CustomerOrder() {
               <div className="flex flex-col items-center mb-10">
                 <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
                 <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">Lo que viene 🔥</p>
-                <div className="mt-4">
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/#eventos`;
-                      navigator.clipboard.writeText(url);
-                      alert('Link copiado ✓');
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400/40"
-                  >
-                    🔗 Copiar link
-                  </button>
-                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Football Night - Spanish */}
@@ -1442,7 +1430,7 @@ export default function CustomerOrder() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <a
                       href="mailto:info@lostios.mx?subject=Propuesta de evento&body=Hola equipo de Los Tios, me gustaría proponer un evento..."
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-xs font-semibold transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-xs font-semibold transition-colors"
                     >
                       ✉️ Contáctanos
                     </a>
@@ -1451,7 +1439,7 @@ export default function CustomerOrder() {
                         navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
                         alert('Link copiado ✓');
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
                       <Copy className="w-4 h-4" />
                       Copiar link
@@ -1467,7 +1455,7 @@ export default function CustomerOrder() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <a
                       href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-xs font-semibold transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-400 hover:bg-yellow-300 text-[#1a1a1a] text-xs font-semibold transition-colors"
                     >
                       ✉️ Contact us
                     </a>
@@ -1476,7 +1464,7 @@ export default function CustomerOrder() {
                         navigator.clipboard.writeText(`${window.location.origin}/#event-contact`);
                         alert('Link copied ✓');
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
                       <Copy className="w-4 h-4" />
                       Copy link
