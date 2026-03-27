@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pizza, ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, X } from "lucide-react";
+import { Pizza, ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, X, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import EventShareButtons from "@/components/EventShareButtons";
@@ -1453,7 +1453,8 @@ export default function CustomerOrder() {
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
-                      📋 Copiar link
+                      <Copy className="w-4 h-4" />
+                      Copiar link
                     </button>
                   </div>
                 </div>
@@ -1477,7 +1478,8 @@ export default function CustomerOrder() {
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold transition-colors border border-gray-600"
                     >
-                      📋 Copy link
+                      <Copy className="w-4 h-4" />
+                      Copy link
                     </button>
                   </div>
                 </div>
