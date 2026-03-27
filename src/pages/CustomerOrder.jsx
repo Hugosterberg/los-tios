@@ -1378,9 +1378,9 @@ export default function CustomerOrder() {
                       { emoji: "🥃", line1: "Shots de", line2: "mezcal" },
                       { emoji: "⚽", line1: "Fútbol", line2: "en vivo" },
                     ].map(({ emoji, line1, line2 }) => (
-                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 bg-yellow-400/10 text-yellow-400">
+                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 bg-yellow-400/10 text-yellow-400 h-16">
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-xs text-center">{line1} {line2}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
                       </div>
                     ))}
                   </div>
@@ -1406,9 +1406,9 @@ export default function CustomerOrder() {
                       { emoji: "🥃", line1: "Mezcal", line2: "shots" },
                       { emoji: "⚽", line1: "Live", line2: "football" },
                     ].map(({ emoji, line1, line2 }) => (
-                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 bg-yellow-400/10 text-yellow-400">
+                      <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 bg-yellow-400/10 text-yellow-400 h-16">
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-xs text-center">{line1} {line2}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
                       </div>
                     ))}
                   </div>
@@ -1441,9 +1441,9 @@ export default function CustomerOrder() {
                       { emoji: "🍺", line1: "Cerveza", line2: "deals" },
                       { emoji: "🎶", line1: "Buena", line2: "música" },
                     ].map(({ emoji, line1, line2 }) => (
-                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-xs text-center">{line1} {line2}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
                       </div>
                     ))}
                   </div>
@@ -1471,9 +1471,9 @@ export default function CustomerOrder() {
                       { emoji: "🍺", line1: "Beer", line2: "deals" },
                       { emoji: "🎶", line1: "Great", line2: "music" },
                     ].map(({ emoji, line1, line2 }) => (
-                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-xs text-center">{line1} {line2}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
                       </div>
                     ))}
                   </div>
