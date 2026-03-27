@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 export default function EventShareButtons({ title, text, url, lang = "es" }) {
   const [copied, setCopied] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const shareUrl = url || window.location.href;
   const shareText = `${title} - ${text}`;
 
@@ -13,9 +14,7 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
         // cancelled
       }
     } else {
-      // Fallback: open WhatsApp share on desktop
-      const encoded = encodeURIComponent(`${shareText} ${shareUrl}`);
-      window.open(`https://wa.me/?text=${encoded}`, "_blank");
+      setShowMenu(!showMenu);
     }
   };
 
@@ -27,16 +26,21 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
   };
 
   const handleInstagramStory = () => {
-    // Copy to clipboard first
     navigator.clipboard.writeText(shareUrl).then(() => {
-      // Open Instagram app/web
       window.open('https://instagram.com/', '_blank');
+      setShowMenu(false);
     });
+  };
+
+  const handleWhatsApp = () => {
+    const encoded = encodeURIComponent(`${shareText} ${shareUrl}`);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    setShowMenu(false);
   };
 
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center relative">
         <button
           onClick={handleShare}
           className="inline-flex items-center justify-center gap-1.5 px-3 h-7 rounded-full bg-yellow-400/20 hover:bg-yellow-400/40 border border-yellow-400/40 text-yellow-400 text-[10px] font-semibold transition-all"
@@ -47,6 +51,29 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
           </svg>
           {lang === "en" ? "Share" : "Compartir"}
         </button>
+
+        {showMenu && (
+          <div className="absolute left-0 top-8 bg-[#1a1a1a] border border-white/20 rounded-lg shadow-lg z-10">
+            <button
+              onClick={handleInstagramStory}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 text-white text-xs font-semibold w-full transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/>
+              </svg>
+              {lang === "en" ? "Instagram Story" : "Instagram Story"}
+            </button>
+            <button
+              onClick={handleWhatsApp}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 text-white text-xs font-semibold w-full transition-colors border-t border-white/10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              {lang === "en" ? "WhatsApp" : "WhatsApp"}
+            </button>
+          </div>
+        )}
 
         <button
           onClick={handleCopy}
@@ -63,16 +90,6 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
               {lang === "en" ? "Copy link" : "Copiar link"}
             </>
           )}
-        </button>
-
-        <button
-          onClick={handleInstagramStory}
-          className="inline-flex items-center justify-center gap-1.5 px-3 h-7 rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-80 text-white text-[10px] font-semibold transition-all"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="block w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/>
-          </svg>
-          {lang === "en" ? "Story" : "Story"}
         </button>
       </div>
     </div>
