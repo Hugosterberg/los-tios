@@ -1386,7 +1386,18 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="⚽ Noche de Fútbol en Los Tios – 28 Marzo" text="¡Ven a ver el partido, pizza, chela y mezcal!" url={`${window.location.origin}/#eventos`} />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/#eventos`);
+                        alert('Link copiado ✓');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy link
+                    </button>
+                  </div>
                 </div>
 
                 {/* Football Night - English */}
@@ -1415,7 +1426,18 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="⚽ Football Night at Los Tios – March 28" text="Come watch the match, fresh pizza, cold beers & mezcal shots!" lang="en" url={`${window.location.origin}/#eventos`} />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/#eventos`);
+                        alert('Link copied ✓');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy link
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1505,7 +1527,18 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="🎂 Cumpleaños del Chef & Apertura – 20 Marzo" text="¡Bebida de bienvenida, pizza, música y mucha fiesta!" url={`${window.location.origin}/#eventos`} />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/#eventos`);
+                        alert('Link copiado ✓');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy link
+                    </button>
+                  </div>
                 </div>
 
                 {/* English */}
@@ -1536,7 +1569,18 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" lang="en" url={`${window.location.origin}/#eventos`} />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/#eventos`);
+                        alert('Link copied ✓');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy link
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
