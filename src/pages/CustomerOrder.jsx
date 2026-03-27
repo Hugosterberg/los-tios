@@ -1361,10 +1361,10 @@ export default function CustomerOrder() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Football Night - Spanish */}
                 <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#242424] border-yellow-500/30">
-                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-3xl px-4 py-2 rounded-bl-2xl leading-none">4 PM</div>
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">28</div>
                   <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">🇲🇽 Español</p>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">PRÓXIMAMENTE · 4 PM HASTA TARDE</p>
-                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Noche de Fútbol en Los Tios<br/>🍕🍺</h3>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">DE MARZO · 4 PM HASTA TARDE</p>
+                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Noche de Fútbol en Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
                     ¡Se arma el ambiente en Los Tios! Ven a disfrutar el partido con nosotros en una noche llena de fútbol, buena vibra y pura fiesta. Tendremos pizzas recién hechas, cervezas bien frías y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el ánimo. Cada jugada se vive mejor aquí — con música, energía y toda la banda apoyando. Perfecto para venir con amigos, echar chela, gritar los goles y quedarte después del partido. No es solo ver el juego… es vivirlo. 🔥
                   </p>
@@ -1386,10 +1386,10 @@ export default function CustomerOrder() {
 
                 {/* Football Night - English */}
                 <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#242424] border-yellow-500/30">
-                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-3xl px-4 py-2 rounded-bl-2xl leading-none">4 PM</div>
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">28</div>
                   <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">🇺🇸 English</p>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">COMING SOON · 4 PM TILL LATE</p>
-                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Football Night at Los Tios<br/>🍕🍺</h3>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">MARCH · 4 PM TILL LATE</p>
+                  <h3 className="text-xl font-black mb-3 pr-16 text-white">⚽ Football Night at Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
                     Game night hits different at Los Tios. Come watch the match with us in a high-energy atmosphere full of good vibes and great people. Expect fresh pizza, ice-cold beers, and <span className="text-yellow-400 font-semibold">mezcal shots</span> to keep the energy going. Every moment of the game feels bigger here — with music, crowd hype, and nonstop action. Bring your crew, grab a drink, cheer loud, and stay after the match to keep the party going. This isn't just watching the game… it's experiencing it. 🔥
                   </p>
