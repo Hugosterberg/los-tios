@@ -1344,64 +1344,99 @@ export default function CustomerOrder() {
       </AnimatePresence>
 
       {/* Eventos */}
-      <div id="eventos" className="bg-[#1a1a1a] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col items-center mb-10">
-            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
-            <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">Lo que viene 🔥</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Spanish */}
-            <div className="bg-[#242424] rounded-2xl p-6 border border-yellow-500/30 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-1">🇲🇽 Español</p>
-              <p className="text-yellow-400/60 text-xs font-bold tracking-widest uppercase mb-4">DE MARZO · 4 PM HASTA TARDE</p>
-              <h3 className="text-white text-xl font-black mb-3 pr-16">🎂 Cumpleaños del Chef<br/>& Apertura del Restaurante</h3>
-              <p className="text-gray-300 leading-relaxed text-sm">
-                ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className="text-yellow-400 font-semibold">bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
-              </p>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                {[
-                  { emoji: "🥂", line1: "Welcome", line2: "drink" },
-                  { emoji: "🍕", line1: "Pizza", line2: "deals" },
-                  { emoji: "🍺", line1: "Cerveza", line2: "deals" },
-                  { emoji: "🎶", line1: "Buena", line2: "música" },
-                ].map(({ emoji, line1, line2 }) => (
-                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1">
-                    <span className="text-base leading-none">{emoji}</span>
-                    <span className="text-xs text-center">{line1} {line2}</span>
-                  </div>
-                ))}
+      {(() => {
+        const eventDate = new Date('2026-03-20');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPast = today > eventDate;
+        const attendees = 50;
+
+        return (
+          <div id="eventos" className="bg-[#1a1a1a] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
+            <div className="max-w-5xl mx-auto">
+              <div className="flex flex-col items-center mb-10">
+                <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
+                <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">
+                  {isPast ? "Eventos pasados 📸" : "Lo que viene 🔥"}
+                </p>
               </div>
-              <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
-            </div>
-            {/* English */}
-            <div className="bg-[#242424] rounded-2xl p-6 border border-yellow-500/30 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-1">🇺🇸 English</p>
-              <p className="text-yellow-400/60 text-xs font-bold tracking-widest uppercase mb-4">MARCH · 4 PM TILL LATE</p>
-              <h3 className="text-white text-xl font-black mb-3 pr-16">🎂 Chef's Birthday<br/>& Restaurant Opening</h3>
-              <p className="text-gray-300 leading-relaxed text-sm">
-                The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className="text-yellow-400 font-semibold">welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
-              </p>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                {[
-                  { emoji: "🥂", line1: "Welcome", line2: "drink" },
-                  { emoji: "🍕", line1: "Pizza", line2: "deals" },
-                  { emoji: "🍺", line1: "Beer", line2: "deals" },
-                  { emoji: "🎶", line1: "Great", line2: "music" },
-                ].map(({ emoji, line1, line2 }) => (
-                  <div key={line1} className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1">
-                    <span className="text-base leading-none">{emoji}</span>
-                    <span className="text-xs text-center">{line1} {line2}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Spanish */}
+                <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
+                  {isPast && (
+                    <div className="absolute inset-0 bg-[#1a1a1a]/60 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl">
+                      <div className="bg-black/70 backdrop-blur-sm px-5 py-3 rounded-2xl flex flex-col items-center gap-1">
+                        <span className="text-gray-300 text-xs font-bold tracking-widest uppercase">Evento pasado</span>
+                        <div className="flex items-center gap-2 text-gray-200 font-black text-lg">
+                          <span>👥</span>
+                          <span>+{attendees} personas asistieron</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? 'text-gray-500' : 'text-yellow-400'}`}>🇲🇽 Español</p>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>DE MARZO · 4 PM HASTA TARDE</p>
+                  <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Cumpleaños del Chef<br/>& Apertura del Restaurante</h3>
+                  <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                    ¡El evento más importante de Los Tios! Celebramos el cumpleaños de nuestro chef y la apertura oficial del restaurante. Habrá <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>bebida de bienvenida</span> para todos, música de primer nivel toda la noche, pizzas increíbles y cerveza a precios de amigo. No te lo puedes perder — ven, come, baila y brinda con nosotros. ¡Nos vemos ahí, familia! 🍕🍺🎶
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                      { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                      { emoji: "🍺", line1: "Cerveza", line2: "deals" },
+                      { emoji: "🎶", line1: "Buena", line2: "música" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center">{line1} {line2}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
+                </div>
+
+                {/* English */}
+                <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isPast ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
+                  {isPast && (
+                    <div className="absolute inset-0 bg-[#1a1a1a]/60 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl">
+                      <div className="bg-black/70 backdrop-blur-sm px-5 py-3 rounded-2xl flex flex-col items-center gap-1">
+                        <span className="text-gray-300 text-xs font-bold tracking-widest uppercase">Past event</span>
+                        <div className="flex items-center gap-2 text-gray-200 font-black text-lg">
+                          <span>👥</span>
+                          <span>+{attendees} people attended</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] font-black text-5xl px-5 py-2 rounded-bl-2xl leading-none">20</div>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? 'text-gray-500' : 'text-yellow-400'}`}>🇺🇸 English</p>
+                  <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isPast ? 'text-gray-600' : 'text-yellow-400/60'}`}>MARCH · 4 PM TILL LATE</p>
+                  <h3 className={`text-xl font-black mb-3 pr-16 ${isPast ? 'text-gray-400' : 'text-white'}`}>🎂 Chef's Birthday<br/>& Restaurant Opening</h3>
+                  <p className={`leading-relaxed text-sm ${isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                    The biggest night in Los Tios history! We're celebrating our chef's birthday AND the official opening of the restaurant. Expect a <span className={isPast ? 'font-semibold' : 'text-yellow-400 font-semibold'}>welcome drink on the house</span>, killer music all night long, insane pizza and cold beers at seriously good prices. Come through, eat good, dance, and toast with us. See you there, familia! 🍕🍺🎶
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                      { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                      { emoji: "🍺", line1: "Beer", line2: "deals" },
+                      { emoji: "🎶", line1: "Great", line2: "music" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center gap-1 ${isPast ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center">{line1} {line2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
+                </div>
               </div>
-              <p className="mt-4 text-xs text-gray-400">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-yellow-400/60">(PLAZA MONTE ALBÁN)</span></p>
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Sobre nosotros */}
       <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
