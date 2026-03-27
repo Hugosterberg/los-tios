@@ -1587,8 +1587,8 @@ export default function CustomerOrder() {
                       </div>
                       </div>
                       </div>
-                      )}
-                      </div>
+                      );
+                      })()}
 
                       {/* Sobre nosotros */}
       <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
@@ -1687,6 +1687,7 @@ export default function CustomerOrder() {
             </a>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
