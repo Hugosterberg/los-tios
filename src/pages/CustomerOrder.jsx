@@ -1386,7 +1386,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="⚽ Noche de Fútbol en Los Tios – 28 Marzo" text="¡Ven a ver el partido, pizza, chela y mezcal!" />
+                  <EventShareButtons title="⚽ Noche de Fútbol en Los Tios – 28 Marzo" text="¡Ven a ver el partido, pizza, chela y mezcal!" url={`${window.location.origin}/#eventos`} />
                 </div>
 
                 {/* Football Night - English */}
@@ -1415,7 +1415,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="⚽ Football Night at Los Tios – March 28" text="Come watch the match, fresh pizza, cold beers & mezcal shots!" lang="en" />
+                  <EventShareButtons title="⚽ Football Night at Los Tios – March 28" text="Come watch the match, fresh pizza, cold beers & mezcal shots!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
               </div>
 
@@ -1451,7 +1451,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="🎂 Cumpleaños del Chef & Apertura – 20 Marzo" text="¡Bebida de bienvenida, pizza, música y mucha fiesta!" />
+                  <EventShareButtons title="🎂 Cumpleaños del Chef & Apertura – 20 Marzo" text="¡Bebida de bienvenida, pizza, música y mucha fiesta!" url={`${window.location.origin}/#eventos`} />
                 </div>
 
                 {/* English */}
@@ -1482,7 +1482,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">📍 Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBÁN)</span></p>
-                  <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" lang="en" />
+                  <EventShareButtons title="🎂 Chef's Birthday & Restaurant Opening – March 20" text="Welcome drink on the house, killer music, pizza & cold beers!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
               </div>
             </div>

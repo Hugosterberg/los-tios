@@ -20,7 +20,7 @@ export default function EventShareButtons({ title, text, url, lang = "es" }) {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`).then(() => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
