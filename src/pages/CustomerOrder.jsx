@@ -1538,7 +1538,7 @@ export default function CustomerOrder() {
                 style={{ border: 0 }}
                 loading="lazy"
                 allowFullScreen
-                src="https://maps.google.com/maps?q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax.&z=18&output=embed"
+                src="https://maps.google.com/maps?q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax.&z=16&output=embed"
               />
             </a>
             <a
