@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const queryClient = useQueryClient();
+  const formRef = React.useRef(null);
 
   const { data: menuItems = [], isLoading } = useQuery({
     queryKey: ['menuItems'],
@@ -64,6 +65,9 @@ export default function MenuManagement() {
   const handleEdit = (item) => {
     setEditingItem(item);
     setShowForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   const handleSubmit = (data) => {
@@ -126,6 +130,7 @@ export default function MenuManagement() {
 
         {/* Form */}
         {showForm && (
+          <div ref={formRef}>
           <MenuItemForm
             item={editingItem}
             onSubmit={handleSubmit}
@@ -135,6 +140,7 @@ export default function MenuManagement() {
             }}
             isLoading={createItem.isPending || updateItem.isPending}
           />
+          </div>
         )}
 
         {/* Menu Items Grid */}
