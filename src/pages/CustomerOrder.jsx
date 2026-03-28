@@ -1060,12 +1060,12 @@ export default function CustomerOrder() {
                             className="h-full"
                           >
                              <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424] flex flex-col h-full">
-                          <div className="relative h-48 flex-shrink-0">
-                            <img
-                              src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                            />
+                                             <div className="relative h-56 flex-shrink-0 bg-[#1a1a1a]">
+                                               <img
+                                                 src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
+                                                 alt={item.name}
+                                                 className="w-full h-full object-contain"
+                                               />
                             {item.is_vegetarian && (
                               <Badge className="absolute top-3 right-3 bg-green-500">
                                 🌱 Vegetariano / Vegetarian
