@@ -101,19 +101,19 @@ export default function Statistics() {
       name: 'Dine-in', 
       value: monthOrders.filter(o => o.order_type === 'dine-in').length,
       revenue: monthOrders.filter(o => o.order_type === 'dine-in').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#DC2626' 
+      color: '#facc15' 
     },
     { 
       name: 'Takeout', 
       value: monthOrders.filter(o => o.order_type === 'takeout').length,
       revenue: monthOrders.filter(o => o.order_type === 'takeout').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#F59E0B' 
+      color: '#a16207' 
     },
     { 
       name: 'Delivery', 
       value: monthOrders.filter(o => o.order_type === 'delivery').length,
       revenue: monthOrders.filter(o => o.order_type === 'delivery').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#10B981' 
+      color: '#fef08a' 
     },
   ];
 
@@ -270,7 +270,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-green-600">${dayStats.totalRevenue.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-yellow-400">${dayStats.totalRevenue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -282,11 +282,11 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-red-600">${dayStats.totalExpenses.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-yellow-400/70">${dayStats.totalExpenses.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg border-t-4 border-t-purple-500">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
@@ -294,7 +294,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className={`text-3xl font-bold ${dayStats.totalProfit >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+                    <div className="text-3xl font-bold text-yellow-400">
                       ${dayStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -399,7 +399,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-green-600">${monthStats.totalRevenue.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-yellow-400">${monthStats.totalRevenue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -411,11 +411,11 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-red-600">${monthStats.totalExpenses.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-yellow-400/70">${monthStats.totalExpenses.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg border-t-4 border-t-purple-500">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
@@ -423,7 +423,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className={`text-3xl font-bold ${monthStats.totalProfit >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+                    <div className="text-3xl font-bold text-yellow-400">
                       ${monthStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -452,7 +452,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-blue-600">${monthStats.avgOrderValue.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-yellow-400">${monthStats.avgOrderValue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -476,9 +476,9 @@ export default function Statistics() {
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                             formatter={(value) => `$${value.toFixed(2)}`}
                           />
-                          <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} name="Ingresos" dot={{ fill: '#10B981', r: 4 }} />
-                          <Line type="monotone" dataKey="expenses" stroke="#DC2626" strokeWidth={3} name="Gastos" dot={{ fill: '#DC2626', r: 4 }} />
-                          <Line type="monotone" dataKey="profit" stroke="#8B5CF6" strokeWidth={3} name="Ganancias" dot={{ fill: '#8B5CF6', r: 4 }} />
+                          <Line type="monotone" dataKey="revenue" stroke="#facc15" strokeWidth={3} name="Ingresos" dot={{ fill: '#facc15', r: 4 }} />
+                          <Line type="monotone" dataKey="expenses" stroke="#a16207" strokeWidth={3} name="Gastos" dot={{ fill: '#a16207', r: 4 }} />
+                          <Line type="monotone" dataKey="profit" stroke="#fef08a" strokeWidth={3} name="Ganancias" dot={{ fill: '#fef08a', r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -589,7 +589,7 @@ export default function Statistics() {
               )}
 
               {/* Top Items */}
-              <Card className="border-0 shadow-lg mt-6">
+              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
                 <CardHeader>
                   <CardTitle>Top 10 Productos Más Vendidos / Top Selling Items</CardTitle>
                 </CardHeader>
@@ -599,9 +599,7 @@ export default function Statistics() {
                       {topItems.map((item, index) => (
                         <div key={index} className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg">
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                              ['bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 'bg-yellow-100 text-yellow-600', 'bg-green-100 text-green-600', 'bg-blue-100 text-blue-600'][index % 5]
-                            }`}>
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-yellow-400/20 text-yellow-400">
                               {index + 1}
                             </div>
                             <div>
@@ -610,7 +608,7 @@ export default function Statistics() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-lg text-green-600">${item.revenue.toFixed(2)}</p>
+                            <p className="font-bold text-lg text-yellow-400">${item.revenue.toFixed(2)}</p>
                             <p className="text-xs text-gray-500">revenue</p>
                           </div>
                         </div>
@@ -624,7 +622,7 @@ export default function Statistics() {
 
               {/* Revenue Breakdown by Type - Not in print */}
               {!printMode && (
-                <Card className="border-0 shadow-lg mt-6">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
                   <CardHeader>
                     <CardTitle>Ingresos por Tipo de Pedido / Revenue by Order Type</CardTitle>
                   </CardHeader>

@@ -79,18 +79,18 @@ export default function ShoppingList() {
 
   const categories = [
     { id: "all", name: "Todos / All", color: "bg-gray-100 text-gray-800", icon: "📋" },
-    { id: "ingredients", name: "Ingredientes / Ingredients", color: "bg-green-100 text-green-800", icon: "🥗" },
-    { id: "supplies", name: "Suministros / Supplies", color: "bg-blue-100 text-blue-800", icon: "📦" },
-    { id: "equipment", name: "Equipo / Equipment", color: "bg-orange-100 text-orange-800", icon: "🔧" },
-    { id: "cleaning", name: "Limpieza / Cleaning", color: "bg-purple-100 text-purple-800", icon: "🧹" },
-    { id: "other", name: "Otros / Other", color: "bg-gray-100 text-gray-800", icon: "📌" },
+    { id: "ingredients", name: "Ingredientes / Ingredients", color: "bg-yellow-400/20 text-yellow-400", icon: "🥗" },
+    { id: "supplies", name: "Suministros / Supplies", color: "bg-yellow-400/20 text-yellow-400", icon: "📦" },
+    { id: "equipment", name: "Equipo / Equipment", color: "bg-yellow-400/20 text-yellow-400", icon: "🔧" },
+    { id: "cleaning", name: "Limpieza / Cleaning", color: "bg-yellow-400/20 text-yellow-400", icon: "🧹" },
+    { id: "other", name: "Otros / Other", color: "bg-yellow-400/10 text-yellow-400/70", icon: "📌" },
   ];
 
   const priorityColors = {
-    low: "bg-blue-100 text-blue-800",
-    medium: "bg-yellow-100 text-yellow-800",
-    high: "bg-orange-100 text-orange-800",
-    urgent: "bg-red-100 text-red-800",
+    low: "bg-yellow-400/10 text-yellow-400/60",
+    medium: "bg-yellow-400/15 text-yellow-400/80",
+    high: "bg-yellow-400/20 text-yellow-400",
+    urgent: "bg-yellow-400/30 text-yellow-300",
   };
 
   const units = [
@@ -290,7 +290,7 @@ export default function ShoppingList() {
             </div>
             <Button
               onClick={() => setShowForm(!showForm)}
-              className="bg-red-600 hover:bg-red-700 gap-2"
+              className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
             >
               <Plus className="w-4 h-4" />
               Agregar Producto / Add Item
@@ -310,7 +310,7 @@ export default function ShoppingList() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-orange-600">{pendingItems.length}</div>
+              <div className="text-3xl font-bold text-yellow-400">{pendingItems.length}</div>
               <p className="text-xs text-gray-500 mt-1">por comprar / to buy</p>
             </CardContent>
           </Card>
@@ -323,7 +323,7 @@ export default function ShoppingList() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-600">{urgentItems.length}</div>
+              <div className="text-3xl font-bold text-yellow-400">{urgentItems.length}</div>
               <p className="text-xs text-gray-500 mt-1">prioridad urgente</p>
             </CardContent>
           </Card>
@@ -335,7 +335,7 @@ export default function ShoppingList() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">${totalEstimatedCost.toFixed(2)}</div>
+              <div className="text-3xl font-bold text-yellow-400">${totalEstimatedCost.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">MXN (pendientes)</p>
             </CardContent>
           </Card>
@@ -350,7 +350,7 @@ export default function ShoppingList() {
                 variant={selectedCategory === cat.id ? "default" : "outline"}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`flex items-center gap-2 whitespace-nowrap ${
-                  selectedCategory === cat.id ? 'bg-red-600 hover:bg-red-700' : ''
+                  selectedCategory === cat.id ? 'bg-yellow-400 hover:bg-yellow-300 text-black' : 'border-yellow-500/20 text-gray-400'
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -539,8 +539,8 @@ export default function ShoppingList() {
                     <Button 
                       type="submit" 
                       disabled={createItem.isPending || updateItem.isPending}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
+                      className="bg-yellow-400 hover:bg-yellow-300 text-black"
+                      >
                       {editingItem ? 'Actualizar / Update' : 'Guardar / Save'}
                     </Button>
                   </div>
@@ -554,7 +554,7 @@ export default function ShoppingList() {
         <div className="space-y-4">
           {isLoading ? (
             <div className="text-center py-20">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto"></div>
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto"></div>
               <p className="mt-4 text-gray-600">Cargando lista... / Loading list...</p>
             </div>
           ) : filteredItems.length > 0 ? (
@@ -587,13 +587,13 @@ export default function ShoppingList() {
                                   {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
                                 </Badge>
                                 {item.status === 'purchased' && (
-                                  <Badge className="bg-green-100 text-green-800">
+                                  <Badge className="bg-yellow-400/20 text-yellow-400">
                                     ✓ Comprado / Purchased
                                   </Badge>
                                 )}
                                 {item.converted_to_expense && (
-                                  <Badge className="bg-blue-100 text-blue-800">
-                                    💰 Convertido a Gasto / Converted to Expense
+                                  <Badge className="bg-yellow-400/10 text-yellow-400/80">
+                                     💰 Convertido a Gasto / Converted to Expense
                                   </Badge>
                                 )}
                               </div>
@@ -614,7 +614,7 @@ export default function ShoppingList() {
                             {item.actual_cost > 0 && (
                               <div>
                                 <p className="text-gray-600">Costo Real:</p>
-                                <p className="font-semibold text-green-600">${item.actual_cost?.toFixed(2)} MXN</p>
+                                <p className="font-semibold text-yellow-400">${item.actual_cost?.toFixed(2)} MXN</p>
                               </div>
                             )}
                             {item.supplier && (
@@ -644,7 +644,7 @@ export default function ShoppingList() {
                               <Button
                                 size="sm"
                                 onClick={() => openPurchaseDialog(item)}
-                                className="bg-green-600 hover:bg-green-700 gap-2"
+                                className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
                               >
                                 <Check className="w-4 h-4" />
                                 Marcar Comprado / Mark Purchased
@@ -662,7 +662,7 @@ export default function ShoppingList() {
                                   <Button
                                     size="sm"
                                     onClick={() => convertToExpense(item)}
-                                    className="bg-blue-600 hover:bg-blue-700 gap-2"
+                                    className="bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 border border-yellow-500/30 gap-2"
                                   >
                                     <ArrowRight className="w-4 h-4" />
                                     Convertir a Gasto / Convert to Expense
@@ -745,8 +745,8 @@ export default function ShoppingList() {
                     onClick={() => setPurchasePaymentSource('company_cash')}
                     className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
                       purchasePaymentSource === 'company_cash'
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                        : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
                     <span className="text-2xl">💵</span>
@@ -761,8 +761,8 @@ export default function ShoppingList() {
                     onClick={() => setPurchasePaymentSource('company_account')}
                     className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
                       purchasePaymentSource === 'company_account'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                        : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
                     <span className="text-2xl">🏦</span>
@@ -777,8 +777,8 @@ export default function ShoppingList() {
                     onClick={() => setPurchasePaymentSource('individual')}
                     className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
                       purchasePaymentSource === 'individual'
-                        ? 'border-purple-600 bg-purple-50'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                        : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
                     <span className="text-2xl">👤</span>
@@ -801,7 +801,7 @@ export default function ShoppingList() {
                 <Button
                   onClick={confirmPurchase}
                   disabled={!purchasePaymentSource || updateItem.isPending || createExpense.isPending}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black"
                 >
                   <Check className="w-4 h-4 mr-2" />
                   Confirmar

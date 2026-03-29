@@ -92,9 +92,9 @@ export default function EmployeeCalendar() {
   };
 
   const roleColors = {
-    cook: "bg-orange-100 text-orange-800", waiter: "bg-blue-100 text-blue-800",
-    cashier: "bg-green-100 text-green-800", delivery: "bg-purple-100 text-purple-800",
-    manager: "bg-red-100 text-red-800", cleaner: "bg-teal-100 text-teal-800", other: "bg-gray-100 text-gray-800"
+    cook: "bg-yellow-400/20 text-yellow-400", waiter: "bg-yellow-400/20 text-yellow-400",
+    cashier: "bg-yellow-400/20 text-yellow-400", delivery: "bg-yellow-400/20 text-yellow-400",
+    manager: "bg-yellow-400/30 text-yellow-300", cleaner: "bg-yellow-400/15 text-yellow-400/80", other: "bg-yellow-400/10 text-yellow-400/60"
   };
 
   const getShiftsForDay = (date) => {
@@ -266,7 +266,7 @@ export default function EmployeeCalendar() {
                     <CardHeader className={`pb-2 ${isToday ? 'bg-yellow-400/10' : 'bg-[#1a1a1a]'}`}>
                       <CardTitle className="text-sm text-center">
                         <div className="font-medium text-gray-600">{format(day, 'EEEE', { locale: es })}</div>
-                        <div className={`text-2xl ${isToday ? 'text-red-600' : ''}`}>{format(day, 'd')}</div>
+                        <div className={`text-2xl ${isToday ? 'text-yellow-400' : ''}`}>{format(day, 'd')}</div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-2 min-h-[150px]">
@@ -278,16 +278,16 @@ export default function EmployeeCalendar() {
                               key={shift.id}
                               onClick={() => openShiftDialog(day, shift)}
                               className={`p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md ${
-                                shift.status === 'paid' ? 'bg-green-100 border border-green-300' :
-                                shift.status === 'completed' ? 'bg-blue-100 border border-blue-300' :
-                                shift.status === 'cancelled' ? 'bg-red-100 border border-red-300 opacity-50' :
-                                'bg-purple-100 border border-purple-300'
+                                shift.status === 'paid' ? 'bg-yellow-400/20 border border-yellow-400/40' :
+                                 shift.status === 'completed' ? 'bg-yellow-400/10 border border-yellow-400/20' :
+                                 shift.status === 'cancelled' ? 'bg-[#1a1a1a] border border-yellow-500/10 opacity-50' :
+                                 'bg-yellow-400/10 border border-yellow-500/20'
                               }`}
                             >
                               <div className="font-semibold truncate">{shift.employee_name}</div>
                               <div className="text-gray-600">{shift.start_time} - {shift.end_time}</div>
-                              <div className="font-bold text-green-700">${shift.amount?.toFixed(2)}</div>
-                              {shift.status === 'paid' && <Badge className="bg-green-600 text-white text-xs mt-1">Pagado</Badge>}
+                              <div className="font-bold text-yellow-400">${shift.amount?.toFixed(2)}</div>
+                              {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black text-xs mt-1">Pagado</Badge>}
                             </div>
                           );
                         })}
@@ -317,8 +317,8 @@ export default function EmployeeCalendar() {
                     getShiftsForDay(new Date()).map((shift) => (
                       <div key={shift.id} className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                            <span className="font-bold text-purple-600">{shift.employee_name.charAt(0)}</span>
+                          <div className="w-10 h-10 bg-yellow-400/20 rounded-full flex items-center justify-center">
+                            <span className="font-bold text-yellow-400">{shift.employee_name.charAt(0)}</span>
                           </div>
                           <div>
                             <p className="font-semibold">{shift.employee_name}</p>
@@ -328,11 +328,11 @@ export default function EmployeeCalendar() {
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-lg">${shift.amount?.toFixed(2)}</span>
                           {shift.status === 'scheduled' && (
-                            <Button size="sm" onClick={() => completeShiftAndPay(shift)} className="bg-green-600 hover:bg-green-700">
+                            <Button size="sm" onClick={() => completeShiftAndPay(shift)} className="bg-yellow-400 hover:bg-yellow-300 text-black">
                               <Check className="w-4 h-4 mr-2" /> Completar y Pagar
                             </Button>
                           )}
-                          {shift.status === 'paid' && <Badge className="bg-green-600">Pagado</Badge>}
+                          {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black">Pagado</Badge>}
                         </div>
                       </div>
                     ))
@@ -347,7 +347,7 @@ export default function EmployeeCalendar() {
           {/* Employees Tab */}
           <TabsContent value="employees" className="space-y-6">
             <div className="flex justify-end">
-              <Button onClick={() => setShowEmployeeForm(!showEmployeeForm)} className="bg-red-600 hover:bg-red-700 gap-2">
+              <Button onClick={() => setShowEmployeeForm(!showEmployeeForm)} className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2">
                 <Plus className="w-4 h-4" /> Nuevo Empleado / New Employee
               </Button>
             </div>
@@ -416,7 +416,7 @@ export default function EmployeeCalendar() {
                       </div>
                       <div className="flex gap-3 justify-end">
                         <Button type="button" variant="outline" onClick={resetEmployeeForm}>Cancelar</Button>
-                        <Button type="submit" className="bg-red-600 hover:bg-red-700">{editingEmployee ? 'Actualizar' : 'Guardar'}</Button>
+                        <Button type="submit" className="bg-yellow-400 hover:bg-yellow-300 text-black">{editingEmployee ? 'Actualizar' : 'Guardar'}</Button>
                       </div>
                     </form>
                   </CardContent>
@@ -431,9 +431,9 @@ export default function EmployeeCalendar() {
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                            <span className="text-xl font-bold text-purple-600">{employee.name.charAt(0)}</span>
-                          </div>
+                          <div className="w-12 h-12 bg-yellow-400/20 rounded-full flex items-center justify-center">
+                              <span className="text-xl font-bold text-yellow-400">{employee.name.charAt(0)}</span>
+                            </div>
                           <div>
                             <h3 className="font-bold text-lg">{employee.name}</h3>
                             <Badge className={roleColors[employee.role]}>{roleLabels[employee.role]}</Badge>
@@ -448,8 +448,8 @@ export default function EmployeeCalendar() {
                       {employee.email && <p className="text-sm text-gray-600 mb-3">📧 {employee.email}</p>}
                       <div className="pt-4 border-t">
                         <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-green-600" />
-                          <span className="font-bold text-green-600">
+                          <DollarSign className="w-4 h-4 text-yellow-400" />
+                            <span className="font-bold text-yellow-400">
                             ${employee.payment_type === 'daily' ? employee.daily_rate?.toFixed(2) : employee.hourly_rate?.toFixed(2)} MXN
                           </span>
                           <span className="text-sm text-gray-500">/ {employee.payment_type === 'daily' ? 'día' : 'hora'}</span>
@@ -513,7 +513,7 @@ export default function EmployeeCalendar() {
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
-              <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700">{editingShift ? 'Actualizar' : 'Guardar'}</Button>
+              <Button type="submit" className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black">{editingShift ? 'Actualizar' : 'Guardar'}</Button>
             </div>
           </form>
         </DialogContent>

@@ -320,13 +320,13 @@ export default function CompanyAccount() {
   // Expense categories and units
   const expenseCategories = [
     { id: "all", name: "Todos / All", color: "bg-gray-100 text-gray-800", icon: "📋" },
-    { id: "ingredients", name: "Ingredientes", color: "bg-green-100 text-green-800", icon: "🥗" },
-    { id: "rent", name: "Renta", color: "bg-blue-100 text-blue-800", icon: "🏠" },
-    { id: "utilities", name: "Servicios", color: "bg-yellow-100 text-yellow-800", icon: "💡" },
-    { id: "salaries", name: "Salarios", color: "bg-purple-100 text-purple-800", icon: "👥" },
-    { id: "equipment", name: "Equipo", color: "bg-orange-100 text-orange-800", icon: "🔧" },
-    { id: "marketing", name: "Marketing", color: "bg-pink-100 text-pink-800", icon: "📢" },
-    { id: "other", name: "Otros", color: "bg-gray-100 text-gray-800", icon: "📦" },
+    { id: "ingredients", name: "Ingredientes", color: "bg-yellow-400/20 text-yellow-400", icon: "🥗" },
+    { id: "rent", name: "Renta", color: "bg-yellow-400/20 text-yellow-400", icon: "🏠" },
+    { id: "utilities", name: "Servicios", color: "bg-yellow-400/20 text-yellow-400", icon: "💡" },
+    { id: "salaries", name: "Salarios", color: "bg-yellow-400/20 text-yellow-400", icon: "👥" },
+    { id: "equipment", name: "Equipo", color: "bg-yellow-400/20 text-yellow-400", icon: "🔧" },
+    { id: "marketing", name: "Marketing", color: "bg-yellow-400/20 text-yellow-400", icon: "📢" },
+    { id: "other", name: "Otros", color: "bg-yellow-400/10 text-yellow-400/70", icon: "📦" },
   ];
 
   const expenseUnits = [
@@ -487,7 +487,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-500">${companyExpenses.toFixed(2)}</div>
+              <div className="text-3xl font-bold text-yellow-400/70">${companyExpenses.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">
                 💵${expensesFromCompanyCash.toFixed(2)} | 🏦${expensesFromCompanyAccount.toFixed(2)}
               </p>
@@ -570,7 +570,7 @@ export default function CompanyAccount() {
                     <TrendingDown className="w-4 h-4" />
                     Total Gastos
                   </div>
-                  <div className="text-2xl font-bold text-red-500">${totalExpensesFiltered.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-yellow-400/70">${totalExpensesFiltered.toFixed(2)}</div>
                 </CardContent>
               </Card>
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
@@ -815,7 +815,7 @@ export default function CompanyAccount() {
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <div className="text-xl font-bold text-red-600">${expense.amount?.toFixed(2)}</div>
+                              <div className="text-xl font-bold text-yellow-400/70">${expense.amount?.toFixed(2)}</div>
                               <p className="text-xs text-gray-500">{expense.quantity} {expense.unit}</p>
                             </div>
                             <div className="flex gap-1">
@@ -1028,9 +1028,9 @@ export default function CompanyAccount() {
                                 transaction.type === 'contribution' ? 'bg-yellow-400/20' : 'bg-red-500/20'
                               }`}>
                                 {transaction.type === 'contribution' ? (
-                                  <TrendingUp className="w-6 h-6 text-green-600" />
+                                  <TrendingUp className="w-6 h-6 text-yellow-400" />
                                 ) : (
-                                  <TrendingDown className="w-6 h-6 text-red-600" />
+                                  <TrendingDown className="w-6 h-6 text-yellow-400/60" />
                                 )}
                               </div>
                               <div className="flex-1">
@@ -1064,7 +1064,7 @@ export default function CompanyAccount() {
 
                           <div className="flex flex-col items-end gap-3">
                             <div className={`text-3xl font-bold ${
-                              transaction.type === 'contribution' ? 'text-green-600' : 'text-red-600'
+                              transaction.type === 'contribution' ? 'text-yellow-400' : 'text-yellow-400/60'
                             }`}>
                               {transaction.type === 'contribution' ? '+' : '-'}${transaction.amount?.toFixed(2)}
                             </div>
@@ -1079,7 +1079,7 @@ export default function CompanyAccount() {
                               <Button
                                 size="icon"
                                 variant="outline"
-                                className="text-red-600 hover:bg-red-50"
+                                className="text-yellow-400/60 hover:text-yellow-400"
                                 onClick={() => handleDeleteTransaction(transaction.id)}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1218,7 +1218,7 @@ export default function CompanyAccount() {
 
             {/* Balance Equalization Card */}
             {equityHolders.length > 1 && (
-              <Card className="border-0 shadow-lg bg-gradient-to-r from-indigo-50 to-blue-50">
+              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-yellow-400">
                     <Users className="w-5 h-5 text-yellow-400" />
@@ -1233,7 +1233,7 @@ export default function CompanyAccount() {
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Promedio por Socio / Average per Partner:</span>
-                      <span className="font-bold text-indigo-600">${averageEquityNet.toFixed(2)}</span>
+                      <span className="font-bold text-yellow-400">${averageEquityNet.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -1242,7 +1242,7 @@ export default function CompanyAccount() {
                       const diff = holder.net_contribution - averageEquityNet;
                       const isAbove = diff >= 0;
                       return (
-                        <div key={holder.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100">
+                        <div key={holder.id} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-yellow-500/10">
                           <div className="flex items-center gap-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                               isAbove ? 'bg-yellow-400/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
@@ -1304,7 +1304,7 @@ export default function CompanyAccount() {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="text-red-600 hover:bg-red-50"
+                              className="text-yellow-400/60 hover:text-yellow-400"
                               onClick={() => handleDeleteContributor(contributor.id)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1322,15 +1322,15 @@ export default function CompanyAccount() {
                         <div className="space-y-2 pt-4 border-t">
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Contribuido / Contributed:</span>
-                            <span className="font-semibold text-green-600">+${contributor.total_contributed.toFixed(2)}</span>
+                            <span className="font-semibold text-yellow-400">+${contributor.total_contributed.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Retirado / Withdrawn:</span>
-                            <span className="font-semibold text-red-600">-${contributor.total_withdrawn.toFixed(2)}</span>
+                            <span className="font-semibold text-yellow-400/60">-${contributor.total_withdrawn.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between pt-2 border-t">
                             <span className="font-semibold">Balance Neto / Net:</span>
-                            <span className={`font-bold ${contributor.net_contribution >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <span className="font-bold text-yellow-400">
                               ${contributor.net_contribution.toFixed(2)}
                             </span>
                           </div>
