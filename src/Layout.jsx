@@ -74,7 +74,7 @@ export default function Layout({ children, currentPageName }) {
               <img 
                 src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                 alt="Los Tíos"
-                className="w-7 h-7 rounded object-contain"
+                className="w-9 h-9 rounded-full object-contain border-2 border-yellow-400/70"
               />
             </Link>
 
