@@ -12,11 +12,11 @@ export default function Layout({ children, currentPageName }) {
   const navItems = [
     { name: "Panel Principal", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
     { name: "Pedidos", url: createPageUrl("Orders"), icon: ShoppingBag },
-    { name: "Estadísticas", url: createPageUrl("Statistics"), icon: BarChart3, highlight: true },
+    { name: "Estadísticas", url: createPageUrl("Statistics"), icon: BarChart3 },
     { name: "Menú", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
-    { name: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet, highlight: true },
-    { name: "Lista de Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart, highlight: true },
-    { name: "Empleados", url: createPageUrl("EmployeeCalendar"), icon: Users, highlight: true },
+    { name: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet },
+    { name: "Lista de Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
+    { name: "Empleados", url: createPageUrl("EmployeeCalendar"), icon: Users },
     { name: "Página de Clientes", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
   ];
 
