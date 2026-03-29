@@ -1050,7 +1050,7 @@ export default function CustomerOrder() {
                   <h2 className="text-3xl font-bold mb-6 text-yellow-400 text-center">
                         {category.name}
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch justify-items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {items.map((item) => (
                           <motion.div
                             key={item.id}
@@ -1058,7 +1058,7 @@ export default function CustomerOrder() {
                             animate={{ opacity: 1, scale: 1 }}
                             whileHover={{ scale: 1.03 }}
                             transition={{ duration: 0.2 }}
-                            className="h-full"
+                            className="h-full flex flex-col"
                           >
                              <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424] flex flex-col h-full">
                                              <div className="relative h-56 flex-shrink-0">
