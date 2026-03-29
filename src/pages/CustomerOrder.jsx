@@ -1065,7 +1065,7 @@ export default function CustomerOrder() {
                                                <img
                                                  src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
                                                  alt={item.name}
-                                                 className="w-full h-full object-cover"
+                                                 className="w-full h-full object-contain"
                                                />
                             {item.is_vegetarian && (
                               <Badge className="absolute top-3 right-3 bg-green-500">
