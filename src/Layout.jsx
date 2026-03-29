@@ -101,9 +101,10 @@ export default function Layout({ children, currentPageName }) {
             <div className="flex items-center gap-1">
               <button
                 onClick={handleLogout}
-                className="hidden md:flex items-center gap-1 px-2 py-1.5 rounded text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all"
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20 transition-all"
               >
                 <LogOut className="w-3 h-3" />
+                Cerrar Sesión
               </button>
 
               <button
