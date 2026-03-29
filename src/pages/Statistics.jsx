@@ -198,7 +198,7 @@ export default function Statistics() {
               <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-400">Ver por Mes:</label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-[#1a1a1a] border-yellow-500/20 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
