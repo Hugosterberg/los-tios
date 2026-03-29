@@ -49,11 +49,9 @@ export default function MenuManagement() {
 
   const categories = [
     { id: "all", name: "Todos" },
-    { id: "specials", name: "Especiales" },
     { id: "appetizers", name: "Entradas" },
     { id: "pizzas", name: "Pizzas" },
     { id: "paninis", name: "Paninis" },
-    { id: "mains", name: "Platos Fuertes" },
     { id: "desserts", name: "Postres" },
     { id: "beverages", name: "Bebidas" },
   ];
