@@ -48,12 +48,14 @@ export default function MenuManagement() {
   });
 
   const categories = [
-    { id: "all", name: "All Items" },
-    { id: "specials", name: "Specials" },
-    { id: "appetizers", name: "Appetizers" },
-    { id: "mains", name: "Main Courses" },
-    { id: "desserts", name: "Desserts" },
-    { id: "beverages", name: "Beverages" },
+    { id: "all", name: "Todos" },
+    { id: "specials", name: "Especiales" },
+    { id: "appetizers", name: "Entradas" },
+    { id: "pizzas", name: "Pizzas" },
+    { id: "paninis", name: "Paninis" },
+    { id: "mains", name: "Platos Fuertes" },
+    { id: "desserts", name: "Postres" },
+    { id: "beverages", name: "Bebidas" },
   ];
 
   const filteredItems = menuItems.filter(item => {

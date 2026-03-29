@@ -61,13 +61,13 @@ export default function CustomerOrder() {
   const availableItems = menuItems.filter(item => item.is_available);
 
   const categories = [
-    { id: "specials", name: "ESPECIALES DEL DÍA", emoji: "⭐" },
-    { id: "appetizers", name: "ENTRADAS", emoji: "🥗" },
-    { id: "pizzas", name: "PIZZAS", emoji: "🍕" },
-    { id: "paninis", name: "PANINIS", emoji: "🥪" },
-    { id: "mains", name: "PLATOS FUERTES", emoji: "🍽️" },
-    { id: "desserts", name: "POSTRES", emoji: "🍰" },
-    { id: "beverages", name: "BEBIDAS", emoji: "🥤" },
+    { id: "specials", name: "ESPECIALES DEL DÍA" },
+    { id: "appetizers", name: "ENTRADAS" },
+    { id: "pizzas", name: "PIZZAS" },
+    { id: "paninis", name: "PANINIS" },
+    { id: "mains", name: "PLATOS FUERTES" },
+    { id: "desserts", name: "POSTRES" },
+    { id: "beverages", name: "BEBIDAS" },
   ];
 
   const openIngredientDialog = (item) => {
@@ -1047,8 +1047,7 @@ export default function CustomerOrder() {
 
               return (
                 <div key={category.id}>
-                  <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 text-yellow-400 justify-center md:justify-start">
-                        <span>{category.emoji}</span>
+                  <h2 className="text-3xl font-bold mb-6 text-yellow-400 text-center">
                         {category.name}
                       </h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">

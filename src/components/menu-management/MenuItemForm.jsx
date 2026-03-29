@@ -147,11 +147,13 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="specials">Today's Specials</SelectItem>
-                  <SelectItem value="appetizers">Appetizers</SelectItem>
-                  <SelectItem value="mains">Main Courses</SelectItem>
-                  <SelectItem value="desserts">Desserts</SelectItem>
-                  <SelectItem value="beverages">Beverages</SelectItem>
+                  <SelectItem value="specials">Especiales</SelectItem>
+                  <SelectItem value="appetizers">Entradas</SelectItem>
+                  <SelectItem value="pizzas">Pizzas</SelectItem>
+                  <SelectItem value="paninis">Paninis</SelectItem>
+                  <SelectItem value="mains">Platos Fuertes</SelectItem>
+                  <SelectItem value="desserts">Postres</SelectItem>
+                  <SelectItem value="beverages">Bebidas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
