@@ -1050,7 +1050,7 @@ export default function CustomerOrder() {
                   <h2 className="text-3xl font-bold mb-6 text-yellow-400 text-center">
                         {category.name}
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch justify-items-center">
                         {items.map((item) => (
                           <motion.div
                             key={item.id}
