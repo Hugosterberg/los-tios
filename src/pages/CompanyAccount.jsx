@@ -419,14 +419,14 @@ export default function CompanyAccount() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+    <div className="min-h-screen bg-[#1a1a1a] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Wallet className="w-10 h-10" />
+          <div className="flex items-center gap-3">
+            <Wallet className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-4xl font-bold">Cuenta de la Empresa</h1>
-              <p className="text-gray-300 mt-1">Company Account & Contributors</p>
+              <h1 className="text-xl font-bold text-yellow-400">Cuenta de la Empresa</h1>
+              <p className="text-xs text-gray-500">Finanzas y Contribuyentes</p>
             </div>
           </div>
         </div>
@@ -466,7 +466,7 @@ export default function CompanyAccount() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
@@ -479,7 +479,7 @@ export default function CompanyAccount() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <TrendingDown className="w-4 h-4" />
@@ -494,7 +494,7 @@ export default function CompanyAccount() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <Users className="w-4 h-4" />
@@ -509,7 +509,7 @@ export default function CompanyAccount() {
         </div>
 
         {/* Cash Flow Summary */}
-        <Card className="border-0 shadow-lg">
+        <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               💵 Resumen de Efectivo / Cash Summary
@@ -527,11 +527,11 @@ export default function CompanyAccount() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="expenses" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="expenses">Gastos / Expenses</TabsTrigger>
-            <TabsTrigger value="transactions">Transacciones</TabsTrigger>
-            <TabsTrigger value="contributors">Contribuyentes</TabsTrigger>
+        <Tabs defaultValue="expenses" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 bg-[#242424] border border-yellow-500/20">
+            <TabsTrigger value="expenses" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Gastos</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Transacciones</TabsTrigger>
+            <TabsTrigger value="contributors" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Contribuyentes</TabsTrigger>
           </TabsList>
 
           {/* Expenses Tab */}
@@ -564,7 +564,7 @@ export default function CompanyAccount() {
 
             {/* Expense Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="border-0 shadow">
+              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
                     <TrendingDown className="w-4 h-4" />
@@ -573,7 +573,7 @@ export default function CompanyAccount() {
                   <div className="text-2xl font-bold text-red-600">${totalExpensesFiltered.toFixed(2)}</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow">
+              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
                     <CalendarIcon className="w-4 h-4" />
@@ -582,7 +582,7 @@ export default function CompanyAccount() {
                   <div className="text-2xl font-bold text-orange-600">${monthlyRecurring.toFixed(2)}</div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow">
+              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardContent className="pt-6">
                   <div className="text-sm text-gray-600 mb-1">Total Recurrentes</div>
                   <div className="text-2xl font-bold text-purple-600">{recurringExpenses.length}</div>
@@ -593,7 +593,7 @@ export default function CompanyAccount() {
             {/* Expense Form */}
             {showExpenseForm && (
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader>
                     <CardTitle>{editingExpense ? 'Editar Gasto' : 'Nuevo Gasto'}</CardTitle>
                   </CardHeader>
@@ -727,7 +727,7 @@ export default function CompanyAccount() {
                       </div>
 
                       {expenseForm.payment_source === 'individual' && (
-                        <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
+                        <div className="space-y-2 p-4 bg-[#1a1a1a] rounded-lg">
                           <Label>Contribuyentes Individuales</Label>
                           <div className="flex gap-2">
                             <Select
@@ -833,7 +833,7 @@ export default function CompanyAccount() {
                   );
                 })
               ) : (
-                <Card className="border-0 shadow">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardContent className="text-center py-12">
                     <Receipt className="w-12 h-12 mx-auto text-gray-400 mb-3" />
                     <p className="text-gray-500">No hay gastos registrados</p>
@@ -858,7 +858,7 @@ export default function CompanyAccount() {
             {/* Transaction Form */}
             {showTransactionForm && (
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader>
                     <CardTitle className="text-2xl">
                       {editingTransaction ? 'Editar Transacción / Edit Transaction' : 'Nueva Transacción / New Transaction'}
@@ -1056,7 +1056,7 @@ export default function CompanyAccount() {
                               <p className="text-xs text-gray-500">Ref: {transaction.reference_number}</p>
                             )}
                             {transaction.notes && (
-                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                              <div className="mt-3 p-3 bg-[#1a1a1a] rounded-lg">
                                 <p className="text-sm text-gray-700">{transaction.notes}</p>
                               </div>
                             )}
@@ -1092,7 +1092,7 @@ export default function CompanyAccount() {
                   </motion.div>
                 ))
               ) : (
-                <Card className="border-0 shadow">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardContent className="text-center py-20">
                     <Wallet className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                     <p className="text-gray-500 text-lg">No hay transacciones registradas</p>
@@ -1118,7 +1118,7 @@ export default function CompanyAccount() {
             {/* Contributor Form */}
             {showContributorForm && (
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader>
                     <CardTitle className="text-2xl">
                       {editingContributor ? 'Editar Contribuyente / Edit Contributor' : 'Nuevo Contribuyente / New Contributor'}
@@ -1337,7 +1337,7 @@ export default function CompanyAccount() {
                         </div>
 
                         {contributor.notes && (
-                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="mt-3 p-3 bg-[#1a1a1a] rounded-lg">
                             <p className="text-sm text-gray-700">{contributor.notes}</p>
                           </div>
                         )}

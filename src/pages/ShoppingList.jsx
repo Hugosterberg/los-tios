@@ -277,15 +277,15 @@ export default function ShoppingList() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+    <div className="min-h-screen bg-[#1a1a1a] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-3">
-              <ShoppingCart className="w-10 h-10" />
+              <ShoppingCart className="w-6 h-6 text-yellow-400" />
               <div>
-                <h1 className="text-4xl font-bold">Lista de Compras</h1>
-                <p className="text-gray-300 mt-1">Shopping List</p>
+                <h1 className="text-xl font-bold text-yellow-400">Lista de Compras</h1>
+                <p className="text-xs text-gray-500">Gestión de compras</p>
               </div>
             </div>
             <Button
@@ -302,7 +302,7 @@ export default function ShoppingList() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
@@ -315,7 +315,7 @@ export default function ShoppingList() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
@@ -328,7 +328,7 @@ export default function ShoppingList() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">
                 Costo Estimado / Estimated Cost
@@ -377,7 +377,7 @@ export default function ShoppingList() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <Card className="border-0 shadow-lg">
+            <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
                 <CardTitle className="text-2xl">
                   {editingItem ? 'Editar Producto / Edit Item' : 'Agregar Producto / Add Item'}
@@ -566,8 +566,8 @@ export default function ShoppingList() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <Card className={`border-0 shadow hover:shadow-lg transition-shadow ${
-                    item.status === 'purchased' ? 'bg-gray-50 opacity-75' : 'bg-white'
+                  <Card className={`bg-[#242424] border border-yellow-500/15 shadow-none transition-all ${
+                    item.status === 'purchased' ? 'opacity-60' : ''
                   }`}>
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -632,7 +632,7 @@ export default function ShoppingList() {
                           </div>
 
                           {item.notes && (
-                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                            <div className="mt-3 p-3 bg-[#1a1a1a] rounded-lg">
                               <p className="text-sm text-gray-700">{item.notes}</p>
                             </div>
                           )}
@@ -697,7 +697,7 @@ export default function ShoppingList() {
               );
             })
           ) : (
-            <Card className="border-0 shadow">
+            <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardContent className="text-center py-20">
                 <ShoppingCart className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                 <p className="text-gray-500 text-lg">No hay productos en la lista</p>

@@ -149,7 +149,7 @@ export default function Statistics() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#1a1a1a] text-white">
       <style>{`
         @media print {
           body * {
@@ -178,13 +178,13 @@ export default function Statistics() {
         }
       `}</style>
 
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12 no-print">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <BarChart3 className="w-10 h-10" />
+          <div className="flex items-center gap-3">
+            <BarChart3 className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-4xl font-bold">Estadísticas de Ventas</h1>
-              <p className="text-gray-300 mt-1">Sales Statistics & Profitability</p>
+              <h1 className="text-xl font-bold text-yellow-400">Estadísticas</h1>
+              <p className="text-xs text-gray-500">Ventas y Rentabilidad</p>
             </div>
           </div>
         </div>
@@ -192,14 +192,11 @@ export default function Statistics() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Date Filters */}
-        <Card className="border-0 shadow-lg no-print">
-          <CardHeader>
-            <CardTitle>Seleccionar Período / Select Time Period</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4 no-print">
+          <h3 className="text-sm font-bold text-yellow-400 mb-3">Seleccionar Período</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ver por Mes / View by Month:</label>
+                <label className="text-xs font-medium text-gray-400">Ver por Mes:</label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger>
                     <SelectValue />
@@ -224,16 +221,15 @@ export default function Statistics() {
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
         {/* Print Buttons */}
         <div className="flex gap-4 no-print">
-          <Button onClick={handlePrintDaily} className="bg-blue-600 hover:bg-blue-700 gap-2">
+          <Button onClick={handlePrintDaily} className="h-8 text-xs bg-yellow-400 hover:bg-yellow-300 text-black gap-2">
             <Printer className="w-4 h-4" />
             Imprimir Reporte Diario / Print Daily Report
           </Button>
-          <Button onClick={handlePrintMonthly} className="bg-purple-600 hover:bg-purple-700 gap-2">
+          <Button onClick={handlePrintMonthly} className="h-8 text-xs bg-[#242424] border border-yellow-500/20 text-gray-300 hover:text-white gap-2">
             <Printer className="w-4 h-4" />
             Imprimir Reporte Mensual / Print Monthly Report
           </Button>
@@ -266,7 +262,7 @@ export default function Statistics() {
                 Estadísticas Diarias / Daily Statistics - {format(new Date(selectedDay), 'MMMM d, yyyy', { locale: es })}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
@@ -278,7 +274,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingDown className="w-4 h-4" />
@@ -307,7 +303,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <Package className="w-4 h-4" />
@@ -395,7 +391,7 @@ export default function Statistics() {
                 Estadísticas Mensuales / Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
@@ -407,7 +403,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingDown className="w-4 h-4" />
@@ -436,7 +432,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <Package className="w-4 h-4" />
@@ -448,7 +444,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
@@ -465,7 +461,7 @@ export default function Statistics() {
               {!printMode && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                   {/* Revenue vs Expenses vs Profit Chart */}
-                  <Card className="border-0 shadow-lg">
+                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
                       <CardTitle>Ingresos, Gastos y Ganancias Diarias</CardTitle>
                       <p className="text-sm text-gray-500">Daily Revenue, Expenses & Profit</p>
@@ -489,7 +485,7 @@ export default function Statistics() {
                   </Card>
 
                   {/* Orders by Type */}
-                  <Card className="border-0 shadow-lg">
+                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
                       <CardTitle>Orders by Type</CardTitle>
                     </CardHeader>
@@ -522,7 +518,7 @@ export default function Statistics() {
               {printMode === 'monthly' && (
                 <div className="space-y-6 mt-6">
                   {/* Revenue Breakdown by Type */}
-                  <Card className="border-0 shadow-lg">
+                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
                       <CardTitle>Ingresos por Tipo de Pedido / Revenue by Order Type</CardTitle>
                     </CardHeader>
@@ -554,7 +550,7 @@ export default function Statistics() {
                   </Card>
 
                   {/* Expenses Summary by Category */}
-                  <Card className="border-0 shadow-lg">
+                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
                       <CardTitle>Resumen de Gastos por Categoría / Expenses Summary by Category</CardTitle>
                     </CardHeader>
@@ -601,7 +597,7 @@ export default function Statistics() {
                   {topItems.length > 0 ? (
                     <div className="space-y-4">
                       {topItems.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div key={index} className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg">
                           <div className="flex items-center gap-4">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                               ['bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 'bg-yellow-100 text-yellow-600', 'bg-green-100 text-green-600', 'bg-blue-100 text-blue-600'][index % 5]
@@ -635,7 +631,7 @@ export default function Statistics() {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {ordersByType.map((type) => (
-                        <div key={type.name} className="p-4 bg-gray-50 rounded-lg">
+                        <div key={type.name} className="p-4 bg-[#1a1a1a] rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-semibold">{type.name}</span>
                             <span className="text-sm text-gray-600">{type.value} pedidos</span>

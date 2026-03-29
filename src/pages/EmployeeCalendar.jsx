@@ -217,30 +217,30 @@ export default function EmployeeCalendar() {
   const activeEmployees = employees.filter(e => e.is_active);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+    <div className="min-h-screen bg-[#1a1a1a] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <Calendar className="w-10 h-10" />
+            <Calendar className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-4xl font-bold">Calendario de Empleados</h1>
-              <p className="text-gray-300 mt-1">Employee Calendar & Shifts</p>
+              <h1 className="text-xl font-bold text-yellow-400">Empleados</h1>
+              <p className="text-xs text-gray-500">Calendario y Turnos</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <Tabs defaultValue="calendar" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendar">📅 Calendario / Calendar</TabsTrigger>
-            <TabsTrigger value="employees">👥 Empleados / Employees</TabsTrigger>
+        <Tabs defaultValue="calendar" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 bg-[#242424] border border-yellow-500/20">
+            <TabsTrigger value="calendar" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">📅 Calendario</TabsTrigger>
+            <TabsTrigger value="employees" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">👥 Empleados</TabsTrigger>
           </TabsList>
 
           {/* Calendar Tab */}
           <TabsContent value="calendar" className="space-y-6">
             {/* Week Navigation */}
-            <Card className="border-0 shadow-lg">
+            <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <Button variant="outline" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}>
@@ -262,8 +262,8 @@ export default function EmployeeCalendar() {
                 const dayShifts = getShiftsForDay(day);
                 const isToday = isSameDay(day, new Date());
                 return (
-                  <Card key={day.toISOString()} className={`border-0 shadow ${isToday ? 'ring-2 ring-red-500' : ''}`}>
-                    <CardHeader className={`pb-2 ${isToday ? 'bg-red-50' : 'bg-gray-50'}`}>
+                  <Card key={day.toISOString()} className={`bg-[#242424] border shadow-none ${isToday ? 'border-yellow-400' : 'border-yellow-500/15'}`}>
+                    <CardHeader className={`pb-2 ${isToday ? 'bg-yellow-400/10' : 'bg-[#1a1a1a]'}`}>
                       <CardTitle className="text-sm text-center">
                         <div className="font-medium text-gray-600">{format(day, 'EEEE', { locale: es })}</div>
                         <div className={`text-2xl ${isToday ? 'text-red-600' : ''}`}>{format(day, 'd')}</div>
@@ -307,7 +307,7 @@ export default function EmployeeCalendar() {
             </div>
 
             {/* Today's Shifts Summary */}
-            <Card className="border-0 shadow-lg">
+            <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
                 <CardTitle>Turnos de Hoy / Today's Shifts</CardTitle>
               </CardHeader>
@@ -315,7 +315,7 @@ export default function EmployeeCalendar() {
                 <div className="space-y-3">
                   {getShiftsForDay(new Date()).length > 0 ? (
                     getShiftsForDay(new Date()).map((shift) => (
-                      <div key={shift.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={shift.id} className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                             <span className="font-bold text-purple-600">{shift.employee_name.charAt(0)}</span>
@@ -354,7 +354,7 @@ export default function EmployeeCalendar() {
 
             {showEmployeeForm && (
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="border-0 shadow-lg">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader>
                     <CardTitle>{editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}</CardTitle>
                   </CardHeader>
@@ -427,7 +427,7 @@ export default function EmployeeCalendar() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {employees.map((employee) => (
                 <motion.div key={employee.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <Card className={`border-0 shadow hover:shadow-lg transition-shadow ${!employee.is_active ? 'opacity-60' : ''}`}>
+                  <Card className={`bg-[#242424] border border-yellow-500/15 shadow-none ${!employee.is_active ? 'opacity-60' : ''}`}>
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
