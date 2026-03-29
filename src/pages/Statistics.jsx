@@ -217,7 +217,7 @@ export default function Statistics() {
                   type="date"
                   value={selectedDay}
                   onChange={(e) => setSelectedDay(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 bg-[#1a1a1a] border border-yellow-500/20 rounded-md text-white [color-scheme:dark]"
                 />
               </div>
             </div>
