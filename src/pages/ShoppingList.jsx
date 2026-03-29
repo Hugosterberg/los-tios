@@ -343,18 +343,19 @@ export default function ShoppingList() {
 
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex gap-2 overflow-x-auto pb-2 flex-1">
+          <div className="flex flex-wrap gap-1.5 flex-1">
             {categories.map((cat) => (
               <Button
                 key={cat.id}
                 variant={selectedCategory === cat.id ? "default" : "outline"}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-2 whitespace-nowrap ${
+                size="sm"
+                className={`flex items-center gap-1 text-xs px-2 py-1 h-7 ${
                   selectedCategory === cat.id ? 'bg-yellow-400 hover:bg-yellow-300 text-black' : 'border-yellow-500/20 text-gray-400'
                 }`}
               >
-                <span>{cat.icon}</span>
-                {cat.name}
+                <span className="text-xs">{cat.icon}</span>
+                {cat.name.split('/')[0].trim()}
               </Button>
             ))}
           </div>
