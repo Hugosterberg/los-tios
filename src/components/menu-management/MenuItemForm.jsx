@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,13 +92,11 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
   };
 
   return (
-    <Card className="mb-8 border-0 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl">
-          {item ? 'Edit Menu Item' : 'Add New Menu Item'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="mb-6 bg-[#242424] border border-yellow-500/20 rounded-xl p-5">
+      <h2 className="text-sm font-bold text-yellow-400 mb-4">
+        {item ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+      </h2>
+      <div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -341,15 +338,17 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
           </div>
 
           <div className="flex gap-3 justify-end pt-4">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+            <Button type="button" variant="outline" onClick={onCancel}
+              className="h-8 text-xs border-yellow-500/20 text-gray-400 hover:text-gray-200 bg-transparent">
+              Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-red-600 hover:bg-red-700">
-              {isLoading ? "Saving..." : item ? "Update Item" : "Add Item"}
+            <Button type="submit" disabled={isLoading}
+              className="h-8 text-xs bg-yellow-400 hover:bg-yellow-300 text-black">
+              {isLoading ? "Guardando..." : item ? "Actualizar" : "Agregar"}
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

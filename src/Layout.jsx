@@ -25,7 +25,7 @@ export default function Layout({ children, currentPageName }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#1a1a1a]">
       <style>{`
         :root {
           --primary-600: #F5C400;

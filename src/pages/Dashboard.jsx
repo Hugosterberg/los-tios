@@ -108,250 +108,170 @@ export default function Dashboard() {
   const customerOrderUrl = `${window.location.origin}${createPageUrl("CustomerOrder")}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+    <div className="min-h-screen bg-[#1a1a1a]">
+      <div className="border-b border-yellow-500/20 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-4xl font-bold mb-2">Panel de Gestión</h1>
-            <p className="text-gray-300">
+            <h1 className="text-xl font-bold text-yellow-400">Panel de Gestión</h1>
+            <p className="text-gray-500 text-sm">
               {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
             </p>
           </motion.div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Customer Order Link Banner */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-l-green-500">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Globe className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Página de Pedidos para Clientes</h3>
-                    <p className="text-sm text-gray-600 mb-2">Comparte este enlace con tus clientes para que puedan ordenar en línea</p>
-                    <code className="text-xs bg-white px-3 py-1 rounded border text-green-700 font-mono">
-                      {customerOrderUrl}
-                    </code>
-                  </div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Button
-                    onClick={() => {
-                      navigator.clipboard.writeText(customerOrderUrl);
-                      alert('¡Enlace copiado al portapapeles!');
-                    }}
-                    variant="outline"
-                    className="bg-white"
-                  >
-                    Copiar Enlace
-                  </Button>
-                  <Button
-                    onClick={() => window.open(createPageUrl("CustomerOrder"), '_blank')}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Ver Página
-                  </Button>
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Globe className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-400">Página de Pedidos para Clientes</p>
+                  <code className="text-xs text-gray-400 font-mono">{customerOrderUrl}</code>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button
+                  onClick={() => { navigator.clipboard.writeText(customerOrderUrl); alert('¡Enlace copiado!'); }}
+                  variant="outline"
+                  className="h-7 text-xs px-3 border-yellow-500/30 text-gray-300 hover:text-yellow-400 bg-transparent"
+                >
+                  Copiar
+                </Button>
+                <Button
+                  onClick={() => window.open(createPageUrl("CustomerOrder"), '_blank')}
+                  className="h-7 text-xs px-3 bg-yellow-400 hover:bg-yellow-300 text-black"
+                >
+                  Ver Página
+                </Button>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Ingresos de Hoy</CardTitle>
-                <DollarSign className="w-5 h-5 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-green-600">${todayRevenue.toFixed(2)} MXN</div>
-                <p className="text-xs text-gray-500 mt-1">{todayOrders.length} pedidos hoy</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Pedidos Activos</CardTitle>
-                <Clock className="w-5 h-5 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-orange-600">{activeOrders}</div>
-                <p className="text-xs text-gray-500 mt-1">Pendientes y en preparación</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total de Pedidos</CardTitle>
-                <ShoppingBag className="w-5 h-5 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{orders.length}</div>
-                <p className="text-xs text-gray-500 mt-1">{completedOrders} completados</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Reservaciones de Hoy</CardTitle>
-                <Calendar className="w-5 h-5 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{reservations.filter(r => r.date === new Date().toISOString().split('T')[0]).length}</div>
-                <p className="text-xs text-gray-500 mt-1">{reservations.length} reservaciones totales</p>
-              </CardContent>
-            </Card>
-          </motion.div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "Ingresos Hoy", value: `$${todayRevenue.toFixed(0)} MXN`, sub: `${todayOrders.length} pedidos`, icon: DollarSign, color: "text-yellow-400" },
+            { label: "Pedidos Activos", value: activeOrders, sub: "Pendientes y en prep.", icon: Clock, color: "text-yellow-400" },
+            { label: "Total Pedidos", value: orders.length, sub: `${completedOrders} completados`, icon: ShoppingBag, color: "text-yellow-400" },
+            { label: "Reservas Hoy", value: reservations.filter(r => r.date === new Date().toISOString().split('T')[0]).length, sub: `${reservations.length} totales`, icon: Calendar, color: "text-yellow-400" },
+          ].map((stat, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+              <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">{stat.label}</p>
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                </div>
+                <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-xs text-gray-600 mt-1">{stat.sub}</p>
+              </div>
+            </motion.div>
+          ))}
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Revenue Trend */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Tendencia de Ingresos (Últimos 7 Días)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={revenueByDay}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" fontSize={12} />
-                  <YAxis fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-                    formatter={(value) => `$${value.toFixed(2)} MXN`}
-                  />
-                  <Line type="monotone" dataKey="revenue" stroke="#DC2626" strokeWidth={3} dot={{ fill: '#DC2626', r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-yellow-400" />
+              Ingresos (Últimos 7 Días)
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={revenueByDay}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="name" fontSize={11} stroke="#666" />
+                <YAxis fontSize={11} stroke="#666" />
+                <Tooltip
+                  contentStyle={{ background: '#242424', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '8px', color: '#fff' }}
+                  formatter={(value) => `$${value.toFixed(0)} MXN`}
+                />
+                <Line type="monotone" dataKey="revenue" stroke="#F5C400" strokeWidth={2} dot={{ fill: '#F5C400', r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
-          {/* Orders by Type */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5" />
-                Pedidos por Tipo
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={ordersByType}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {ordersByType.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+              <Package className="w-4 h-4 text-yellow-400" />
+              Pedidos por Tipo
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={ordersByType} cx="50%" cy="50%" labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={75} dataKey="value">
+                  {ordersByType.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ background: '#242424', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '8px', color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Popular Items */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Productos Más Vendidos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {popularItems.length > 0 ? (
-                <div className="space-y-4">
-                  {popularItems.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          ['bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 'bg-yellow-100 text-yellow-600', 'bg-green-100 text-green-600', 'bg-blue-100 text-blue-600'][index]
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <span className="font-medium">{item.name}</span>
-                      </div>
-                      <span className="text-gray-600 font-semibold">{item.count} vendidos</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-sm font-semibold text-gray-300 mb-4">Productos Más Vendidos</p>
+            {popularItems.length > 0 ? (
+              <div className="space-y-3">
+                {popularItems.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-yellow-400/10 text-yellow-400 text-xs font-bold flex items-center justify-center">{index + 1}</span>
+                      <span className="text-sm text-gray-300">{item.name}</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-8">No hay datos de ventas aún</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Estadísticas Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Ingresos Totales</span>
-                  <span className="font-bold text-xl text-green-600">${totalRevenue.toFixed(2)} MXN</span>
-                </div>
-                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Valor Promedio del Pedido</span>
-                  <span className="font-bold text-xl">${(totalRevenue / (orders.length || 1)).toFixed(2)} MXN</span>
-                </div>
-                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Productos en Menú</span>
-                  <span className="font-bold text-xl">{menuItems.length}</span>
-                </div>
-                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Productos Disponibles</span>
-                  <span className="font-bold text-xl text-green-600">{menuItems.filter(i => i.is_available).length}</span>
-                </div>
+                    <span className="text-xs text-gray-500">{item.count} vendidos</span>
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <p className="text-gray-600 text-sm text-center py-6">No hay datos de ventas aún</p>
+            )}
+          </div>
+
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-sm font-semibold text-gray-300 mb-4">Estadísticas Rápidas</p>
+            <div className="space-y-3">
+              {[
+                { label: "Ingresos Totales", value: `$${totalRevenue.toFixed(0)} MXN`, accent: true },
+                { label: "Promedio por Pedido", value: `$${(totalRevenue / (orders.length || 1)).toFixed(0)} MXN` },
+                { label: "Productos en Menú", value: menuItems.length },
+                { label: "Productos Disponibles", value: menuItems.filter(i => i.is_available).length, accent: true },
+              ].map((stat, i) => (
+                <div key={i} className="flex justify-between items-center py-2 border-b border-yellow-500/10 last:border-0">
+                  <span className="text-xs text-gray-500">{stat.label}</span>
+                  <span className={`text-sm font-bold ${stat.accent ? 'text-yellow-400' : 'text-gray-300'}`}>{stat.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Reservations Section */}
-        <div className="space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-6 h-6 text-purple-600" />
-              <h2 className="text-2xl font-bold">Reservaciones</h2>
-              <span className="text-sm text-gray-500">({todayReservations.length} hoy)</span>
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-yellow-400" />
+              <h2 className="text-sm font-bold text-gray-300">Reservaciones</h2>
+              <span className="text-xs text-gray-600">({todayReservations.length} hoy)</span>
             </div>
             <Button
               onClick={() => setShowReservationForm(!showReservationForm)}
-              className="bg-purple-600 hover:bg-purple-700 gap-2"
+              className="h-7 text-xs px-3 bg-yellow-400 hover:bg-yellow-300 text-black gap-1"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
               Nueva Reservación
             </Button>
           </div>

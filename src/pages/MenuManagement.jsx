@@ -80,48 +80,51 @@ export default function MenuManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="min-h-screen bg-[#1a1a1a]">
+      <div className="border-b border-yellow-500/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
-              <p className="text-gray-600 mt-1">Manage your restaurant's menu items and pricing</p>
+              <h1 className="text-lg font-bold text-yellow-400">Gestión de Menú</h1>
+              <p className="text-gray-500 text-xs">Administrar productos y precios</p>
             </div>
             <Button
               onClick={() => {
                 setEditingItem(null);
                 setShowForm(true);
               }}
-              className="bg-red-600 hover:bg-red-700 gap-2"
+              className="bg-yellow-400 hover:bg-yellow-300 text-black text-sm gap-2 h-8 px-3"
             >
-              <Plus className="w-4 h-4" />
-              Add New Item
+              <Plus className="w-3 h-3" />
+              Agregar Producto
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search and Filters */}
-        <div className="mb-8 space-y-4">
+        <div className="mb-6 space-y-3">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
             <Input
-              placeholder="Search menu items..."
-              className="pl-10"
+              placeholder="Buscar productos..."
+              className="pl-9 bg-[#242424] border-yellow-500/20 text-gray-300 placeholder:text-gray-600 h-8 text-sm focus:border-yellow-400"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {categories.map((category) => (
               <Button
                 key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
                 onClick={() => setSelectedCategory(category.id)}
-                className={selectedCategory === category.id ? 'bg-red-600 hover:bg-red-700' : ''}
+                className={`h-7 text-xs px-3 flex-shrink-0 ${
+                  selectedCategory === category.id
+                    ? 'bg-yellow-400 text-black hover:bg-yellow-300'
+                    : 'bg-transparent border border-yellow-500/20 text-gray-400 hover:border-yellow-400 hover:text-yellow-400'
+                }`}
               >
                 {category.name}
               </Button>
@@ -146,14 +149,14 @@ export default function MenuManagement() {
 
         {/* Menu Items Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-96 bg-gray-200 rounded-xl animate-pulse" />
+              <div key={i} className="h-64 bg-[#242424] rounded-xl animate-pulse" />
             ))}
           </div>
         ) : filteredItems.length > 0 ? (
           <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             initial="hidden"
             animate="visible"
             variants={{

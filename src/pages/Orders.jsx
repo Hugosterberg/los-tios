@@ -84,57 +84,43 @@ export default function Orders() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <ShoppingBag className="w-8 h-8 text-red-600" />
+    <div className="min-h-screen bg-[#1a1a1a]">
+      <div className="border-b border-yellow-500/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-yellow-400" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
-                <p className="text-gray-600 mt-1">Create and track customer orders</p>
+                <h1 className="text-lg font-bold text-yellow-400">Gestión de Pedidos</h1>
+                <p className="text-gray-500 text-xs">Crear y gestionar pedidos</p>
               </div>
             </div>
             <Button
               onClick={() => setShowNewOrderForm(true)}
-              className="bg-red-600 hover:bg-red-700 gap-2"
+              className="bg-yellow-400 hover:bg-yellow-300 text-black text-sm gap-2 h-8 px-3"
             >
-              <Plus className="w-4 h-4" />
-              New Order
+              <Plus className="w-3 h-3" />
+              Nuevo Pedido
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="border-0 shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Active Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-orange-600">{activeOrders.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Ready for Pickup</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{readyOrders.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{orders.length}</div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-500 mb-1">Pedidos Activos</p>
+            <p className="text-2xl font-bold text-yellow-400">{activeOrders.length}</p>
+          </div>
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-500 mb-1">Listos para Entregar</p>
+            <p className="text-2xl font-bold text-yellow-400">{readyOrders.length}</p>
+          </div>
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-500 mb-1">Total Pedidos</p>
+            <p className="text-2xl font-bold text-gray-300">{orders.length}</p>
+          </div>
         </div>
 
         {/* New Order Form */}
@@ -148,73 +134,46 @@ export default function Orders() {
         )}
 
         {/* Orders Tabs */}
-        <Tabs defaultValue="active" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="active">Active ({activeOrders.length})</TabsTrigger>
-            <TabsTrigger value="ready">Ready ({readyOrders.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
+        <Tabs defaultValue="active" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 bg-[#242424] border border-yellow-500/20">
+            <TabsTrigger value="active" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Activos ({activeOrders.length})</TabsTrigger>
+            <TabsTrigger value="ready" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Listos ({readyOrders.length})</TabsTrigger>
+            <TabsTrigger value="completed" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Completados ({completedOrders.length})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="active" className="space-y-4">
-            {activeOrders.length > 0 ? (
-              activeOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
-                  onPrintReceipt={handlePrintReceipt}
-                  onDelete={handleDeleteOrder}
-                  onCompleteOrder={handleCompleteOrder}
-                />
-              ))
-            ) : (
-              <Card className="border-0 shadow">
-                <CardContent className="text-center py-12">
-                  <p className="text-gray-500">No active orders</p>
-                </CardContent>
-              </Card>
+          <TabsContent value="active" className="space-y-3">
+            {activeOrders.length > 0 ? activeOrders.map((order) => (
+              <OrderCard key={order.id} order={order}
+                onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
+                onPrintReceipt={handlePrintReceipt} onDelete={handleDeleteOrder} onCompleteOrder={handleCompleteOrder} />
+            )) : (
+              <div className="bg-[#242424] border border-yellow-500/10 rounded-xl text-center py-10">
+                <p className="text-gray-600 text-sm">No hay pedidos activos</p>
+              </div>
             )}
           </TabsContent>
 
-          <TabsContent value="ready" className="space-y-4">
-            {readyOrders.length > 0 ? (
-              readyOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
-                  onPrintReceipt={handlePrintReceipt}
-                  onDelete={handleDeleteOrder}
-                  onCompleteOrder={handleCompleteOrder}
-                />
-              ))
-            ) : (
-              <Card className="border-0 shadow">
-                <CardContent className="text-center py-12">
-                  <p className="text-gray-500">No orders ready</p>
-                </CardContent>
-              </Card>
+          <TabsContent value="ready" className="space-y-3">
+            {readyOrders.length > 0 ? readyOrders.map((order) => (
+              <OrderCard key={order.id} order={order}
+                onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
+                onPrintReceipt={handlePrintReceipt} onDelete={handleDeleteOrder} onCompleteOrder={handleCompleteOrder} />
+            )) : (
+              <div className="bg-[#242424] border border-yellow-500/10 rounded-xl text-center py-10">
+                <p className="text-gray-600 text-sm">No hay pedidos listos</p>
+              </div>
             )}
           </TabsContent>
 
-          <TabsContent value="completed" className="space-y-4">
-            {completedOrders.length > 0 ? (
-              completedOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
-                  onPrintReceipt={handlePrintReceipt}
-                  onDelete={handleDeleteOrder}
-                  onCompleteOrder={handleCompleteOrder}
-                />
-              ))
-            ) : (
-              <Card className="border-0 shadow">
-                <CardContent className="text-center py-12">
-                  <p className="text-gray-500">No completed orders</p>
-                </CardContent>
-              </Card>
+          <TabsContent value="completed" className="space-y-3">
+            {completedOrders.length > 0 ? completedOrders.map((order) => (
+              <OrderCard key={order.id} order={order}
+                onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
+                onPrintReceipt={handlePrintReceipt} onDelete={handleDeleteOrder} onCompleteOrder={handleCompleteOrder} />
+            )) : (
+              <div className="bg-[#242424] border border-yellow-500/10 rounded-xl text-center py-10">
+                <p className="text-gray-600 text-sm">No hay pedidos completados</p>
+              </div>
             )}
           </TabsContent>
         </Tabs>
