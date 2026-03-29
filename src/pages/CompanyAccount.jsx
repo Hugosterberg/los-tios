@@ -544,7 +544,7 @@ export default function CompanyAccount() {
                     variant={selectedExpenseCategory === cat.id ? "default" : "outline"}
                     onClick={() => setSelectedExpenseCategory(cat.id)}
                     className={`flex items-center gap-2 whitespace-nowrap ${
-                      selectedExpenseCategory === cat.id ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'border-yellow-500/20 text-gray-400 hover:text-white'
+                      selectedExpenseCategory === cat.id ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-[#1a1a1a] border-yellow-500/20 text-gray-400 hover:text-white'
                     }`}
                     size="sm"
                   >
