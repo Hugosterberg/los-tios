@@ -67,60 +67,52 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
 
       {/* Top Bar */}
-      <header className="bg-[#1a1a1a] border-b border-yellow-500/30 sticky top-0 z-50 shadow-sm">
+      <header className="bg-[#1a1a1a] border-b border-yellow-500/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-                <img 
-                  src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
-                  alt="Los Tíos"
-                  className="w-12 h-12 rounded-xl object-contain bg-[#1a1a1a]"
-                />
-                <div>
-                  <h1 className="text-xl font-bold text-yellow-400">Los Tíos</h1>
-                  <p className="text-xs text-gray-400">Sistema de Gestión</p>
-                </div>
-              </div>
+          <div className="flex justify-between items-center h-11">
+            <div className="flex items-center gap-2">
+              <img 
+                src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
+                alt="Los Tíos"
+                className="w-7 h-7 rounded object-contain"
+              />
+              <span className="text-sm font-bold text-yellow-400">Los Tíos</span>
+            </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-0.5">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.url}
-                  className={`nav-link flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
                     item.highlight 
-                      ? 'highlight-link' 
+                      ? 'bg-yellow-400 text-black hover:bg-yellow-300' 
                       : location.pathname === item.url
-                        ? 'text-yellow-400 bg-yellow-400/10 active'
-                        : 'text-gray-300 hover:bg-white/10'
+                        ? 'text-yellow-400 bg-yellow-400/10'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="w-3 h-3" />
                   {item.name}
                 </Link>
               ))}
             </nav>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div className="flex items-center gap-1">
+              <button
                 onClick={handleLogout}
-                className="hidden md:flex items-center gap-2 text-gray-300 hover:text-white hover:bg-white/10"
+                className="hidden md:flex items-center gap-1 px-2 py-1.5 rounded text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all"
               >
-                <LogOut className="w-4 h-4" />
-                Cerrar Sesión
-              </Button>
+                <LogOut className="w-3 h-3" />
+              </button>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden text-gray-300 hover:text-white hover:bg-white/10"
+              <button
+                className="md:hidden p-1.5 text-gray-400 hover:text-white"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </Button>
+                {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </div>
