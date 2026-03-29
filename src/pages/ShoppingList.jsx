@@ -351,7 +351,7 @@ export default function ShoppingList() {
                 onClick={() => setSelectedCategory(cat.id)}
                 size="sm"
                 className={`flex items-center gap-1 text-xs px-2 py-1 h-7 ${
-                  selectedCategory === cat.id ? 'bg-yellow-400 hover:bg-yellow-300 text-black' : 'border-yellow-500/20 text-gray-400'
+                  selectedCategory === cat.id ? 'bg-yellow-400 hover:bg-yellow-300 text-black' : 'bg-[#1a1a1a] border-yellow-500/20 text-gray-400 hover:text-white'
                 }`}
               >
                 <span className="text-xs">{cat.icon}</span>
