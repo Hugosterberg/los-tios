@@ -54,6 +54,7 @@ export default function MenuManagement() {
     { id: "paninis", name: "Paninis" },
     { id: "desserts", name: "Postres" },
     { id: "beverages", name: "Bebidas" },
+    { id: "salsas", name: "Salsas" },
   ];
 
   const filteredItems = menuItems.filter(item => {

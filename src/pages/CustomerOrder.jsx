@@ -68,6 +68,7 @@ export default function CustomerOrder() {
     { id: "mains", name: "PLATOS FUERTES" },
     { id: "desserts", name: "POSTRES" },
     { id: "beverages", name: "BEBIDAS" },
+    { id: "salsas", name: "SALSAS" },
   ];
 
   const openIngredientDialog = (item) => {

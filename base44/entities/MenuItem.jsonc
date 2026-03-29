@@ -24,10 +24,9 @@
         "appetizers",
         "pizzas",
         "paninis",
-        "mains",
         "desserts",
         "beverages",
-        "specials"
+        "salsas"
       ],
       "description": "Category of the dish"
     },
