@@ -13,7 +13,7 @@ export default function MenuItemCard({ item, onEdit, onDelete, onToggleAvailabil
         visible: { opacity: 1, y: 0 }
       }}
     >
-      <div className={`bg-[#242424] border rounded-xl overflow-hidden transition-all ${
+      <div className={`bg-[#242424] border rounded-xl overflow-hidden transition-all flex flex-col h-full ${
         item.is_available ? 'border-yellow-500/20 hover:border-yellow-500/40' : 'border-gray-700/30 opacity-50'
       }`}>
         <div className="relative h-40 overflow-hidden">
@@ -29,7 +29,7 @@ export default function MenuItemCard({ item, onEdit, onDelete, onToggleAvailabil
           )}
         </div>
 
-        <div className="p-3">
+        <div className="p-3 flex flex-col flex-1">
           <div className="flex items-start justify-between mb-1">
             <div className="flex-1">
               <h3 className="font-bold text-sm text-white">{item.name}</h3>
@@ -44,7 +44,7 @@ export default function MenuItemCard({ item, onEdit, onDelete, onToggleAvailabil
             <p className="text-gray-500 text-xs mb-2 line-clamp-2">{item.description}</p>
           )}
 
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-1 mb-3 flex-1 content-start">
             <Badge className="text-xs bg-yellow-400/10 text-yellow-400 border-0">
               {item.category?.replace(/_/g, ' ')}
             </Badge>
