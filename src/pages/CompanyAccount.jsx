@@ -435,29 +435,29 @@ export default function CompanyAccount() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <Card className="border-0 shadow-lg border-t-4 border-t-green-500">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Saldo en Cuenta / Account Balance
+              <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-yellow-400" />
+                Saldo en Cuenta
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${companyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-3xl font-bold ${companyBalance >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${companyBalance.toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">MXN en banco / in bank</p>
+              <p className="text-xs text-gray-500 mt-1">MXN en banco</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg border-t-4 border-t-yellow-500">
+          <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
                 💵 Efectivo Disponible
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${availableCash >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+              <div className={`text-3xl font-bold ${availableCash >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${availableCash.toFixed(2)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -468,26 +468,26 @@ export default function CompanyAccount() {
 
           <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
+              <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-yellow-400" />
                 Contribuciones
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">${totalContributions.toFixed(2)}</div>
+              <div className="text-3xl font-bold text-yellow-400">${totalContributions.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">{transactions.filter(t => t.type === 'contribution').length} transacciones</p>
             </CardContent>
           </Card>
 
           <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <TrendingDown className="w-4 h-4" />
+              <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                <TrendingDown className="w-4 h-4 text-yellow-400" />
                 Gastos Empresa
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-600">${companyExpenses.toFixed(2)}</div>
+              <div className="text-3xl font-bold text-red-500">${companyExpenses.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">
                 💵${expensesFromCompanyCash.toFixed(2)} | 🏦${expensesFromCompanyAccount.toFixed(2)}
               </p>
@@ -496,13 +496,13 @@ export default function CompanyAccount() {
 
           <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Users className="w-4 h-4" />
+              <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                <Users className="w-4 h-4 text-yellow-400" />
                 Contribuyentes
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-600">{contributors.filter(c => c.is_active).length}</div>
+              <div className="text-3xl font-bold text-yellow-400">{contributors.filter(c => c.is_active).length}</div>
               <p className="text-xs text-gray-500 mt-1">{contributors.length} total</p>
             </CardContent>
           </Card>
@@ -510,15 +510,15 @@ export default function CompanyAccount() {
 
         {/* Cash Flow Summary */}
         <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              💵 Resumen de Efectivo / Cash Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-8">
-              <p className="text-lg text-gray-600 mb-2">Total Efectivo Disponible / Total Available Cash</p>
-              <div className={`text-6xl font-bold ${availableCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-yellow-400">
+            💵 Resumen de Efectivo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <p className="text-sm text-gray-400 mb-2">Total Efectivo Disponible</p>
+            <div className={`text-6xl font-bold ${availableCash >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${availableCash.toFixed(2)}
               </div>
               <p className="text-sm text-gray-500 mt-2">MXN</p>
@@ -544,7 +544,7 @@ export default function CompanyAccount() {
                     variant={selectedExpenseCategory === cat.id ? "default" : "outline"}
                     onClick={() => setSelectedExpenseCategory(cat.id)}
                     className={`flex items-center gap-2 whitespace-nowrap ${
-                      selectedExpenseCategory === cat.id ? 'bg-red-600 hover:bg-red-700' : ''
+                      selectedExpenseCategory === cat.id ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'border-yellow-500/20 text-gray-400 hover:text-white'
                     }`}
                     size="sm"
                   >
@@ -555,7 +555,7 @@ export default function CompanyAccount() {
               </div>
               <Button
                 onClick={() => setShowExpenseForm(!showExpenseForm)}
-                className="bg-red-600 hover:bg-red-700 gap-2"
+                className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Nuevo Gasto
@@ -570,7 +570,7 @@ export default function CompanyAccount() {
                     <TrendingDown className="w-4 h-4" />
                     Total Gastos
                   </div>
-                  <div className="text-2xl font-bold text-red-600">${totalExpensesFiltered.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-red-500">${totalExpensesFiltered.toFixed(2)}</div>
                 </CardContent>
               </Card>
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
@@ -579,13 +579,13 @@ export default function CompanyAccount() {
                     <CalendarIcon className="w-4 h-4" />
                     Recurrentes Mensuales
                   </div>
-                  <div className="text-2xl font-bold text-orange-600">${monthlyRecurring.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-yellow-400">${monthlyRecurring.toFixed(2)}</div>
                 </CardContent>
               </Card>
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardContent className="pt-6">
                   <div className="text-sm text-gray-600 mb-1">Total Recurrentes</div>
-                  <div className="text-2xl font-bold text-purple-600">{recurringExpenses.length}</div>
+                  <div className="text-2xl font-bold text-yellow-400">{recurringExpenses.length}</div>
                 </CardContent>
               </Card>
             </div>
@@ -716,7 +716,7 @@ export default function CompanyAccount() {
                               type="button"
                               onClick={() => setExpenseForm({ ...expenseForm, payment_source: ps.id, contributors: ps.id !== 'individual' ? [] : expenseForm.contributors })}
                               className={`p-3 border-2 rounded-lg text-center transition-all ${
-                                expenseForm.payment_source === ps.id ? 'border-red-600 bg-red-50' : 'border-gray-300 hover:border-gray-400'
+                                expenseForm.payment_source === ps.id ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                               }`}
                             >
                               <div className="font-semibold text-sm">{ps.label}</div>
@@ -778,7 +778,7 @@ export default function CompanyAccount() {
 
                       <div className="flex gap-3 justify-end">
                         <Button type="button" variant="outline" onClick={resetExpenseForm}>Cancelar</Button>
-                        <Button type="submit" disabled={createExpense.isPending || updateExpense.isPending} className="bg-red-600 hover:bg-red-700">
+                        <Button type="submit" disabled={createExpense.isPending || updateExpense.isPending} className="bg-yellow-400 hover:bg-yellow-300 text-black">
                           {editingExpense ? 'Actualizar' : 'Guardar'}
                         </Button>
                       </div>
@@ -794,7 +794,7 @@ export default function CompanyAccount() {
                 filteredExpenses.map((expense) => {
                   const cat = expenseCategories.find(c => c.id === expense.category) || expenseCategories[expenseCategories.length - 1];
                   return (
-                    <Card key={expense.id} className="border-0 shadow hover:shadow-lg transition-shadow">
+                    <Card key={expense.id} className="bg-[#242424] border border-yellow-500/15 shadow-none">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 flex-1">
@@ -848,10 +848,10 @@ export default function CompanyAccount() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setShowTransactionForm(!showTransactionForm)}
-                className="bg-red-600 hover:bg-red-700 gap-2"
+                className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Nueva Transacción / New Transaction
+                Nueva Transacción
               </Button>
             </div>
 
@@ -940,8 +940,8 @@ export default function CompanyAccount() {
                               onClick={() => setTransactionForm({ ...transactionForm, payment_method: 'cash' })}
                               className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
                                 transactionForm.payment_method === 'cash'
-                                  ? 'border-green-600 bg-green-50'
-                                  : 'border-gray-300 hover:border-gray-400'
+                                  ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                                  : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                               }`}
                             >
                               <span className="text-2xl">💵</span>
@@ -956,8 +956,8 @@ export default function CompanyAccount() {
                               onClick={() => setTransactionForm({ ...transactionForm, payment_method: 'transfer' })}
                               className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all text-left ${
                                 transactionForm.payment_method === 'transfer'
-                                  ? 'border-blue-600 bg-blue-50'
-                                  : 'border-gray-300 hover:border-gray-400'
+                                  ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                                  : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                               }`}
                             >
                               <span className="text-2xl">🏦</span>
@@ -1004,8 +1004,8 @@ export default function CompanyAccount() {
                         <Button type="button" variant="outline" onClick={resetTransactionForm}>
                           Cancelar / Cancel
                         </Button>
-                        <Button type="submit" disabled={createTransaction.isPending || updateTransaction.isPending} className="bg-red-600 hover:bg-red-700">
-                          {editingTransaction ? 'Actualizar / Update' : 'Guardar / Save'}
+                        <Button type="submit" disabled={createTransaction.isPending || updateTransaction.isPending} className="bg-yellow-400 hover:bg-yellow-300 text-black">
+                          {editingTransaction ? 'Actualizar' : 'Guardar'}
                         </Button>
                       </div>
                     </form>
@@ -1019,13 +1019,13 @@ export default function CompanyAccount() {
               {transactions.length > 0 ? (
                 transactions.map((transaction) => (
                   <motion.div key={transaction.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <Card className="border-0 shadow hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
+                    <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+                      <CardContent className="p-4">
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-start gap-3 mb-3">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                                transaction.type === 'contribution' ? 'bg-green-100' : 'bg-red-100'
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                transaction.type === 'contribution' ? 'bg-yellow-400/20' : 'bg-red-500/20'
                               }`}>
                                 {transaction.type === 'contribution' ? (
                                   <TrendingUp className="w-6 h-6 text-green-600" />
@@ -1036,7 +1036,7 @@ export default function CompanyAccount() {
                               <div className="flex-1">
                                 <h3 className="font-bold text-lg">{transaction.contributor_name}</h3>
                                 <div className="flex flex-wrap gap-2 mt-2">
-                                  <Badge className={transaction.type === 'contribution' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                  <Badge className={transaction.type === 'contribution' ? 'bg-yellow-400/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}>
                                     {transaction.type === 'contribution' ? 'Contribución' : 'Retiro'}
                                   </Badge>
                                   <Badge variant="outline">
@@ -1108,10 +1108,10 @@ export default function CompanyAccount() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setShowContributorForm(!showContributorForm)}
-                className="bg-red-600 hover:bg-red-700 gap-2"
+                className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Nuevo Contribuyente / New Contributor
+                Nuevo Contribuyente
               </Button>
             </div>
 
@@ -1205,7 +1205,7 @@ export default function CompanyAccount() {
                         <Button 
                           type="submit" 
                           disabled={createContributor.isPending || updateContributor.isPending}
-                          className="bg-red-600 hover:bg-red-700"
+                          className="bg-yellow-400 hover:bg-yellow-300 text-black"
                         >
                           {editingContributor ? 'Actualizar / Update' : 'Guardar / Save'}
                         </Button>
@@ -1220,13 +1220,13 @@ export default function CompanyAccount() {
             {equityHolders.length > 1 && (
               <Card className="border-0 shadow-lg bg-gradient-to-r from-indigo-50 to-blue-50">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-indigo-600" />
-                    Balance entre Socios / Partners Balance
+                  <CardTitle className="flex items-center gap-2 text-yellow-400">
+                    <Users className="w-5 h-5 text-yellow-400" />
+                    Balance entre Socios
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-4 p-4 bg-white/60 rounded-lg">
+                  <div className="mb-4 p-4 bg-[#1a1a1a] rounded-lg">
                     <div className="flex justify-between items-center text-sm mb-2">
                       <span className="text-gray-600">Contribución Neta Total / Total Net:</span>
                       <span className="font-bold">${totalEquityNet.toFixed(2)}</span>
@@ -1245,7 +1245,7 @@ export default function CompanyAccount() {
                         <div key={holder.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100">
                           <div className="flex items-center gap-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                              isAbove ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              isAbove ? 'bg-yellow-400/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
                             }`}>
                               {holder.name.charAt(0).toUpperCase()}
                             </div>
@@ -1257,7 +1257,7 @@ export default function CompanyAccount() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={`font-bold text-sm ${isAbove ? 'text-green-600' : 'text-red-600'}`}>
+                            <p className={`font-bold text-sm ${isAbove ? 'text-yellow-400' : 'text-red-400'}`}>
                               {isAbove ? '+' : ''}{diff.toFixed(2)}
                             </p>
                             <p className="text-xs text-gray-500">
@@ -1277,14 +1277,14 @@ export default function CompanyAccount() {
               {contributorTotals.length > 0 ? (
                 contributorTotals.map((contributor) => (
                   <motion.div key={contributor.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <Card className={`border-0 shadow hover:shadow-lg transition-shadow ${
+                    <Card className={`bg-[#242424] border border-yellow-500/15 shadow-none ${
                       !contributor.is_active ? 'opacity-60' : ''
                     }`}>
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                              <span className="text-xl font-bold text-purple-600">
+                            <div className="w-12 h-12 bg-yellow-400/20 rounded-full flex items-center justify-center">
+                              <span className="text-xl font-bold text-yellow-400">
                                 {contributor.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
@@ -1346,7 +1346,7 @@ export default function CompanyAccount() {
                   </motion.div>
                 ))
               ) : (
-                <Card className="border-0 shadow md:col-span-2">
+                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none md:col-span-2">
                   <CardContent className="text-center py-20">
                     <Users className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                     <p className="text-gray-500 text-lg">No hay contribuyentes registrados</p>
