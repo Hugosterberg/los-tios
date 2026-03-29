@@ -70,14 +70,13 @@ export default function Layout({ children, currentPageName }) {
       <header className="bg-[#1a1a1a] border-b border-yellow-500/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-11">
-            <div className="flex items-center gap-2">
+            <Link to={createPageUrl("Dashboard")}>
               <img 
                 src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
                 alt="Los Tíos"
                 className="w-7 h-7 rounded object-contain"
               />
-              <span className="text-sm font-bold text-yellow-400">Los Tíos</span>
-            </div>
+            </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-0.5">
