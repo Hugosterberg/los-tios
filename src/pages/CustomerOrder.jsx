@@ -63,7 +63,9 @@ export default function CustomerOrder() {
   const categories = [
     { id: "specials", name: "ESPECIALES DEL DÍA", emoji: "⭐" },
     { id: "appetizers", name: "ENTRADAS", emoji: "🥗" },
-    { id: "mains", name: "PIZZAS Y PLATOS FUERTES", emoji: "" },
+    { id: "pizzas", name: "PIZZAS", emoji: "🍕" },
+    { id: "paninis", name: "PANINIS", emoji: "🥪" },
+    { id: "mains", name: "PLATOS FUERTES", emoji: "🍽️" },
     { id: "desserts", name: "POSTRES", emoji: "🍰" },
     { id: "beverages", name: "BEBIDAS", emoji: "🥤" },
   ];

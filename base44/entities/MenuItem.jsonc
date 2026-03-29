@@ -1,0 +1,86 @@
+{
+  "name": "MenuItem",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the dish in Spanish"
+    },
+    "name_en": {
+      "type": "string",
+      "description": "Name of the dish in English"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the dish in Spanish"
+    },
+    "description_en": {
+      "type": "string",
+      "description": "Detailed description of the dish in English"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "appetizers",
+        "pizzas",
+        "paninis",
+        "mains",
+        "desserts",
+        "beverages",
+        "specials"
+      ],
+      "description": "Category of the dish"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price of the dish"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL to dish image"
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of main ingredients"
+    },
+    "available_extras": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre del extra / Extra name"
+          },
+          "price": {
+            "type": "number",
+            "description": "Precio adicional / Additional price"
+          }
+        }
+      },
+      "description": "Extras disponibles para este producto / Available extras for this item"
+    },
+    "is_vegetarian": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_available": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the dish is currently available"
+    },
+    "preparation_time": {
+      "type": "number",
+      "description": "Time in minutes to prepare"
+    }
+  },
+  "required": [
+    "name",
+    "category",
+    "price"
+  ],
+  "rls": {}
+}
