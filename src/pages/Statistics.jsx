@@ -8,6 +8,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, startOf
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { es } from "date-fns/locale";
+import { listOrders } from "@/lib/local-dev-orders";
 
 export default function Statistics() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -16,7 +17,7 @@ export default function Statistics() {
 
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => base44.entities.Order.list('-created_date'),
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), '-created_date'),
   });
 
   const { data: expenses = [] } = useQuery({
@@ -178,7 +179,7 @@ export default function Statistics() {
         }
       `}</style>
 
-      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6 no-print">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-5 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <BarChart3 className="w-6 h-6 text-yellow-400" />
@@ -190,9 +191,9 @@ export default function Statistics() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
         {/* Date Filters */}
-        <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4 no-print">
+        <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4 no-print">
           <h3 className="text-sm font-bold text-yellow-400 mb-3">Seleccionar Período</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -258,10 +259,10 @@ export default function Statistics() {
           {/* Daily Statistics */}
           {(!printMode || printMode === 'daily') && (
             <div className="mb-8">
-              <h2 className="text-2xl font-bold mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">
                 Estadísticas Diarias / Daily Statistics - {format(new Date(selectedDay), 'MMMM d, yyyy', { locale: es })}
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
@@ -270,7 +271,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400">${dayStats.totalRevenue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-yellow-400">${dayStats.totalRevenue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -282,7 +283,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400/70">${dayStats.totalExpenses.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-yellow-400/70">${dayStats.totalExpenses.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -294,7 +295,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400">
+                    <div className="text-2xl font-bold text-yellow-400">
                       ${dayStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -311,7 +312,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{dayStats.totalOrders}</div>
+                    <div className="text-2xl font-bold">{dayStats.totalOrders}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -387,10 +388,10 @@ export default function Statistics() {
           {/* Monthly Statistics */}
           {(!printMode || printMode === 'monthly') && (
             <div>
-              <h2 className="text-2xl font-bold mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">
                 Estadísticas Mensuales / Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
@@ -399,7 +400,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400">${monthStats.totalRevenue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-yellow-400">${monthStats.totalRevenue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -411,7 +412,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400/70">${monthStats.totalExpenses.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-yellow-400/70">${monthStats.totalExpenses.toFixed(2)}</div>
                   </CardContent>
                 </Card>
 
@@ -423,7 +424,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400">
+                    <div className="text-2xl font-bold text-yellow-400">
                       ${monthStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -440,7 +441,7 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{monthStats.totalOrders}</div>
+                    <div className="text-2xl font-bold">{monthStats.totalOrders}</div>
                   </CardContent>
                 </Card>
 
@@ -452,14 +453,14 @@ export default function Statistics() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-yellow-400">${monthStats.avgOrderValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-yellow-400">${monthStats.avgOrderValue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Charts - Hide in print mode */}
               {!printMode && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-6">
                   {/* Revenue vs Expenses vs Profit Chart */}
                   <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>

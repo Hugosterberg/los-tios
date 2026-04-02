@@ -10,10 +10,12 @@ import { Palette, Upload, Save, RefreshCw, Image as ImageIcon, CreditCard, Bankn
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { appParams } from "@/lib/app-params";
 
 export default function Customization() {
   const queryClient = useQueryClient();
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const canUploadImages = Boolean(appParams.appId && appParams.serverUrl && appParams.token);
 
   const { data: settings = [], isLoading } = useQuery({
     queryKey: ['appSettings'],
@@ -39,6 +41,7 @@ export default function Customization() {
     bank_account_number: "",
     bank_account_holder: "",
     clabe: "",
+    clip_payment_link: "",
   };
 
   const [formData, setFormData] = useState(currentSettings);
@@ -66,6 +69,10 @@ export default function Customization() {
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!canUploadImages) {
+      alert("Bilduppladdning kraver riktig Base44-backend och inloggning. Anvand bild-URL-faltet lokalt.");
+      return;
+    }
 
     setUploadingLogo(true);
     try {
@@ -104,6 +111,7 @@ export default function Customization() {
         bank_account_number: "",
         bank_account_holder: "",
         clabe: "",
+        clip_payment_link: "",
       });
     }
   };
@@ -318,10 +326,15 @@ export default function Customization() {
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
-                    disabled={uploadingLogo}
+                    disabled={uploadingLogo || !canUploadImages}
                   />
                   {uploadingLogo && (
                     <p className="text-sm text-gray-500">Subiendo... / Uploading...</p>
+                  )}
+                  {!canUploadImages && (
+                    <p className="text-sm text-amber-600">
+                      File upload kraver riktig Base44-backend och token. Anvand bild-URL lokalt eller logga in via Base44.
+                    </p>
                   )}
                 </div>
 
@@ -554,6 +567,19 @@ export default function Customization() {
                 <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h4 className="font-semibold text-blue-900">Información Bancaria / Bank Information</h4>
                   <p className="text-sm text-blue-700">Esta información se mostrará en el recibo cuando el cliente seleccione pago con tarjeta / This information will be shown on the receipt when customer selects card payment</p>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clip_payment_link">Liga de pago de Clip / Clip payment link</Label>
+                    <Input
+                      id="clip_payment_link"
+                      value={formData.clip_payment_link || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_payment_link: e.target.value })}
+                      placeholder="https://..."
+                    />
+                    <p className="text-xs text-blue-700">
+                      Esta liga se abre cuando el cliente elige tarjeta en checkout.
+                    </p>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">

@@ -152,7 +152,21 @@ button:focus-visible {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    min-width: 320px;
+  }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    min-width: 320px;
+  }
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 15px;
   }
 }

@@ -8,8 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { X, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { base44 } from "@/api/base44Client";
+import { appParams } from "@/lib/app-params";
 
 export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
+  const canUploadImages = Boolean(appParams.appId && appParams.serverUrl && appParams.token);
   const [formData, setFormData] = useState({
     name: "",
     name_en: "",
@@ -19,14 +21,12 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
     price: 0,
     image_url: "",
     ingredients: [],
-    available_extras: [], // Added
     is_vegetarian: false,
     is_available: true,
     preparation_time: 15,
   });
 
   const [ingredientInput, setIngredientInput] = useState("");
-  const [extraInput, setExtraInput] = useState({ name: "", price: 0 }); // Added
   const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
@@ -57,27 +57,13 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
     });
   };
 
-  // Added extra functions
-  const addExtra = () => {
-    if (extraInput.name.trim() && extraInput.price > 0) {
-      setFormData({
-        ...formData,
-        available_extras: [...(formData.available_extras || []), { ...extraInput }]
-      });
-      setExtraInput({ name: "", price: 0 });
-    }
-  };
-
-  const removeExtra = (index) => {
-    setFormData({
-      ...formData,
-      available_extras: formData.available_extras.filter((_, i) => i !== index)
-    });
-  };
-
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!canUploadImages) {
+      alert("Bilduppladdning kraver riktig Base44-backend och inloggning. Anvand bild-URL-faltet lokalt.");
+      return;
+    }
 
     setUploadingImage(true);
     try {
@@ -169,7 +155,7 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
               <Label htmlFor="image">Image</Label>
               <div className="space-y-2">
                 <div className="flex gap-2">
-                  <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg transition-colors ${canUploadImages ? "cursor-pointer hover:bg-gray-50" : "cursor-not-allowed opacity-60"}`}>
                     <Upload className="w-4 h-4" />
                     <span className="text-sm font-medium">
                       {uploadingImage ? "Laddar upp..." : "Ladda upp bild"}
@@ -178,11 +164,16 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
-                      disabled={uploadingImage}
+                      disabled={uploadingImage || !canUploadImages}
                       className="hidden"
                     />
                   </label>
                 </div>
+                {!canUploadImages && (
+                  <p className="text-xs text-amber-400">
+                    Filuppladdning ar inte tillganglig i lokal bypass utan Base44-konfiguration och token. Klistra in en bild-URL eller logga in mot riktig backend.
+                  </p>
+                )}
                 {formData.image_url && (
                   <div className="relative">
                     <img 
@@ -262,53 +253,6 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
                     <button
                       type="button"
                       onClick={() => removeIngredient(index)}
-                      className="ml-1 hover:text-red-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Added Available Extras section */}
-          <div className="space-y-2">
-            <Label>Available Extras (Add-ons)</Label>
-            <div className="flex gap-2">
-              <Input
-                value={extraInput.name}
-                onChange={(e) => setExtraInput({ ...extraInput, name: e.target.value })}
-                placeholder="Extra name (e.g., Extra Cheese)"
-                className="flex-1"
-              />
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={extraInput.price}
-                onChange={(e) => setExtraInput({ ...extraInput, price: parseFloat(e.target.value) || 0 })}
-                placeholder="Price"
-                className="w-24"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addExtra();
-                  }
-                }}
-              />
-              <Button type="button" onClick={addExtra} variant="outline">
-                Add Extra
-              </Button>
-            </div>
-            {formData.available_extras && formData.available_extras.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.available_extras.map((extra, index) => (
-                  <Badge key={index} className="gap-1 bg-green-100 text-green-800">
-                    {extra.name} (+${extra.price?.toFixed(2)})
-                    <button
-                      type="button"
-                      onClick={() => removeExtra(index)}
                       className="ml-1 hover:text-red-600"
                     >
                       <X className="w-3 h-3" />

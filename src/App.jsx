@@ -11,6 +11,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import CustomerOrder from './pages/CustomerOrder';
+import LocalSetupHelp from '@/components/LocalSetupHelp';
 
 const { Pages, Layout } = pagesConfig;
 
@@ -46,6 +47,8 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
+    } else if (authError.type === 'local_config_missing') {
+      return <LocalSetupHelp />;
     } else if (authError.type === 'auth_required') {
       navigateToLogin();
       return null;

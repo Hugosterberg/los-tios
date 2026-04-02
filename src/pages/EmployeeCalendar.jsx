@@ -218,7 +218,7 @@ export default function EmployeeCalendar() {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white">
-      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <Calendar className="w-6 h-6 text-yellow-400" />
@@ -230,7 +230,7 @@ export default function EmployeeCalendar() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
         <Tabs defaultValue="calendar" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2 bg-[#242424] border border-yellow-500/20">
             <TabsTrigger value="calendar" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">📅 Calendario</TabsTrigger>

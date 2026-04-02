@@ -1,27 +1,41 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Pizza, LayoutDashboard, UtensilsCrossed, ShoppingBag, Calendar, BarChart3, Menu, X, LogOut, Globe, Receipt, ShoppingCart, Wallet, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  UtensilsCrossed,
+  ShoppingBag,
+  BarChart3,
+  Menu,
+  X,
+  LogOut,
+  Globe,
+  ShoppingCart,
+  Wallet,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import losTiosLogo from "@/assets/los-tios-logo.png";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const { logout } = useAuth();
 
   const navItems = [
-    { name: "Panel Principal", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
-    { name: "Pedidos", url: createPageUrl("Orders"), icon: ShoppingBag },
-    { name: "Estadísticas", url: createPageUrl("Statistics"), icon: BarChart3 },
-    { name: "Menú", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
-    { name: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet },
-    { name: "Lista de Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
-    { name: "Empleados", url: createPageUrl("EmployeeCalendar"), icon: Users },
-    { name: "Página de Clientes", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
+    { name: "Panel Principal", shortName: "Panel", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
+    { name: "Pedidos", shortName: "Pedidos", url: createPageUrl("Orders"), icon: ShoppingBag },
+    { name: "Estadisticas", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
+    { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
+    { name: "Finanzas", shortName: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet },
+    { name: "Lista de Compras", shortName: "Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
+    { name: "Empleados", shortName: "Empleados", url: createPageUrl("EmployeeCalendar"), icon: Users },
+    { name: "Pagina de Clientes", shortName: "Clientes", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
   ];
 
   const handleLogout = () => {
-    base44.auth.logout();
+    logout();
   };
 
   return (
@@ -66,95 +80,92 @@ export default function Layout({ children, currentPageName }) {
         }
       `}</style>
 
-      {/* Top Bar */}
-      <header className="bg-[#1a1a1a] border-b border-yellow-500/20 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-11">
-            <Link to={createPageUrl("Dashboard")}>
-              <img 
-                src="https://media.base44.com/images/public/69b1d01a96680d8f83115050/0982a0490_los_tios_logo_8k.png" 
-                alt="Los Tíos"
-                className="w-9 h-9 rounded-full object-contain border-2 border-yellow-400/70"
+      <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-[#1a1a1a]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-11 items-center justify-between gap-3">
+            <Link to={createPageUrl("Dashboard")} className="shrink-0">
+              <img
+                src={losTiosLogo}
+                alt="Los Tios"
+                className="h-9 w-9 rounded-full bg-[#f5c400] p-[1px] border-2 border-yellow-300/90 object-contain shadow-sm"
               />
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-0.5">
+            <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.url}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
-                    item.highlight 
-                      ? 'bg-yellow-400 text-black hover:bg-yellow-300' 
+                  title={item.name}
+                  className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-all 2xl:px-2.5 ${
+                    item.highlight
+                      ? "bg-yellow-400 text-black hover:bg-yellow-300"
                       : location.pathname === item.url
-                        ? 'text-yellow-400 bg-yellow-400/10'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        ? "bg-yellow-400/10 text-yellow-400"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  <item.icon className="w-3 h-3" />
-                  {item.name}
+                  <item.icon className="h-3 w-3" />
+                  <span className="2xl:hidden">{item.shortName}</span>
+                  <span className="hidden 2xl:inline">{item.name}</span>
                 </Link>
               ))}
             </nav>
 
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={handleLogout}
-                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20 transition-all"
+                className="hidden items-center gap-1.5 rounded bg-yellow-400/10 px-2 py-1.5 text-[11px] font-medium text-yellow-400 transition-all hover:bg-yellow-400/20 xl:flex 2xl:px-2.5"
               >
-                <LogOut className="w-3 h-3" />
-                Cerrar Sesión
+                <LogOut className="h-3 w-3" />
+                <span className="2xl:hidden">Salir</span>
+                <span className="hidden 2xl:inline">Cerrar Sesion</span>
               </button>
 
               <button
-                className="md:hidden p-1.5 text-gray-400 hover:text-white"
+                className="p-1.5 text-gray-400 hover:text-white xl:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-yellow-500/30 bg-[#1a1a1a]">
-            <nav className="px-4 py-4 space-y-2">
+          <div className="border-t border-yellow-500/30 bg-[#1a1a1a] xl:hidden">
+            <nav className="space-y-2 px-4 py-4">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.url}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
                     item.highlight
-                      ? 'highlight-link'
+                      ? "highlight-link"
                       : location.pathname === item.url
-                        ? 'text-yellow-400 bg-yellow-400/10'
-                        : 'text-gray-300 hover:bg-white/10'
+                        ? "bg-yellow-400/10 text-yellow-400"
+                        : "text-gray-300 hover:bg-white/10"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="h-5 w-5" />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               ))}
               <Button
                 variant="ghost"
                 onClick={handleLogout}
-                className="w-full justify-start px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10"
+                className="w-full justify-start px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white"
               >
-                <LogOut className="w-5 h-5 mr-3" />
-                Cerrar Sesión
+                <LogOut className="mr-3 h-5 w-5" />
+                Cerrar Sesion
               </Button>
             </nav>
           </div>
         )}
       </header>
 
-      {/* Main Content */}
-      <main>
-        {children}
-      </main>
+      <main>{children}</main>
     </div>
   );
 }

@@ -26,9 +26,21 @@ Copy-Item .env.example .env.local
 ```env
 VITE_BASE44_APP_ID=din_app_id_fran_base44
 VITE_BASE44_BACKEND_URL=https://din-base44-backend-url
+VITE_BASE44_APP_BASE_URL=https://din-base44-backend-url
+VITE_LOCAL_DEV_BYPASS_AUTH=false
 ```
 
-Vanligtvis far du dessa fran din Base44-app eller fran deploy-URL:en som appen redan kor mot.
+`VITE_BASE44_APP_ID` och `VITE_BASE44_BACKEND_URL` behovs for att appen ska prata med din riktiga backend lokalt.
+
+`VITE_BASE44_APP_BASE_URL` ar valfri och anvands av Vite-pluginen for att proxya `/api` i dev-lage.
+
+Om du bara vill jobba i UI:t lokalt utan att skickas till Base44-login kan du tillfalligt satta:
+
+```env
+VITE_LOCAL_DEV_BYPASS_AUTH=true
+```
+
+Det bypassar admin-login i dev-lage, men ersatter inte riktig backendkonfiguration om du vill ha riktig data.
 
 ## Starta appen
 
@@ -50,5 +62,6 @@ Om du oppnar appen via en Base44-inloggningsredirect kan `access_token` laggas i
 ## Felsokning
 
 - Om `npm` blockeras i PowerShell, kor `npm.cmd` i stallet for `npm`.
-- Om `npm install` fastnar pa Windows-behorigheter eller antivirus, kor terminalen som Administrator eller tillat installationen utanför begransad miljo.
+- Om `npm install` fastnar pa Windows-behorigheter eller antivirus, kor terminalen som Administrator eller tillat installationen utanfor begransad miljo.
 - Om appen startar men inte kan prata med backend, kontrollera att `VITE_BASE44_APP_ID` och `VITE_BASE44_BACKEND_URL` stammer.
+- Om appen visar en lokal setup-sida saknas Base44-konfiguration i `.env.local`.

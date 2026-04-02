@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { createMenuItem, deleteMenuItem, listMenuItems, updateMenuItem } from "@/lib/local-dev-menu";
 
 import MenuItemCard from "../components/menu-management/MenuItemCard";
 import MenuItemForm from "../components/menu-management/MenuItemForm";
@@ -19,11 +20,11 @@ export default function MenuManagement() {
 
   const { data: menuItems = [], isLoading } = useQuery({
     queryKey: ['menuItems'],
-    queryFn: () => base44.entities.MenuItem.list(),
+    queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
   });
 
   const createItem = useMutation({
-    mutationFn: (data) => base44.entities.MenuItem.create(data),
+    mutationFn: (data) => createMenuItem(data, (payload) => base44.entities.MenuItem.create(payload)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
       setShowForm(false);
@@ -32,7 +33,7 @@ export default function MenuManagement() {
   });
 
   const updateItem = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.MenuItem.update(id, data),
+    mutationFn: ({ id, data }) => updateMenuItem(id, data, (itemId, payload) => base44.entities.MenuItem.update(itemId, payload)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
       setShowForm(false);
@@ -41,7 +42,7 @@ export default function MenuManagement() {
   });
 
   const deleteItem = useMutation({
-    mutationFn: (id) => base44.entities.MenuItem.delete(id),
+    mutationFn: (id) => deleteMenuItem(id, (itemId) => base44.entities.MenuItem.delete(itemId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
     },
