@@ -65,6 +65,14 @@ function getCheckboxPropertyKey(page) {
   return null;
 }
 
+function getSelectPropertyKey(page) {
+  if (!page.properties) return null;
+  for (const [key, prop] of Object.entries(page.properties)) {
+    if (prop.type === "select") return key;
+  }
+  return null;
+}
+
 function getPageMeta(page) {
   if (!page.properties) return {};
   const meta = {};
@@ -91,6 +99,10 @@ function isTaskDone(item) {
   for (const [, prop] of Object.entries(item.properties)) {
     if (prop.type === "status") {
       const name = prop.status?.name?.toLowerCase() || "";
+      return name.includes("done") || name.includes("complete") || name.includes("finished");
+    }
+    if (prop.type === "select") {
+      const name = prop.select?.name?.toLowerCase() || "";
       return name.includes("done") || name.includes("complete") || name.includes("finished");
     }
   }
@@ -466,7 +478,7 @@ function DocumentsTab() {
     if (getPageTitle(item) === "(untitled)") return false;
     if (!item.properties) return true;
     const props = Object.values(item.properties);
-    return !props.some((p) => p.type === "checkbox" || p.type === "status");
+    return !props.some((p) => p.type === "checkbox" || p.type === "status" || p.type === "select");
   });
 
   return (
@@ -560,7 +572,7 @@ export default function NotionPage() {
     if (item.object !== "page") return false;
     if (!item.properties) return false;
     const props = Object.values(item.properties);
-    const isTask = props.some((p) => p.type === "checkbox" || p.type === "status");
+    const isTask = props.some((p) => p.type === "checkbox" || p.type === "status" || p.type === "select");
     if (!isTask) return false;
     return !isTaskDone(item);
   });
@@ -568,6 +580,7 @@ export default function NotionPage() {
   const handleMarkDone = async (item) => {
     const checkboxKey = getCheckboxPropertyKey(item);
     const statusKey = getStatusPropertyKey(item);
+    const selectKey = getSelectPropertyKey(item);
 
     let properties = {};
     if (checkboxKey) {
@@ -575,6 +588,9 @@ export default function NotionPage() {
     } else if (statusKey) {
       // Try to set status to "Done" — Notion requires the exact option name that exists
       properties[statusKey] = { status: { name: "Done" } };
+    } else if (selectKey) {
+      // Try to set select to "Done" — Notion requires the exact option name that exists
+      properties[selectKey] = { select: { name: "Done" } };
     }
 
     if (Object.keys(properties).length === 0) return;
