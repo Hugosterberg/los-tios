@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Save, ShieldCheck, Wifi, XCircle, BookOpen } from "lucide-react";
-import NotionExplorer from "@/components/integrations/NotionExplorer";
+
 
 function fieldHasValue(value) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
@@ -38,14 +38,7 @@ export default function Integrations() {
     setTesting((t) => ({ ...t, [sectionId]: true }));
     setTestResults((r) => ({ ...r, [sectionId]: null }));
     try {
-      if (sectionId === "notion") {
-        try {
-          await base44.functions.invoke("notionProxy", { path: "users/me", method: "GET" });
-          setTestResults((r) => ({ ...r, notion: { ok: true, message: "Conexión exitosa con Notion." } }));
-        } catch (e) {
-          throw new Error(e?.response?.data?.error || e?.message || "Error conectando Notion.");
-        }
-      } else if (sectionId === "loyverse") {
+      if (sectionId === "loyverse") {
         const token = formData.loyverse_api_token?.trim();
         if (!token) throw new Error("Falta el token de Loyverse.");
         await base44.functions.invoke("loyverseProxy", { path: "merchant", apiToken: token });
@@ -247,20 +240,6 @@ export default function Integrations() {
                       </TabsTrigger>
                     );
                   })}
-                  {/* Notion Tab Trigger */}
-                  <TabsTrigger
-                    value="notion"
-                    className="rounded-xl border border-white/10 bg-[#101010] px-4 py-3 text-left text-gray-300 data-[state=active]:border-yellow-400/50 data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300"
-                  >
-                    <div className="flex items-center gap-3">
-                      <BookOpen className="h-4 w-4" />
-                      <div>
-                        <p className="font-semibold">Notion</p>
-                        <p className="text-xs text-gray-500">OAuth connected</p>
-                      </div>
-                      <Badge className="bg-emerald-500/15 text-emerald-300">Ready</Badge>
-                    </div>
-                  </TabsTrigger>
                 </TabsList>
 
                 {INTEGRATION_SETTINGS_SECTIONS.map((section) => (
@@ -388,49 +367,7 @@ export default function Integrations() {
                     </div>
                   </TabsContent>
                 ))}
-                {/* Notion Tab Content */}
-                 <TabsContent value="notion" className="mt-0">
-                   <div className="space-y-6">
-                     {/* Header */}
-                     <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
-                       <div>
-                         <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                           <BookOpen className="h-5 w-5 text-yellow-400" /> Notion Explorer
-                         </h2>
-                         <p className="mt-1 max-w-2xl text-sm text-gray-400">
-                           Connected via OAuth. Browse your workspace, read documents and view tasks directly.
-                         </p>
-                       </div>
-                       <div className="flex items-center gap-2 flex-wrap">
-                         {testResults["notion"] && (
-                           <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults["notion"].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
-                             {testResults["notion"].ok
-                               ? <CheckCircle2 className="h-3.5 w-3.5" />
-                               : <XCircle className="h-3.5 w-3.5" />}
-                             {testResults["notion"].message}
-                           </span>
-                         )}
-                         <Button
-                           type="button"
-                           variant="outline"
-                           onClick={() => runTest("notion")}
-                           disabled={testing["notion"]}
-                           className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
-                         >
-                           {testing["notion"]
-                             ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                             : <Wifi className="mr-2 h-4 w-4" />}
-                           Test connection
-                         </Button>
-                       </div>
-                     </div>
 
-                     {/* Explorer */}
-                     <div className="rounded-2xl border border-white/10 bg-[#141414] p-5">
-                       <NotionExplorer />
-                     </div>
-                   </div>
-                 </TabsContent>
 
               </Tabs>
             </CardContent>

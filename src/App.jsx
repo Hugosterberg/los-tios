@@ -11,6 +11,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import CustomerOrder from './pages/CustomerOrder';
+import NotionPage from './pages/Notion';
 import LocalSetupHelp from '@/components/LocalSetupHelp';
 
 const { Pages, Layout } = pagesConfig;
@@ -68,6 +69,11 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       <Route path="/CustomerOrder" element={<CustomerOrder />} />
+      <Route path="/Notion" element={
+        <LayoutWrapper currentPageName="Notion">
+          <NotionPage />
+        </LayoutWrapper>
+      } />
       {Object.entries(Pages).map(([path, Page]) => (
         path !== "CustomerOrder" && (
           <Route
