@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit, Receipt, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +20,7 @@ export default function CompanyAccount() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [showContributorForm, setShowContributorForm] = useState(false);
   const [editingContributor, setEditingContributor] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const queryClient = useQueryClient();
 
   const [transactionForm, setTransactionForm] = useState({
@@ -529,11 +530,129 @@ export default function CompanyAccount() {
 
         {/* Tabs */}
         <Tabs defaultValue="expenses" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3 bg-[#242424] border border-yellow-500/20">
+          <TabsList className="grid w-full grid-cols-4 bg-[#242424] border border-yellow-500/20">
+            <TabsTrigger value="daily-income" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Ingresos Diarios</TabsTrigger>
             <TabsTrigger value="expenses" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Gastos</TabsTrigger>
             <TabsTrigger value="transactions" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Transacciones</TabsTrigger>
             <TabsTrigger value="contributors" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Contribuyentes</TabsTrigger>
           </TabsList>
+
+          {/* Daily Income Tab */}
+          <TabsContent value="daily-income" className="space-y-6">
+            <div className="flex gap-4 items-end">
+              <div className="space-y-2">
+                <Label htmlFor="income-date">Seleccionar Fecha</Label>
+                <Input
+                  id="income-date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border-yellow-500/20 bg-[#242424]"
+                />
+              </div>
+              <div className="text-sm text-gray-400 pb-2">
+                {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: es })}
+              </div>
+            </div>
+
+            {(() => {
+              const dateRange = {
+                start: startOfDay(new Date(selectedDate)),
+                end: endOfDay(new Date(selectedDate)),
+              };
+
+              const loyverseIncome = orders.filter(o => {
+                const orderDate = new Date(o.created_date);
+                return orderDate >= dateRange.start && orderDate <= dateRange.end && o.status === 'delivered';
+              });
+
+              const loyverseCash = loyverseIncome
+                .filter(o => o.payment_method === 'cash')
+                .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+              const loyverseCard = loyverseIncome
+                .filter(o => o.payment_method === 'card')
+                .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+              const manualCash = transactions
+                .filter(t => {
+                  const txDate = new Date(t.date);
+                  return txDate >= dateRange.start && txDate <= dateRange.end && 
+                         t.type === 'contribution' && t.payment_method === 'cash';
+                })
+                .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+              const revolut = transactions
+                .filter(t => {
+                  const txDate = new Date(t.date);
+                  return txDate >= dateRange.start && txDate <= dateRange.end && 
+                         t.type === 'contribution' && t.payment_method === 'transfer';
+                })
+                .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+              const totalIncome = loyverseCash + loyverseCard + manualCash + revolut;
+
+              return (
+                <>
+                  <Card className="bg-gradient-to-r from-yellow-400/10 to-yellow-400/5 border border-yellow-500/30 shadow-none">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-400 mb-1">Total Ingresos del Día</p>
+                          <div className="text-5xl font-bold text-yellow-400">${totalIncome.toFixed(2)}</div>
+                        </div>
+                        <div className="text-right text-sm text-gray-500">
+                          {loyverseIncome.length} órdenes
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-400">💳 Clip (Tarjetas)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">${loyverseCard.toFixed(2)}</div>
+                        <p className="text-xs text-gray-500 mt-1">{loyverseIncome.filter(o => o.payment_method === 'card').length} órdenes</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-400">💵 Loyverse (Efectivo)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">${loyverseCash.toFixed(2)}</div>
+                        <p className="text-xs text-gray-500 mt-1">{loyverseIncome.filter(o => o.payment_method === 'cash').length} órdenes</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-400">🏷️ Efectivo Manual</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">${manualCash.toFixed(2)}</div>
+                        <p className="text-xs text-gray-500 mt-1">Registros manuales</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-400">🏦 Revolut/Banco</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">${revolut.toFixed(2)}</div>
+                        <p className="text-xs text-gray-500 mt-1">Transferencias</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              );
+            })()}
+          </TabsContent>
 
           {/* Expenses Tab */}
           <TabsContent value="expenses" className="space-y-6">
