@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Eye, EyeOff, Info, KeyRound, RefreshCw, Save, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Save, ShieldCheck, Wifi, XCircle } from "lucide-react";
 
 function fieldHasValue(value) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
@@ -30,6 +30,41 @@ function buildSectionStatus(section, formData) {
 export default function Integrations() {
   const queryClient = useQueryClient();
   const [showSecrets, setShowSecrets] = useState({});
+  const [testResults, setTestResults] = useState({});
+  const [testing, setTesting] = useState({});
+
+  const runTest = async (sectionId) => {
+    setTesting((t) => ({ ...t, [sectionId]: true }));
+    setTestResults((r) => ({ ...r, [sectionId]: null }));
+    try {
+      if (sectionId === "loyverse") {
+        const token = formData.loyverse_api_token?.trim();
+        if (!token) throw new Error("Falta el token de Loyverse.");
+        await base44.functions.invoke("loyverseProxy", { path: "me", apiToken: token });
+        setTestResults((r) => ({ ...r, loyverse: { ok: true, message: "Conexión exitosa con Loyverse." } }));
+      } else if (sectionId === "clip") {
+        const key = formData.clip_api_key?.trim();
+        const secret = formData.clip_api_secret?.trim();
+        const manualToken = formData.clip_api_token?.trim();
+        const authToken = manualToken || (key && secret ? `Basic ${btoa(`${key}:${secret}`)}` : null);
+        if (!authToken) throw new Error("Faltan credenciales de Clip.");
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+        const from = new Date(yesterday); from.setDate(from.getDate() - 1);
+        await base44.functions.invoke("clipProxy", {
+          path: "payments",
+          apiType: "payments",
+          authToken,
+          searchParams: { from: from.toISOString().slice(0, 10), to: yesterday.toISOString().slice(0, 10), size: 1 },
+        });
+        setTestResults((r) => ({ ...r, clip: { ok: true, message: "Conexión exitosa con Clip." } }));
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || "Error desconocido.";
+      setTestResults((r) => ({ ...r, [sectionId]: { ok: false, message: msg } }));
+    } finally {
+      setTesting((t) => ({ ...t, [sectionId]: false }));
+    }
+  };
 
   const { data: settings = [], isLoading } = useQuery({
     queryKey: ["appSettings"],
@@ -245,15 +280,37 @@ export default function Integrations() {
                           <p className="mt-1 max-w-2xl text-sm text-gray-400">{section.description}</p>
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => resetSection(section)}
-                          className="border-white/10 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Reset section
-                        </Button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {testResults[section.id] && (
+                            <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults[section.id].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
+                              {testResults[section.id].ok
+                                ? <CheckCircle2 className="h-3.5 w-3.5" />
+                                : <XCircle className="h-3.5 w-3.5" />}
+                              {testResults[section.id].message}
+                            </span>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => runTest(section.id)}
+                            disabled={testing[section.id]}
+                            className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                          >
+                            {testing[section.id]
+                              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              : <Wifi className="mr-2 h-4 w-4" />}
+                            Test conexión
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => resetSection(section)}
+                            className="border-white/10 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Reset
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
