@@ -43,9 +43,14 @@ function getCheckboxStatus(page) {
 
 function getTaskStatus(page) {
   if (!page.properties) return null;
-  for (const [, prop] of Object.entries(page.properties)) {
-    if (prop.type === "status") return { name: prop.status?.name, color: prop.status?.color };
-    if (prop.type === "select") return { name: prop.select?.name, color: prop.select?.color };
+  // Look for status or select properties
+  for (const [key, prop] of Object.entries(page.properties)) {
+    if (prop.type === "status" && prop.status) {
+      return { name: prop.status.name, color: prop.status.color };
+    }
+    if (prop.type === "select" && prop.select) {
+      return { name: prop.select.name, color: prop.select.color };
+    }
   }
   return null;
 }
@@ -602,7 +607,9 @@ export default function NotionPage() {
       const res = await base44.functions.invoke("notionProxy", {
         path: "search", method: "POST", body: { query: "", page_size: 100 }
       });
-      setAllResults(res.data?.results || []);
+      const results = res.data?.results || [];
+      console.log("Fetched tasks:", results.slice(0, 3).map(t => ({ title: getPageTitle(t), status: getTaskStatus(t), props: Object.keys(t.properties || {}) })));
+      setAllResults(results);
     } catch (e) {
       setTasksError(e?.response?.data?.error || e?.message || "Failed to load.");
     } finally {
