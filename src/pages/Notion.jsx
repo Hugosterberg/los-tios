@@ -499,7 +499,7 @@ function DocumentsTab() {
 
   const load = () => {
     setSelected(null);
-    search({ filter: { value: "page", property: "object" }, page_size: 50, sort: { direction: "ascending", timestamp: "last_edited_time" } });
+    search({ query: "", page_size: 100 });
   };
 
   useEffect(() => { load(); }, []);
