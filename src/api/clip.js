@@ -1,13 +1,7 @@
 import { buildClipResolvedConfig } from "@/lib/integrationSettings";
-const DEFAULT_CLIP_PAYMENTS_API_BASE_URL = "https://api.payclip.com";
-const DEFAULT_CLIP_SETTLEMENTS_API_BASE_URL = "https://api-gw.payclip.com";
-const DEFAULT_CLIP_PAYMENTS_PROXY_PATH = "/api/clip/payments";
-const DEFAULT_CLIP_SETTLEMENTS_PROXY_PATH = "/api/clip/settlements";
-
-export const CLIP_PAYMENTS_API_BASE_URL =
-  import.meta.env.VITE_CLIP_PAYMENTS_API_BASE_URL || DEFAULT_CLIP_PAYMENTS_API_BASE_URL;
-export const CLIP_SETTLEMENTS_API_BASE_URL =
-  import.meta.env.VITE_CLIP_SETTLEMENTS_API_BASE_URL || DEFAULT_CLIP_SETTLEMENTS_API_BASE_URL;
+import { base44 } from "@/api/base44Client";
+export const CLIP_PAYMENTS_API_BASE_URL = "https://api.payclip.com";
+export const CLIP_SETTLEMENTS_API_BASE_URL = "https://api-gw.payclip.com";
 
 function buildClipAuthToken(config = {}) {
   if (config.authToken) {
@@ -31,8 +25,8 @@ export function getClipResolvedConfig(settings = {}) {
   const config = buildClipResolvedConfig(settings);
   return {
     ...config,
-    paymentsBaseUrl: config.paymentsBaseUrl || DEFAULT_CLIP_PAYMENTS_API_BASE_URL,
-    settlementsBaseUrl: config.settlementsBaseUrl || DEFAULT_CLIP_SETTLEMENTS_API_BASE_URL,
+    paymentsBaseUrl: config.paymentsBaseUrl || CLIP_PAYMENTS_API_BASE_URL,
+    settlementsBaseUrl: config.settlementsBaseUrl || CLIP_SETTLEMENTS_API_BASE_URL,
     authToken: buildClipAuthToken(config),
   };
 }
@@ -41,17 +35,7 @@ export function hasClipApiConfig(settings = {}) {
   return Boolean(getClipResolvedConfig(settings).authToken);
 }
 
-function getClipPaymentsRequestBaseUrl(config) {
-  return import.meta.env.DEV
-    ? (import.meta.env.VITE_CLIP_PAYMENTS_PROXY_PATH || DEFAULT_CLIP_PAYMENTS_PROXY_PATH)
-    : config.paymentsBaseUrl;
-}
 
-function getClipSettlementsRequestBaseUrl(config) {
-  return import.meta.env.DEV
-    ? (import.meta.env.VITE_CLIP_SETTLEMENTS_PROXY_PATH || DEFAULT_CLIP_SETTLEMENTS_PROXY_PATH)
-    : config.settlementsBaseUrl;
-}
 
 export const CLIP_API_CATALOG = [
   {
@@ -146,67 +130,19 @@ class ClipApiError extends Error {
   }
 }
 
-function buildClipUrl(baseUrl, path, searchParams = {}) {
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
-  const resolvedBaseUrl = /^https?:/i.test(normalizedBaseUrl)
-    ? `${normalizedBaseUrl}/`
-    : `${window.location.origin}${normalizedBaseUrl}/`;
-  const url = new URL(path, resolvedBaseUrl);
-
-  Object.entries(searchParams).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, value);
-    }
-  });
-
-  return url.toString();
-}
-
-async function clipFetch(baseUrl, path, { searchParams, authHeader = "Authorization", authToken } = {}) {
+async function clipFetch(path, { searchParams, apiType = "payments", authToken } = {}) {
   if (!authToken) {
     throw new ClipApiError("Missing Clip auth token");
   }
 
-  const url = buildClipUrl(baseUrl, path, searchParams);
-  const headerCandidates = authHeader === "x-api-key"
-    ? [
-        { "x-api-key": authToken },
-        { Authorization: authToken },
-      ]
-    : [
-        { Authorization: authToken },
-        { "x-api-key": authToken },
-      ];
+  const response = await base44.functions.invoke("clipProxy", {
+    path,
+    searchParams,
+    apiType,
+    authToken,
+  });
 
-  let lastResponse = null;
-  let lastErrorText = "";
-
-  for (const authHeaders of headerCandidates) {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        ...authHeaders,
-      },
-    });
-
-    if (response.ok) {
-      return response.json();
-    }
-
-    lastResponse = response;
-    lastErrorText = await response.text();
-
-    if (response.status !== 401 && response.status !== 403) {
-      break;
-    }
-  }
-
-  if (!lastResponse?.ok) {
-    throw new ClipApiError(
-      `Clip API error on ${path} ${lastResponse?.status || ""}: ${lastErrorText || lastResponse?.statusText || "Unknown error"}`.trim(),
-      lastResponse?.status,
-    );
-  }
+  return response.data;
 }
 
 function normalizeClipItem(payload) {
@@ -293,27 +229,25 @@ function getDefaultSettlementsRange() {
 
 export async function getClipOverview(settings = {}) {
   const config = getClipResolvedConfig(settings);
-  const paymentsRequestBaseUrl = getClipPaymentsRequestBaseUrl(config);
-  const settlementsRequestBaseUrl = getClipSettlementsRequestBaseUrl(config);
   const paymentsRange = getDefaultPaymentsRange();
   const settlementsRange = getDefaultSettlementsRange();
 
   const [paymentsPayload, settlementsPayload] = await Promise.all([
-    clipFetch(paymentsRequestBaseUrl, "payments", {
+    clipFetch("payments", {
       searchParams: {
         from: paymentsRange.from,
         to: paymentsRange.to,
         size: 100,
       },
-      authHeader: "Authorization",
+      apiType: "payments",
       authToken: config.authToken,
     }),
-    clipFetch(settlementsRequestBaseUrl, "settlements", {
+    clipFetch("settlements", {
       searchParams: {
         from: settlementsRange.from,
         to: settlementsRange.to,
       },
-      authHeader: "x-api-key",
+      apiType: "settlements",
       authToken: config.authToken,
     }),
   ]);
@@ -383,8 +317,8 @@ export async function getClipPaymentDetails(paymentId, settings = {}) {
   }
 
   const config = getClipResolvedConfig(settings);
-  const payload = await clipFetch(getClipPaymentsRequestBaseUrl(config), `payments/${paymentId}`, {
-    authHeader: "Authorization",
+  const payload = await clipFetch(`payments/${paymentId}`, {
+    apiType: "payments",
     authToken: config.authToken,
   });
 
@@ -397,8 +331,8 @@ export async function getClipPaymentByReceipt(receiptNo, settings = {}) {
   }
 
   const config = getClipResolvedConfig(settings);
-  const payload = await clipFetch(getClipPaymentsRequestBaseUrl(config), `payments/receipt-no/${receiptNo}`, {
-    authHeader: "Authorization",
+  const payload = await clipFetch(`payments/receipt-no/${receiptNo}`, {
+    apiType: "payments",
     authToken: config.authToken,
   });
 
@@ -411,8 +345,8 @@ export async function getClipSettlementDetails(settlementReportId, settings = {}
   }
 
   const config = getClipResolvedConfig(settings);
-  const payload = await clipFetch(getClipSettlementsRequestBaseUrl(config), `settlements/${settlementReportId}`, {
-    authHeader: "x-api-key",
+  const payload = await clipFetch(`settlements/${settlementReportId}`, {
+    apiType: "settlements",
     authToken: config.authToken,
   });
 
