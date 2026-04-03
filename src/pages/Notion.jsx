@@ -448,15 +448,22 @@ function DocumentsTab() {
 
   const load = () => {
     setSelected(null);
-    search({ filter: { value: "page", property: "object" }, page_size: 50 });
+    search({ filter: { value: "page", property: "object" }, page_size: 50, sort: { direction: "ascending", timestamp: "last_edited_time" } });
   };
 
   useEffect(() => { load(); }, []);
 
+  // Only show pages that are NOT tasks (no checkbox or status property)
+  const docs = results.filter((item) => {
+    if (!item.properties) return true;
+    const props = Object.values(item.properties);
+    return !props.some((p) => p.type === "checkbox" || p.type === "status");
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">{results.length > 0 ? `${results.length} pages found` : ""}</p>
+        <p className="text-sm text-gray-400">{docs.length > 0 ? `${docs.length} documents found` : ""}</p>
         <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}
           className="border-white/10 bg-transparent text-gray-300 hover:bg-white/5">
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -466,7 +473,7 @@ function DocumentsTab() {
       {loading && <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-yellow-400" /></div>}
       {!loading && (
         <div className={`grid gap-4 ${selected ? "lg:grid-cols-2" : "grid-cols-1"}`}>
-          <ResultList items={results} selectedId={selected?.id} onSelect={setSelected} emptyMessage="No pages found." />
+          <ResultList items={docs} selectedId={selected?.id} onSelect={setSelected} emptyMessage="No documents found." />
           {selected && <PageContent key={selected.id} page={selected} onClose={() => setSelected(null)} />}
         </div>
       )}
@@ -590,12 +597,6 @@ export default function NotionPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Tabs defaultValue="tasks" className="space-y-6">
           <TabsList className="bg-[#1a1a1a] border border-white/10 p-1 h-auto gap-1">
-            <TabsTrigger value="search" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
-              <Search className="h-4 w-4 mr-2" /> Search
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
-              <FileText className="h-4 w-4 mr-2" /> Documents
-            </TabsTrigger>
             <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
               <CheckSquare className="h-4 w-4 mr-2" /> Open Tasks
               {tasksLoading
@@ -605,6 +606,12 @@ export default function NotionPage() {
                     {tasks.length}
                   </span>
                 )}
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
+              <FileText className="h-4 w-4 mr-2" /> Documents
+            </TabsTrigger>
+            <TabsTrigger value="search" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
+              <Search className="h-4 w-4 mr-2" /> Search
             </TabsTrigger>
           </TabsList>
 
