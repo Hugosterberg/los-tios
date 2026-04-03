@@ -13,6 +13,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import CustomerOrder from './pages/CustomerOrder';
 import NotionPage from './pages/Notion';
 import LocalSetupHelp from '@/components/LocalSetupHelp';
+import IncomeTracker from './pages/IncomeTracker';
 
 const { Pages, Layout } = pagesConfig;
 
@@ -72,6 +73,11 @@ const AuthenticatedApp = () => {
       <Route path="/Notion" element={
         <LayoutWrapper currentPageName="Notion">
           <NotionPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/IncomeTracker" element={
+        <LayoutWrapper currentPageName="IncomeTracker">
+          <IncomeTracker />
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => (
