@@ -251,8 +251,12 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
                 {name}
               </span>
             ))}
+            {/* Created date */}
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">
+              Skapad: {new Date(item.created_time).toLocaleDateString("sv-SE")}
+            </span>
             <span className="text-[10px] text-gray-600 ml-auto shrink-0">
-              {new Date(item.last_edited_time).toLocaleDateString("sv-SE")}
+              Redigerad: {new Date(item.last_edited_time).toLocaleDateString("sv-SE")}
             </span>
           </div>
         </div>
