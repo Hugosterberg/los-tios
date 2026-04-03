@@ -5,14 +5,19 @@ const NOTION_API_BASE = "https://api.notion.com/v1";
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    let user;
+    try {
+      user = await base44.auth.me();
+    } catch (_) {
+      // ignore auth errors
+    }
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { accessToken } = await base44.asServiceRole.connectors.getConnection("notion");
     const body = await req.json();
-    const { path, method = "GET", payload, body: bodyPayload, searchParams } = body;
+    const { path, method = "GET", body: notionBody, searchParams } = body;
 
     if (!path) {
       return Response.json({ error: "Missing path" }, { status: 400 });
@@ -33,19 +38,20 @@ Deno.serve(async (req) => {
       },
     };
 
-    const requestBody = payload || bodyPayload;
-    if (requestBody && method !== "GET") {
-      fetchOptions.body = JSON.stringify(requestBody);
+    if (notionBody && method !== "GET") {
+      fetchOptions.body = JSON.stringify(notionBody);
     }
 
     const response = await fetch(url, fetchOptions);
     const data = await response.json();
 
     if (!response.ok) {
+      console.error("Notion API error:", data);
       return Response.json({ error: data.message || "Notion API error", details: data }, { status: response.status });
     }
 
     return Response.json(data);
+
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

@@ -558,6 +558,10 @@ export default function NotionPage() {
 
   const tasks = allResults.filter((item) => {
     if (item.object !== "page") return false;
+    if (!item.properties) return false;
+    const props = Object.values(item.properties);
+    const isTask = props.some((p) => p.type === "checkbox" || p.type === "status");
+    if (!isTask) return false;
     return !isTaskDone(item);
   });
 
