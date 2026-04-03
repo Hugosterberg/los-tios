@@ -230,6 +230,7 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone, commentCounts = {} }
   
   const title = getPageTitle(item);
   const status = getTaskStatus(item);
+  console.log(`TaskCard: ${title}`, { status, hasName: !!status?.name });
   const meta = getPageMeta(item);
   const isSelected = selectedId === item.id;
   const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
