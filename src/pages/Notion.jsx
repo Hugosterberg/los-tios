@@ -609,7 +609,15 @@ export default function NotionPage() {
         path: "search", method: "POST", body: { query: "", page_size: 100 }
       });
       const results = res.data?.results || [];
-      console.log("Fetched tasks:", results.slice(0, 3).map(t => ({ title: getPageTitle(t), status: getTaskStatus(t), props: Object.keys(t.properties || {}) })));
+      console.log("Fetched tasks:", results.slice(0, 3).map(t => {
+        const props = t.properties || {};
+        return {
+          title: getPageTitle(t),
+          status: getTaskStatus(t),
+          statusProp: Object.entries(props).find(([, p]) => p.type === "status" || p.type === "select"),
+          allProps: Object.entries(props).map(([k, v]) => ({ name: k, type: v.type }))
+        };
+      }));
       setAllResults(results);
     } catch (e) {
       setTasksError(e?.response?.data?.error || e?.message || "Failed to load.");
