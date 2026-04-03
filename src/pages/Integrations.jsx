@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { buildDefaultAppSettings, INTEGRATION_SETTINGS_SECTIONS } from "@/lib/appSettings";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Eye, EyeOff, KeyRound, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Info, KeyRound, RefreshCw, Save, ShieldCheck, XCircle } from "lucide-react";
 
 function fieldHasValue(value) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
@@ -205,6 +205,40 @@ export default function Integrations() {
                 {INTEGRATION_SETTINGS_SECTIONS.map((section) => (
                   <TabsContent key={section.id} value={section.id} className="mt-0">
                     <div className="space-y-6">
+
+                      {/* Clip auth status banner */}
+                      {section.id === "clip" && (() => {
+                        const key = formData.clip_api_key?.trim();
+                        const secret = formData.clip_api_secret?.trim();
+                        const manualToken = formData.clip_api_token?.trim();
+                        const hasManual = Boolean(manualToken);
+                        const hasAuto = Boolean(key && secret);
+                        const generatedToken = hasAuto ? `Basic ${btoa(`${key}:${secret}`)}` : null;
+
+                        return (
+                          <div className={`rounded-2xl border p-4 text-sm ${hasManual || hasAuto ? "border-emerald-500/30 bg-emerald-500/10" : "border-yellow-500/30 bg-yellow-500/10"}`}>
+                            <div className="flex items-start gap-3">
+                              {hasManual || hasAuto
+                                ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                                : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+                              }
+                              <div className="space-y-1">
+                                {hasManual ? (
+                                  <p className="text-emerald-300 font-medium">Token manual configurado — se usará directamente.</p>
+                                ) : hasAuto ? (
+                                  <>
+                                    <p className="text-emerald-300 font-medium">Token generado automáticamente desde clave pública + secreta.</p>
+                                    <p className="font-mono text-xs text-gray-400 break-all">{generatedToken}</p>
+                                  </>
+                                ) : (
+                                  <p className="text-yellow-300 font-medium">Faltan credenciales — configura la clave pública y secreta para generar el token Basic.</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <h2 className="text-xl font-semibold text-white">{section.title}</h2>
