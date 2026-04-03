@@ -402,11 +402,14 @@ function SearchTab() {
   const [selected, setSelected] = useState(null);
   const { results, loading, error, search } = useNotionSearch();
 
-  const handleSearch = () => {
+  useEffect(() => {
     if (!query.trim()) return;
-    setSelected(null);
-    search({ query: query.trim(), page_size: 30 });
-  };
+    const timer = setTimeout(() => {
+      setSelected(null);
+      search({ query: query.trim(), page_size: 30 });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   return (
     <div className="space-y-4">
@@ -414,13 +417,10 @@ function SearchTab() {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           placeholder="Search pages, docs, tasks..."
           className="border-white/10 bg-[#0d0d0d] text-white placeholder:text-gray-500"
         />
-        <Button onClick={handleSearch} disabled={loading || !query.trim()} className="bg-yellow-400 text-black hover:bg-yellow-300 shrink-0">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-        </Button>
+        {loading && <Loader2 className="h-5 w-5 animate-spin text-yellow-400 self-center shrink-0" />}
       </div>
       {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
       {loading && <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-yellow-400" /></div>}
@@ -453,8 +453,9 @@ function DocumentsTab() {
 
   useEffect(() => { load(); }, []);
 
-  // Only show pages that are NOT tasks (no checkbox or status property)
+  // Only show pages that are NOT tasks and have a real title
   const docs = results.filter((item) => {
+    if (getPageTitle(item) === "(untitled)") return false;
     if (!item.properties) return true;
     const props = Object.values(item.properties);
     return !props.some((p) => p.type === "checkbox" || p.type === "status");
