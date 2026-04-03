@@ -43,7 +43,7 @@ function getCheckboxStatus(page) {
 }
 
 function getTaskStatus(page) {
-  if (!page.properties) return null;
+  if (!page.properties) return { name: "Not started", color: "gray" };
   // Look for status or select properties
   for (const [key, prop] of Object.entries(page.properties)) {
     if (prop.type === "status" && prop.status) {
@@ -53,7 +53,7 @@ function getTaskStatus(page) {
       return { name: prop.select.name, color: prop.select.color };
     }
   }
-  return null;
+  return { name: "Not started", color: "gray" };
 }
 
 function getStatusPropertyKey(page) {
