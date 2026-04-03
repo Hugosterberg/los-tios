@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Save, ShieldCheck, Wifi, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Save, ShieldCheck, Wifi, XCircle, BookOpen } from "lucide-react";
 
 function fieldHasValue(value) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
@@ -37,7 +37,14 @@ export default function Integrations() {
     setTesting((t) => ({ ...t, [sectionId]: true }));
     setTestResults((r) => ({ ...r, [sectionId]: null }));
     try {
-      if (sectionId === "loyverse") {
+      if (sectionId === "notion") {
+        try {
+          await base44.functions.invoke("notionProxy", { path: "users/me", method: "GET" });
+          setTestResults((r) => ({ ...r, notion: { ok: true, message: "Conexión exitosa con Notion." } }));
+        } catch (e) {
+          throw new Error(e?.response?.data?.error || e?.message || "Error conectando Notion.");
+        }
+      } else if (sectionId === "loyverse") {
         const token = formData.loyverse_api_token?.trim();
         if (!token) throw new Error("Falta el token de Loyverse.");
         await base44.functions.invoke("loyverseProxy", { path: "merchant", apiToken: token });
@@ -241,6 +248,21 @@ export default function Integrations() {
                   })}
                 </TabsList>
 
+                {/* Notion Tab Trigger */}
+                  <TabsTrigger
+                    value="notion"
+                    className="rounded-xl border border-white/10 bg-[#101010] px-4 py-3 text-left text-gray-300 data-[state=active]:border-yellow-400/50 data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="h-4 w-4" />
+                      <div>
+                        <p className="font-semibold">Notion</p>
+                        <p className="text-xs text-gray-500">OAuth conectado</p>
+                      </div>
+                      <Badge className="bg-emerald-500/15 text-emerald-300">Ready</Badge>
+                    </div>
+                  </TabsTrigger>
+
                 {INTEGRATION_SETTINGS_SECTIONS.map((section) => (
                   <TabsContent key={section.id} value={section.id} className="mt-0">
                     <div className="space-y-6">
@@ -366,6 +388,76 @@ export default function Integrations() {
                     </div>
                   </TabsContent>
                 ))}
+                {/* Notion Tab Content */}
+                <TabsContent value="notion" className="mt-0">
+                  <div className="space-y-6">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold text-white">Notion</h2>
+                        <p className="mt-1 max-w-2xl text-sm text-gray-400">
+                          Integración OAuth con Notion — conectado como cuenta compartida (info@lostios.mx). Puedes leer y escribir en workspaces, páginas y bases de datos.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {testResults["notion"] && (
+                          <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults["notion"].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
+                            {testResults["notion"].ok
+                              ? <CheckCircle2 className="h-3.5 w-3.5" />
+                              : <XCircle className="h-3.5 w-3.5" />}
+                            {testResults["notion"].message}
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => runTest("notion")}
+                          disabled={testing["notion"]}
+                          className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                        >
+                          {testing["notion"]
+                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            : <Wifi className="mr-2 h-4 w-4" />}
+                          Test conexión
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        <div className="space-y-1">
+                          <p className="text-emerald-300 font-medium">Autenticación OAuth activa — no se requieren tokens manuales.</p>
+                          <p className="text-gray-400 text-xs">
+                            El token de acceso es administrado automáticamente por la plataforma. 
+                            Usa el botón "Test conexión" para verificar que el workspace está accesible.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-[#141414] p-5 space-y-3">
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-yellow-400" />
+                        Próximos pasos
+                      </h3>
+                      <ul className="space-y-2 text-sm text-gray-400">
+                        <li className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
+                          Comparte las páginas o bases de datos de Notion con la integración para que sean accesibles via API.
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
+                          Configura qué datos de Los Tios quieres sincronizar (pedidos, gastos, inventario, etc.).
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
+                          El proxy <code className="text-yellow-300 text-xs">notionProxy</code> está listo para hacer llamadas a cualquier endpoint de Notion API.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </TabsContent>
+
               </Tabs>
             </CardContent>
           </Card>
