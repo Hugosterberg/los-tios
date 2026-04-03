@@ -349,7 +349,7 @@ function DocumentsTab() {
   );
 }
 
-function TasksTab() {
+function TasksTab({ onCountChange }) {
   const [selected, setSelected] = useState(null);
   const { results, loading, error, search } = useNotionSearch();
 
@@ -377,6 +377,8 @@ function TasksTab() {
     }
     return false;
   });
+
+  useEffect(() => { onCountChange(tasks.length); }, [tasks.length]);
 
   return (
     <div className="space-y-4">
@@ -406,6 +408,7 @@ function TasksTab() {
 }
 
 export default function NotionPage() {
+  const [taskCount, setTaskCount] = React.useState(0);
   return (
     <div className="min-h-screen bg-[#111111] text-white">
       {/* Header */}
@@ -435,12 +438,17 @@ export default function NotionPage() {
             </TabsTrigger>
             <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
               <CheckSquare className="h-4 w-4 mr-2" /> Open Tasks
+              {taskCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/30 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 leading-none">
+                  {taskCount}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="search" className="mt-0"><SearchTab /></TabsContent>
           <TabsContent value="documents" className="mt-0"><DocumentsTab /></TabsContent>
-          <TabsContent value="tasks" className="mt-0"><TasksTab /></TabsContent>
+          <TabsContent value="tasks" className="mt-0"><TasksTab onCountChange={setTaskCount} /></TabsContent>
         </Tabs>
       </div>
     </div>
