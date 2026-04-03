@@ -211,9 +211,8 @@ function PageContent({ page, onClose }) {
 
 // ─── TaskCard ─────────────────────────────────────────────────────────────────
 
-function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
+function TaskCard({ item, selectedId, onSelect, onMarkDone, commentCounts = {} }) {
   const [marking, setMarking] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
   
   const title = getPageTitle(item);
   const status = getTaskStatus(item);
@@ -222,24 +221,7 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
   const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
   const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
   const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
-
-  // Fetch comment count
-  useEffect(() => {
-    const fetchComments = async () => {
-      try {
-        const res = await base44.functions.invoke("notionProxy", {
-          path: `blocks/${item.id}/children`,
-          method: "GET",
-          body: {}
-        });
-        const comments = (res.data?.results || []).filter(b => b.type === "comment").length;
-        setCommentCount(comments);
-      } catch {
-        setCommentCount(0);
-      }
-    };
-    fetchComments();
-  }, [item.id]);
+  const commentCount = commentCounts[item.id] || 0;
 
   const handleMarkDone = async (e) => {
     e.stopPropagation();
@@ -540,6 +522,25 @@ function DocumentsTab() {
 
 function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
   const [selected, setSelected] = useState(null);
+  const [commentCounts, setCommentCounts] = useState({});
+
+  useEffect(() => {
+    if (!selected) return;
+    const fetchComments = async () => {
+      try {
+        const res = await base44.functions.invoke("notionProxy", {
+          path: `blocks/${selected.id}/children`,
+          method: "GET",
+          body: {}
+        });
+        const comments = (res.data?.results || []).filter(b => b.type === "comment").length;
+        setCommentCounts(prev => ({ ...prev, [selected.id]: comments }));
+      } catch {
+        setCommentCounts(prev => ({ ...prev, [selected.id]: 0 }));
+      }
+    };
+    fetchComments();
+  }, [selected?.id]);
 
   return (
     <div className="space-y-4">
@@ -568,6 +569,7 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
                 selectedId={selected?.id}
                 onSelect={setSelected}
                 onMarkDone={onMarkDone}
+                commentCounts={commentCounts}
               />
             ))}
           </div>
