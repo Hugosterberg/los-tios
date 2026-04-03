@@ -16,11 +16,19 @@ function extractPlainText(richText = []) {
 }
 
 function getPageTitle(page) {
-  if (!page.properties) return "(untitled)";
-  for (const prop of Object.values(page.properties)) {
-    if (prop.type === "title" && prop.title?.length > 0) {
-      return extractPlainText(prop.title);
+  // Database pages: title is in a property with type "title"
+  if (page.properties) {
+    for (const prop of Object.values(page.properties)) {
+      if (prop.type === "title") {
+        const text = extractPlainText(prop.title || []);
+        if (text.trim()) return text;
+      }
     }
+  }
+  // Regular pages: title is directly on page.title
+  if (page.title) {
+    const text = extractPlainText(Array.isArray(page.title) ? page.title : []);
+    if (text.trim()) return text;
   }
   return "(untitled)";
 }
