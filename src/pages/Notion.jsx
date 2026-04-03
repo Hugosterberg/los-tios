@@ -144,7 +144,7 @@ function getStatusColor(statusName) {
 // ─── renderBlock ─────────────────────────────────────────────────────────────
 
 function renderBlock(block) {
-  const text = (arr) => extractPlainText(arr || []);
+  const text = (arr) => extractPlainText(Array.isArray(arr) ? arr : []);
   switch (block.type) {
     case "paragraph":
       return <p className="text-gray-300 text-sm leading-relaxed">{text(block.paragraph?.rich_text)}</p>;
