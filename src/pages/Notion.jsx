@@ -121,11 +121,19 @@ const PRIORITY_COLORS = {
 };
 
 const STATUS_COLORS = {
-  "In progress": "text-blue-300 bg-blue-500/15 border-blue-500/30",
-  "Not started": "text-gray-400 bg-gray-500/10 border-gray-500/20",
-  "Done": "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+  "in progress": "text-blue-300 bg-blue-500/15 border-blue-500/30",
+  "not started": "text-gray-400 bg-gray-500/10 border-gray-500/20",
+  "done": "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+  "to-do": "text-yellow-400 bg-yellow-500/15 border-yellow-500/30",
+  "todo": "text-yellow-400 bg-yellow-500/15 border-yellow-500/30",
   "default": "text-yellow-300 bg-yellow-500/10 border-yellow-500/30",
 };
+
+function getStatusColor(statusName) {
+  if (!statusName) return STATUS_COLORS.default;
+  const normalized = statusName.toLowerCase().replace(/\s+/g, '-');
+  return STATUS_COLORS[normalized] || STATUS_COLORS[statusName.toLowerCase()] || STATUS_COLORS.default;
+}
 
 // ─── renderBlock ─────────────────────────────────────────────────────────────
 
@@ -220,7 +228,7 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone, commentCounts = {} }
   const isSelected = selectedId === item.id;
   const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
   const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
-  const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
+  const statusColorClass = getStatusColor(status?.name);
   const commentCount = commentCounts[item.id] || 0;
 
   const handleMarkDone = async (e) => {
@@ -341,7 +349,7 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
         const isSelected = selectedId === item.id;
         const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
         const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
-        const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
+        const statusColorClass = getStatusColor(status?.name);
 
         return (
           <button
