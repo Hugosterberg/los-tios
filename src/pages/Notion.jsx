@@ -45,6 +45,7 @@ function getTaskStatus(page) {
   if (!page.properties) return null;
   for (const [, prop] of Object.entries(page.properties)) {
     if (prop.type === "status") return { name: prop.status?.name, color: prop.status?.color };
+    if (prop.type === "select") return { name: prop.select?.name, color: prop.select?.color };
   }
   return null;
 }
@@ -212,6 +213,8 @@ function PageContent({ page, onClose }) {
 
 function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
   const [marking, setMarking] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
+  
   const title = getPageTitle(item);
   const status = getTaskStatus(item);
   const meta = getPageMeta(item);
@@ -219,6 +222,24 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
   const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
   const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
   const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
+
+  // Fetch comment count
+  useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        const res = await base44.functions.invoke("notionProxy", {
+          path: `blocks/${item.id}/children`,
+          method: "GET",
+          body: {}
+        });
+        const comments = (res.data?.results || []).filter(b => b.type === "comment").length;
+        setCommentCount(comments);
+      } catch {
+        setCommentCount(0);
+      }
+    };
+    fetchComments();
+  }, [item.id]);
 
   const handleMarkDone = async (e) => {
     e.stopPropagation();
@@ -248,6 +269,19 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
             {status?.name && (
               <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${statusColorClass}`}>
                 {status.name}
+              </span>
+            )}
+            {/* Assignees - show who's working on it */}
+            {meta.assignees?.map((name) => (
+              <span key={name} className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
+                <User className="h-2.5 w-2.5" />
+                {name}
+              </span>
+            ))}
+            {/* Comment count */}
+            {commentCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-400">
+                💬 {commentCount}
               </span>
             )}
             {/* Priority */}
