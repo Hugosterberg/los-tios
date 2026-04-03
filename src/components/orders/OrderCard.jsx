@@ -3,55 +3,67 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Clock, Package, Truck, User, Phone, MapPin, Printer, Trash2 } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Package,
+  Truck,
+  Phone,
+  MapPin,
+  Printer,
+  Trash2,
+  CreditCard,
+  Banknote,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 const statusConfig = {
   pending: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", label: "Pending" },
   preparing: { color: "bg-blue-100 text-blue-800 border-blue-300", label: "Preparing" },
   ready: { color: "bg-green-100 text-green-800 border-green-300", label: "Ready" },
+  out_for_delivery: { color: "bg-indigo-100 text-indigo-800 border-indigo-300", label: "Out for delivery" },
   delivered: { color: "bg-gray-100 text-gray-800 border-gray-300", label: "Delivered" },
   cancelled: { color: "bg-red-100 text-red-800 border-red-300", label: "Cancelled" },
 };
 
+const statusFlow = ["pending", "preparing", "ready", "out_for_delivery", "delivered"];
+
 const orderTypeIcons = {
   "dine-in": Package,
   "takeout": Package,
-  "delivery": Truck,
+  delivery: Truck,
 };
 
-export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDelete, onCompleteOrder }) {
+export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDelete }) {
   const Icon = orderTypeIcons[order.order_type] || Package;
+  const paymentIsCard = order.payment_method === "card";
+  const paymentLabel = paymentIsCard ? "Clip / Card" : "Cash";
+  const paymentStatusLabel =
+    order.payment_status === "confirmed" || order.payment_status === "paid" ? "Paid" : "Pending";
+  const statusIndex = statusFlow.indexOf(order.status);
+  const previousStatus = statusIndex > 0 ? statusFlow[statusIndex - 1] : null;
+  const nextStatus =
+    statusIndex >= 0 && statusIndex < statusFlow.length - 1 ? statusFlow[statusIndex + 1] : null;
 
   return (
     <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Order Info */}
+      <CardContent className="p-5">
+        <div className="flex flex-col lg:flex-row gap-5">
           <div className="flex-1 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold">{order.customer_name}</h3>
+                  <h3 className="text-lg font-bold">{order.customer_name}</h3>
                   <Badge className={`${statusConfig[order.status]?.color} border`}>
-                    {statusConfig[order.status]?.label}
+                    {statusConfig[order.status]?.label || order.status}
                   </Badge>
                 </div>
                 <p className="text-sm text-gray-500">
                   {format(new Date(order.created_date), "MMM d, yyyy 'at' h:mm a")}
                 </p>
               </div>
-              
+
               <div className="text-right">
-                <div className="text-2xl font-bold text-red-600">
-                  ${order.total_amount?.toFixed(2)}
-                </div>
+                <div className="text-xl font-bold text-red-600">${order.total_amount?.toFixed(2)}</div>
                 <Badge variant="outline" className="mt-1">
                   <Icon className="w-3 h-3 mr-1" />
                   {order.order_type}
@@ -59,11 +71,14 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
               </div>
             </div>
 
-            {/* Customer Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="flex items-center gap-2 text-gray-600">
                 <Phone className="w-4 h-4" />
-                {order.customer_phone}
+                {order.customer_phone || "No phone"}
+              </div>
+              <div className="flex items-center gap-2 text-gray-600">
+                {paymentIsCard ? <CreditCard className="w-4 h-4" /> : <Banknote className="w-4 h-4" />}
+                {paymentLabel} - {paymentStatusLabel}
               </div>
               {order.table_number && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -79,14 +94,12 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
               )}
             </div>
 
-            {/* Order Items */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-3.5">
               <h4 className="font-semibold mb-3">Order Items:</h4>
               <div className="space-y-3">
                 {order.items?.map((item, idx) => {
-                  const extrasTotal = (item.extras || []).reduce((sum, extra) => sum + (extra.price || 0), 0);
-                  const itemTotal = (item.price + extrasTotal) * item.quantity;
-                  
+                  const itemTotal = (item.price || 0) * item.quantity;
+
                   return (
                     <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
                       <div className="flex justify-between text-sm">
@@ -100,14 +113,9 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
                         </span>
                         <span className="font-medium">${itemTotal.toFixed(2)}</span>
                       </div>
-                      {item.extras && item.extras.length > 0 && (
-                        <p className="text-xs text-green-600 ml-6 mt-1">
-                          + Extras: {item.extras.map(e => `${e.name} (+$${e.price?.toFixed(2)})`).join(', ')}
-                        </p>
-                      )}
                       {item.removed_ingredients && item.removed_ingredients.length > 0 && (
                         <p className="text-xs text-red-600 ml-6 mt-1">
-                          Without: {item.removed_ingredients.join(', ')}
+                          Without: {item.removed_ingredients.join(", ")}
                         </p>
                       )}
                     </div>
@@ -125,38 +133,38 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
             )}
           </div>
 
-          {/* Actions */}
-          <div className="lg:w-64 space-y-3">
-            {order.status !== 'delivered' && order.status !== 'cancelled' && (
-              <Button
-                onClick={() => onCompleteOrder(order)}
-                className="w-full gap-2 bg-green-600 hover:bg-green-700"
-              >
-                ✓ Completar Pedido / Complete Order
-              </Button>
-            )}
-            
+          <div className="lg:w-56 space-y-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Update Status:</label>
-              <Select value={order.status} onValueChange={onUpdateStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="preparing">Preparing</SelectItem>
-                  <SelectItem value="ready">Ready</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+              <label className="text-sm font-medium text-gray-700">Order Status:</label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={!previousStatus}
+                  onClick={() => previousStatus && onUpdateStatus(previousStatus)}
+                  className="h-9 w-9"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Current</p>
+                  <p className="font-semibold">{statusConfig[order.status]?.label || order.status}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={!nextStatus}
+                  onClick={() => nextStatus && onUpdateStatus(nextStatus)}
+                  className="h-9 w-9"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
-            <Button
-              onClick={() => onPrintReceipt(order)}
-              variant="outline"
-              className="w-full gap-2"
-            >
+            <Button onClick={() => onPrintReceipt(order)} variant="outline" className="w-full gap-2">
               <Printer className="w-4 h-4" />
               Print Receipt
             </Button>

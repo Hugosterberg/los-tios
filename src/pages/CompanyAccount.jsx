@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { listOrders } from "@/lib/local-dev-orders";
 
 export default function CompanyAccount() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
@@ -80,7 +81,7 @@ export default function CompanyAccount() {
 
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => base44.entities.Order.list('-created_date'),
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), '-created_date'),
   });
 
   const createTransaction = useMutation({
@@ -420,7 +421,7 @@ export default function CompanyAccount() {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white">
-      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-6">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <Wallet className="w-6 h-6 text-yellow-400" />
@@ -432,9 +433,9 @@ export default function CompanyAccount() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
@@ -443,7 +444,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${companyBalance >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
+              <div className={`text-2xl font-bold ${companyBalance >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${companyBalance.toFixed(2)}
               </div>
               <p className="text-xs text-gray-500 mt-1">MXN en banco</p>
@@ -457,7 +458,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${availableCash >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
+              <div className={`text-2xl font-bold ${availableCash >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${availableCash.toFixed(2)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -474,7 +475,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-400">${totalContributions.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-yellow-400">${totalContributions.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">{transactions.filter(t => t.type === 'contribution').length} transacciones</p>
             </CardContent>
           </Card>
@@ -487,7 +488,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-400/70">${companyExpenses.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-yellow-400/70">${companyExpenses.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">
                 💵${expensesFromCompanyCash.toFixed(2)} | 🏦${expensesFromCompanyAccount.toFixed(2)}
               </p>
@@ -502,7 +503,7 @@ export default function CompanyAccount() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-400">{contributors.filter(c => c.is_active).length}</div>
+              <div className="text-2xl font-bold text-yellow-400">{contributors.filter(c => c.is_active).length}</div>
               <p className="text-xs text-gray-500 mt-1">{contributors.length} total</p>
             </CardContent>
           </Card>

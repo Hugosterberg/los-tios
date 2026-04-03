@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from 'date-fns/locale'; // Import Spanish locale
+import { listMenuItems } from "@/lib/local-dev-menu";
+import { listOrders } from "@/lib/local-dev-orders";
 
 // Helper function to create page URLs.
 // This assumes a simple routing structure where CustomerOrder page is at /customer-order
@@ -30,7 +32,7 @@ export default function Dashboard() {
 
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => base44.entities.Order.list('-created_date'),
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), '-created_date'),
   });
 
   const { data: reservations = [] } = useQuery({
@@ -40,7 +42,7 @@ export default function Dashboard() {
 
   const { data: menuItems = [] } = useQuery({
     queryKey: ['menuItems'],
-    queryFn: () => base44.entities.MenuItem.list(),
+    queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
   });
 
   const createReservation = useMutation({
@@ -109,7 +111,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a]">
-      <div className="border-b border-yellow-500/20 py-6">
+      <div className="border-b border-yellow-500/20 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -123,14 +125,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 lg:py-6">
         {/* Customer Order Link Banner */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <Globe className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
@@ -172,7 +174,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">{stat.label}</p>
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
-                <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className={`text-xl sm:text-2xl font-bold ${stat.color}`}>{stat.value}</p>
                 <p className="text-xs text-gray-600 mt-1">{stat.sub}</p>
               </div>
             </motion.div>
@@ -181,7 +183,7 @@ export default function Dashboard() {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4">
             <p className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-yellow-400" />
               Ingresos (Últimos 7 Días)
@@ -200,7 +202,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4">
             <p className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
               <Package className="w-4 h-4 text-yellow-400" />
               Pedidos por Tipo
@@ -222,7 +224,7 @@ export default function Dashboard() {
 
         {/* Bottom Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4">
             <p className="text-sm font-semibold text-gray-300 mb-4">Productos Más Vendidos</p>
             {popularItems.length > 0 ? (
               <div className="space-y-3">
@@ -241,7 +243,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+          <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4">
             <p className="text-sm font-semibold text-gray-300 mb-4">Estadísticas Rápidas</p>
             <div className="space-y-3">
               {[

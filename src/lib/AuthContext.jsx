@@ -4,6 +4,8 @@ import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
+const isLocalDevBypass = import.meta.env.DEV && import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === 'true';
+const hasBase44Config = Boolean(appParams.appId && appParams.serverUrl);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -21,6 +23,30 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
+
+      if (isLocalDevBypass) {
+        setAppPublicSettings({ local_dev_bypass: true });
+        setUser({
+          id: 'local-dev-admin',
+          email: 'local@lostios.dev',
+          role: 'admin',
+          full_name: 'Local Dev Admin'
+        });
+        setIsAuthenticated(true);
+        setIsLoadingPublicSettings(false);
+        setIsLoadingAuth(false);
+        return;
+      }
+
+      if (!hasBase44Config) {
+        setAuthError({
+          type: 'local_config_missing',
+          message: 'Missing Base44 local configuration'
+        });
+        setIsLoadingPublicSettings(false);
+        setIsLoadingAuth(false);
+        return;
+      }
       
       // First, check app public settings (with token if available)
       // This will tell us if auth is required, user not registered, etc.
@@ -113,6 +139,11 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+
+    if (isLocalDevBypass) {
+      window.location.assign('/');
+      return;
+    }
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
