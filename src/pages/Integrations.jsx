@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2, RefreshCw, Save, ShieldCheck, Wifi, XCircle, BookOpen } from "lucide-react";
+import NotionExplorer from "@/components/integrations/NotionExplorer";
 
 function fieldHasValue(value) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
@@ -106,7 +107,7 @@ export default function Integrations() {
     onSuccess: (_, values) => {
       queryClient.invalidateQueries({ queryKey: ["appSettings"] });
       saveStoredIntegrationSettings(values);
-      window.alert("Configuracion guardada exitosamente. / Settings saved successfully.");
+      window.alert("Settings saved successfully.");
     },
   });
 
@@ -131,7 +132,7 @@ export default function Integrations() {
 
   const resetSection = (section) => {
     const confirmed = window.confirm(
-      `Restablecer los campos de ${section.title} a los valores predeterminados?`,
+      `Reset all fields in ${section.title} to default values?`,
     );
 
     if (!confirmed) {
@@ -169,9 +170,9 @@ export default function Integrations() {
                   <KeyRound className="h-7 w-7" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Integraciones</h1>
+                  <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
                   <p className="mt-2 text-sm text-gray-400">
-                    Administra todas las API keys, tokens, URLs base y credenciales sensibles desde una sola pestaña.
+                    Manage all API keys, tokens, base URLs and sensitive credentials from one place.
                   </p>
                 </div>
               </div>
@@ -180,8 +181,8 @@ export default function Integrations() {
             <div className="flex items-center gap-3 rounded-2xl border border-yellow-500/20 bg-black/30 px-4 py-3">
               <ShieldCheck className="h-5 w-5 text-yellow-300" />
               <div className="text-sm">
-                <p className="font-medium text-white">Sync local inmediato</p>
-                <p className="text-gray-400">Los cambios se guardan en admin y tambien en `localStorage` para las vistas API.</p>
+                <p className="font-medium text-white">Instant local sync</p>
+                  <p className="text-gray-400">Changes are saved to the database and also cached in localStorage for API views.</p>
               </div>
             </div>
           </div>
@@ -193,15 +194,15 @@ export default function Integrations() {
           <Card className="border-yellow-500/20 bg-[#171717] shadow-xl">
             <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <CardTitle className="text-white">Vault de credenciales</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Usa las pestañas para separar Clip y Loyverse. Los campos marcados como secretos pueden ocultarse o mostrarse.
-                </CardDescription>
+                <CardTitle className="text-white">Credentials Vault</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Use tabs to manage Clip and Loyverse credentials. Fields marked as secrets can be hidden or revealed.
+                  </CardDescription>
               </div>
 
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
                 <Label htmlFor="show-all-secrets" className="text-sm text-gray-300">
-                  Mostrar secretos
+                  Show secrets
                 </Label>
                 <Switch
                   id="show-all-secrets"
@@ -255,7 +256,7 @@ export default function Integrations() {
                       <BookOpen className="h-4 w-4" />
                       <div>
                         <p className="font-semibold">Notion</p>
-                        <p className="text-xs text-gray-500">OAuth conectado</p>
+                        <p className="text-xs text-gray-500">OAuth connected</p>
                       </div>
                       <Badge className="bg-emerald-500/15 text-emerald-300">Ready</Badge>
                     </div>
@@ -284,14 +285,14 @@ export default function Integrations() {
                               }
                               <div className="space-y-1">
                                 {hasManual ? (
-                                  <p className="text-emerald-300 font-medium">Token manual configurado — se usará directamente.</p>
+                                  <p className="text-emerald-300 font-medium">Manual token configured — will be used directly.</p>
                                 ) : hasAuto ? (
                                   <>
-                                    <p className="text-emerald-300 font-medium">Token generado automáticamente desde clave pública + secreta.</p>
+                                    <p className="text-emerald-300 font-medium">Token auto-generated from public key + secret.</p>
                                     <p className="font-mono text-xs text-gray-400 break-all">{generatedToken}</p>
                                   </>
                                 ) : (
-                                  <p className="text-yellow-300 font-medium">Faltan credenciales — configura la clave pública y secreta para generar el token Basic.</p>
+                                  <p className="text-yellow-300 font-medium">Missing credentials — configure the public key and secret to generate a Basic token.</p>
                                 )}
                               </div>
                             </div>
@@ -322,18 +323,18 @@ export default function Integrations() {
                             className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
                           >
                             {testing[section.id]
-                              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              : <Wifi className="mr-2 h-4 w-4" />}
-                            Test conexión
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => resetSection(section)}
-                            className="border-white/10 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-                          >
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Reset
+                                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                : <Wifi className="mr-2 h-4 w-4" />}
+                              Test connection
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => resetSection(section)}
+                              className="border-white/10 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Reset
                           </Button>
                         </div>
                       </div>
@@ -388,74 +389,48 @@ export default function Integrations() {
                   </TabsContent>
                 ))}
                 {/* Notion Tab Content */}
-                <TabsContent value="notion" className="mt-0">
-                  <div className="space-y-6">
-                    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <h2 className="text-xl font-semibold text-white">Notion</h2>
-                        <p className="mt-1 max-w-2xl text-sm text-gray-400">
-                          Integración OAuth con Notion — conectado como cuenta compartida (info@lostios.mx). Puedes leer y escribir en workspaces, páginas y bases de datos.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {testResults["notion"] && (
-                          <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults["notion"].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
-                            {testResults["notion"].ok
-                              ? <CheckCircle2 className="h-3.5 w-3.5" />
-                              : <XCircle className="h-3.5 w-3.5" />}
-                            {testResults["notion"].message}
-                          </span>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => runTest("notion")}
-                          disabled={testing["notion"]}
-                          className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
-                        >
-                          {testing["notion"]
-                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            : <Wifi className="mr-2 h-4 w-4" />}
-                          Test conexión
-                        </Button>
-                      </div>
-                    </div>
+                 <TabsContent value="notion" className="mt-0">
+                   <div className="space-y-6">
+                     {/* Header */}
+                     <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
+                       <div>
+                         <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                           <BookOpen className="h-5 w-5 text-yellow-400" /> Notion Explorer
+                         </h2>
+                         <p className="mt-1 max-w-2xl text-sm text-gray-400">
+                           Connected via OAuth. Browse your workspace, read documents and view tasks directly.
+                         </p>
+                       </div>
+                       <div className="flex items-center gap-2 flex-wrap">
+                         {testResults["notion"] && (
+                           <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults["notion"].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
+                             {testResults["notion"].ok
+                               ? <CheckCircle2 className="h-3.5 w-3.5" />
+                               : <XCircle className="h-3.5 w-3.5" />}
+                             {testResults["notion"].message}
+                           </span>
+                         )}
+                         <Button
+                           type="button"
+                           variant="outline"
+                           onClick={() => runTest("notion")}
+                           disabled={testing["notion"]}
+                           className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                         >
+                           {testing["notion"]
+                             ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                             : <Wifi className="mr-2 h-4 w-4" />}
+                           Test connection
+                         </Button>
+                       </div>
+                     </div>
 
-                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                        <div className="space-y-1">
-                          <p className="text-emerald-300 font-medium">Autenticación OAuth activa — no se requieren tokens manuales.</p>
-                          <p className="text-gray-400 text-xs">
-                            El token de acceso es administrado automáticamente por la plataforma. 
-                            Usa el botón "Test conexión" para verificar que el workspace está accesible.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-[#141414] p-5 space-y-3">
-                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-yellow-400" />
-                        Próximos pasos
-                      </h3>
-                      <ul className="space-y-2 text-sm text-gray-400">
-                        <li className="flex items-start gap-2">
-                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
-                          Comparte las páginas o bases de datos de Notion con la integración para que sean accesibles via API.
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
-                          Configura qué datos de Los Tios quieres sincronizar (pedidos, gastos, inventario, etc.).
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400"></span>
-                          El proxy <code className="text-yellow-300 text-xs">notionProxy</code> está listo para hacer llamadas a cualquier endpoint de Notion API.
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </TabsContent>
+                     {/* Explorer */}
+                     <div className="rounded-2xl border border-white/10 bg-[#141414] p-5">
+                       <NotionExplorer />
+                     </div>
+                   </div>
+                 </TabsContent>
 
               </Tabs>
             </CardContent>
