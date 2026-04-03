@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
     const { accessToken } = await base44.asServiceRole.connectors.getConnection("notion");
     const body = await req.json();
-    const { path, method = "GET", payload, searchParams } = body;
+    const { path, method = "GET", payload, body: bodyPayload, searchParams } = body;
 
     if (!path) {
       return Response.json({ error: "Missing path" }, { status: 400 });
@@ -33,8 +33,9 @@ Deno.serve(async (req) => {
       },
     };
 
-    if (payload && method !== "GET") {
-      fetchOptions.body = JSON.stringify(payload);
+    const requestBody = payload || bodyPayload;
+    if (requestBody && method !== "GET") {
+      fetchOptions.body = JSON.stringify(requestBody);
     }
 
     const response = await fetch(url, fetchOptions);

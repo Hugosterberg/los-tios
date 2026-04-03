@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BookOpen, CheckSquare, FileText, Loader2, RefreshCw,
-  Search, ChevronRight, ExternalLink, CheckCircle2, Circle, X
+  Search, ChevronRight, ExternalLink, CheckCircle2, Circle, X,
+  User, Calendar, Flag, AlertCircle
 } from "lucide-react";
 
 function extractPlainText(richText = []) {
@@ -34,10 +35,45 @@ function getTaskStatus(page) {
   if (!page.properties) return null;
   for (const [, prop] of Object.entries(page.properties)) {
     if (prop.type === "status") return prop.status?.name;
-    if (prop.type === "select" && prop.select) return prop.select.name;
   }
   return null;
 }
+
+function getPageMeta(page) {
+  if (!page.properties) return {};
+  const meta = {};
+  for (const [key, prop] of Object.entries(page.properties)) {
+    const k = key.toLowerCase();
+    // Assignee / owner
+    if ((prop.type === "people" || prop.type === "person") && prop.people?.length > 0) {
+      meta.assignees = prop.people.map((p) => p.name || p.id).filter(Boolean);
+    }
+    // Deadline / due date
+    if (prop.type === "date" && prop.date?.start && (k.includes("due") || k.includes("deadline") || k.includes("date") || k.includes("fecha"))) {
+      if (!meta.deadline) meta.deadline = prop.date.start;
+    }
+    // Priority
+    if ((k.includes("priority") || k.includes("prioridad")) && prop.type === "select" && prop.select) {
+      meta.priority = prop.select.name;
+      meta.priorityColor = prop.select.color;
+    }
+    // Status (via select fallback)
+    if (prop.type === "select" && !meta.statusSelect && !k.includes("priority") && !k.includes("prioridad")) {
+      meta.statusSelect = prop.select?.name;
+    }
+  }
+  return meta;
+}
+
+const PRIORITY_COLORS = {
+  red: "text-red-400 bg-red-500/15 border-red-500/30",
+  orange: "text-orange-400 bg-orange-500/15 border-orange-500/30",
+  yellow: "text-yellow-400 bg-yellow-500/15 border-yellow-500/30",
+  green: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+  blue: "text-blue-400 bg-blue-500/15 border-blue-500/30",
+  gray: "text-gray-400 bg-gray-500/15 border-gray-500/30",
+  default: "text-gray-400 bg-white/5 border-white/10",
+};
 
 function renderBlock(block) {
   const text = (arr) => extractPlainText(arr || []);
@@ -130,31 +166,74 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
         const isDb = item.object === "database";
         const checkbox = getCheckboxStatus(item);
         const status = getTaskStatus(item);
+        const meta = getPageMeta(item);
         const isSelected = selectedId === item.id;
+
+        // Deadline logic
+        const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
+        const deadlineStr = meta.deadline
+          ? new Date(meta.deadline).toLocaleDateString("sv-SE")
+          : null;
+
         return (
           <button
             key={item.id}
             type="button"
             onClick={() => onSelect(item)}
-            className={`w-full text-left flex items-center gap-3 rounded-xl border px-4 py-3 transition-all ${
+            className={`w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all ${
               isSelected ? "border-yellow-400/50 bg-yellow-400/10" : "border-white/10 bg-[#1a1a1a] hover:bg-white/5"
             }`}
           >
-            {isDb
-              ? <CheckSquare className="h-4 w-4 shrink-0 text-purple-400" />
-              : checkbox === true
-                ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                : checkbox === false
-                  ? <Circle className="h-4 w-4 shrink-0 text-gray-500" />
-                  : <FileText className="h-4 w-4 shrink-0 text-blue-400" />}
+            <div className="mt-0.5 shrink-0">
+              {isDb
+                ? <CheckSquare className="h-4 w-4 text-purple-400" />
+                : checkbox === true
+                  ? <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  : checkbox === false
+                    ? <Circle className="h-4 w-4 text-gray-500" />
+                    : <FileText className="h-4 w-4 text-blue-400" />}
+            </div>
+
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">{title}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {status && <span className="mr-2 text-yellow-400/80">{status}</span>}
-                {new Date(item.last_edited_time).toLocaleDateString()}
-              </p>
+
+              {/* Badges row */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {/* Status */}
+                {status && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-300">
+                    {status}
+                  </span>
+                )}
+                {/* Priority */}
+                {meta.priority && (
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[meta.priority?.toLowerCase()] || PRIORITY_COLORS[meta.priorityColor] || PRIORITY_COLORS.default}`}>
+                    <Flag className="h-2.5 w-2.5" />
+                    {meta.priority}
+                  </span>
+                )}
+                {/* Deadline */}
+                {deadlineStr && (
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${isOverdue ? "border-red-500/30 bg-red-500/10 text-red-400" : "border-white/10 bg-white/5 text-gray-400"}`}>
+                    {isOverdue ? <AlertCircle className="h-2.5 w-2.5" /> : <Calendar className="h-2.5 w-2.5" />}
+                    {deadlineStr}
+                  </span>
+                )}
+                {/* Assignees */}
+                {meta.assignees?.map((name) => (
+                  <span key={name} className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">
+                    <User className="h-2.5 w-2.5" />
+                    {name}
+                  </span>
+                ))}
+                {/* Edited date (smaller, at end) */}
+                <span className="text-[10px] text-gray-600 ml-auto shrink-0">
+                  {new Date(item.last_edited_time).toLocaleDateString("sv-SE")}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+
+            <div className="flex items-center gap-1.5 shrink-0 self-center">
               {item.url && (
                 <a href={item.url} target="_blank" rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
