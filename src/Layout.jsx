@@ -29,20 +29,20 @@ export default function Layout({ children, currentPageName }) {
   const { logout } = useAuth();
 
   const navItems = [
-    { name: "Panel Principal", shortName: "Panel", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
-    { name: "Pedidos", shortName: "Pedidos", url: createPageUrl("Orders"), icon: ShoppingBag },
-    { name: "Pedidos Loyverse", shortName: "LV Ped", url: createPageUrl("LoyverseOrders"), icon: Receipt },
-    { name: "LV Finanzas", shortName: "LV Fin", url: createPageUrl("LVFinanzas"), icon: Wallet },
+    { name: "Dashboard", shortName: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
+    { name: "Orders", shortName: "Orders", url: createPageUrl("Orders"), icon: ShoppingBag },
+    { name: "Loyverse Orders", shortName: "LV Orders", url: createPageUrl("LoyverseOrders"), icon: Receipt },
+    { name: "LV Finance", shortName: "LV Finance", url: createPageUrl("LVFinanzas"), icon: Wallet },
     { name: "Clip", shortName: "Clip", url: createPageUrl("Clip"), icon: CreditCard },
-    { name: "Integraciones", shortName: "Keys", url: createPageUrl("Integrations"), icon: KeyRound },
+    { name: "Integrations", shortName: "Keys", url: createPageUrl("Integrations"), icon: KeyRound },
     { name: "Notion", shortName: "Notion", url: createPageUrl("Notion"), icon: BookOpen },
-    { name: "Estadisticas", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
+    { name: "Statistics", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
     { name: "Loyverse", shortName: "Loyverse", url: createPageUrl("Loyverse"), icon: Store },
     { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
-    { name: "Finanzas", shortName: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet },
-    { name: "Lista de Compras", shortName: "Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
-    { name: "Empleados", shortName: "Empleados", url: createPageUrl("EmployeeCalendar"), icon: Users },
-    { name: "Pagina de Clientes", shortName: "Clientes", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
+    { name: "Finance", shortName: "Finance", url: createPageUrl("CompanyAccount"), icon: Wallet },
+    { name: "Shopping List", shortName: "Shopping", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
+    { name: "Employees", shortName: "Employees", url: createPageUrl("EmployeeCalendar"), icon: Users },
+    { name: "Customer Page", shortName: "Customers", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
   ];
 
   const handleLogout = () => {
@@ -93,7 +93,7 @@ export default function Layout({ children, currentPageName }) {
 
       <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-[#1a1a1a]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-11 items-center justify-between gap-3">
+          <div className="flex h-11 items-center justify-between gap-3" lang="en">
             <Link to={createPageUrl("Dashboard")} className="shrink-0">
               <img
                 src={losTiosLogo}
@@ -129,8 +129,8 @@ export default function Layout({ children, currentPageName }) {
                 className="hidden items-center gap-1.5 rounded bg-yellow-400/10 px-2 py-1.5 text-[11px] font-medium text-yellow-400 transition-all hover:bg-yellow-400/20 xl:flex 2xl:px-2.5"
               >
                 <LogOut className="h-3 w-3" />
-                <span className="2xl:hidden">Salir</span>
-                <span className="hidden 2xl:inline">Cerrar Sesion</span>
+                <span className="2xl:hidden">Logout</span>
+                <span className="hidden 2xl:inline">Sign Out</span>
               </button>
 
               <button
@@ -169,7 +169,7 @@ export default function Layout({ children, currentPageName }) {
                 className="w-full justify-start px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white"
               >
                 <LogOut className="mr-3 h-5 w-5" />
-                Cerrar Sesion
+                Sign Out
               </Button>
             </nav>
           </div>
