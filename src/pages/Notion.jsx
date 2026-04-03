@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import {
   Search, ChevronRight, ExternalLink, CheckCircle2, Circle, X,
   User, Calendar, Flag, AlertCircle
 } from "lucide-react";
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function extractPlainText(richText = []) {
   return richText.map((t) => t.plain_text || "").join("");
@@ -34,7 +36,23 @@ function getCheckboxStatus(page) {
 function getTaskStatus(page) {
   if (!page.properties) return null;
   for (const [, prop] of Object.entries(page.properties)) {
-    if (prop.type === "status") return prop.status?.name;
+    if (prop.type === "status") return { name: prop.status?.name, color: prop.status?.color };
+  }
+  return null;
+}
+
+function getStatusPropertyKey(page) {
+  if (!page.properties) return null;
+  for (const [key, prop] of Object.entries(page.properties)) {
+    if (prop.type === "status") return key;
+  }
+  return null;
+}
+
+function getCheckboxPropertyKey(page) {
+  if (!page.properties) return null;
+  for (const [key, prop] of Object.entries(page.properties)) {
+    if (prop.type === "checkbox") return key;
   }
   return null;
 }
@@ -44,25 +62,31 @@ function getPageMeta(page) {
   const meta = {};
   for (const [key, prop] of Object.entries(page.properties)) {
     const k = key.toLowerCase();
-    // Assignee / owner
     if ((prop.type === "people" || prop.type === "person") && prop.people?.length > 0) {
       meta.assignees = prop.people.map((p) => p.name || p.id).filter(Boolean);
     }
-    // Deadline / due date
     if (prop.type === "date" && prop.date?.start && (k.includes("due") || k.includes("deadline") || k.includes("date") || k.includes("fecha"))) {
       if (!meta.deadline) meta.deadline = prop.date.start;
     }
-    // Priority
     if ((k.includes("priority") || k.includes("prioridad")) && prop.type === "select" && prop.select) {
       meta.priority = prop.select.name;
       meta.priorityColor = prop.select.color;
     }
-    // Status (via select fallback)
-    if (prop.type === "select" && !meta.statusSelect && !k.includes("priority") && !k.includes("prioridad")) {
-      meta.statusSelect = prop.select?.name;
-    }
   }
   return meta;
+}
+
+function isTaskDone(item) {
+  const checkbox = getCheckboxStatus(item);
+  if (checkbox === true) return true;
+  if (!item.properties) return false;
+  for (const [, prop] of Object.entries(item.properties)) {
+    if (prop.type === "status") {
+      const name = prop.status?.name?.toLowerCase() || "";
+      return name.includes("done") || name.includes("complete") || name.includes("finished");
+    }
+  }
+  return false;
 }
 
 const PRIORITY_COLORS = {
@@ -74,6 +98,15 @@ const PRIORITY_COLORS = {
   gray: "text-gray-400 bg-gray-500/15 border-gray-500/30",
   default: "text-gray-400 bg-white/5 border-white/10",
 };
+
+const STATUS_COLORS = {
+  "In progress": "text-blue-300 bg-blue-500/15 border-blue-500/30",
+  "Not started": "text-gray-400 bg-gray-500/10 border-gray-500/20",
+  "Done": "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+  "default": "text-yellow-300 bg-yellow-500/10 border-yellow-500/30",
+};
+
+// ─── renderBlock ─────────────────────────────────────────────────────────────
 
 function renderBlock(block) {
   const text = (arr) => extractPlainText(arr || []);
@@ -94,9 +127,7 @@ function renderBlock(block) {
       const checked = block.to_do?.checked;
       return (
         <div className="flex items-center gap-2 text-sm">
-          {checked
-            ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-            : <Circle className="h-4 w-4 text-gray-500 shrink-0" />}
+          {checked ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" /> : <Circle className="h-4 w-4 text-gray-500 shrink-0" />}
           <span className={checked ? "line-through text-gray-500" : "text-gray-300"}>{text(block.to_do?.rich_text)}</span>
         </div>
       );
@@ -111,6 +142,8 @@ function renderBlock(block) {
       return null;
   }
 }
+
+// ─── PageContent ─────────────────────────────────────────────────────────────
 
 function PageContent({ page, onClose }) {
   const [blocks, setBlocks] = useState([]);
@@ -155,6 +188,104 @@ function PageContent({ page, onClose }) {
   );
 }
 
+// ─── TaskCard ─────────────────────────────────────────────────────────────────
+
+function TaskCard({ item, selectedId, onSelect, onMarkDone }) {
+  const [marking, setMarking] = useState(false);
+  const title = getPageTitle(item);
+  const status = getTaskStatus(item);
+  const meta = getPageMeta(item);
+  const isSelected = selectedId === item.id;
+  const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
+  const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
+  const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
+
+  const handleMarkDone = async (e) => {
+    e.stopPropagation();
+    setMarking(true);
+    await onMarkDone(item);
+    setMarking(false);
+  };
+
+  return (
+    <div
+      className={`rounded-xl border transition-all ${isSelected ? "border-yellow-400/50 bg-yellow-400/10" : "border-white/10 bg-[#1a1a1a]"}`}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(item)}
+        className="w-full text-left flex gap-3 px-4 py-3"
+      >
+        <div className="mt-0.5 shrink-0">
+          <Circle className="h-4 w-4 text-gray-500" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-white truncate">{title}</p>
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            {/* Status */}
+            {status?.name && (
+              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${statusColorClass}`}>
+                {status.name}
+              </span>
+            )}
+            {/* Priority */}
+            {meta.priority && (
+              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[meta.priorityColor] || PRIORITY_COLORS[meta.priority?.toLowerCase()] || PRIORITY_COLORS.default}`}>
+                <Flag className="h-2.5 w-2.5" />
+                {meta.priority}
+              </span>
+            )}
+            {/* Deadline */}
+            {deadlineStr && (
+              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${isOverdue ? "border-red-500/30 bg-red-500/10 text-red-400" : "border-white/10 bg-white/5 text-gray-400"}`}>
+                {isOverdue ? <AlertCircle className="h-2.5 w-2.5" /> : <Calendar className="h-2.5 w-2.5" />}
+                {deadlineStr}
+              </span>
+            )}
+            {/* Assignees */}
+            {meta.assignees?.map((name) => (
+              <span key={name} className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">
+                <User className="h-2.5 w-2.5" />
+                {name}
+              </span>
+            ))}
+            <span className="text-[10px] text-gray-600 ml-auto shrink-0">
+              {new Date(item.last_edited_time).toLocaleDateString("sv-SE")}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 self-center">
+          {item.url && (
+            <a href={item.url} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-gray-500 hover:text-yellow-400">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+          <ChevronRight className="h-4 w-4 text-gray-600" />
+        </div>
+      </button>
+
+      {/* Mark as Done button */}
+      <div className="px-4 pb-3 flex justify-end">
+        <button
+          onClick={handleMarkDone}
+          disabled={marking}
+          className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+        >
+          {marking ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+          Mark as Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ResultList (for Search + Documents) ─────────────────────────────────────
+
 function ResultList({ items, selectedId, onSelect, emptyMessage }) {
   if (items.length === 0) {
     return <p className="text-sm text-gray-500 text-center py-10">{emptyMessage}</p>;
@@ -168,12 +299,9 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
         const status = getTaskStatus(item);
         const meta = getPageMeta(item);
         const isSelected = selectedId === item.id;
-
-        // Deadline logic
         const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
-        const deadlineStr = meta.deadline
-          ? new Date(meta.deadline).toLocaleDateString("sv-SE")
-          : null;
+        const deadlineStr = meta.deadline ? new Date(meta.deadline).toLocaleDateString("sv-SE") : null;
+        const statusColorClass = STATUS_COLORS[status?.name] || STATUS_COLORS.default;
 
         return (
           <button
@@ -193,46 +321,35 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
                     ? <Circle className="h-4 w-4 text-gray-500" />
                     : <FileText className="h-4 w-4 text-blue-400" />}
             </div>
-
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">{title}</p>
-
-              {/* Badges row */}
               <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                {/* Status */}
-                {status && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-300">
-                    {status}
+                {status?.name && (
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${statusColorClass}`}>
+                    {status.name}
                   </span>
                 )}
-                {/* Priority */}
                 {meta.priority && (
-                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[meta.priority?.toLowerCase()] || PRIORITY_COLORS[meta.priorityColor] || PRIORITY_COLORS.default}`}>
-                    <Flag className="h-2.5 w-2.5" />
-                    {meta.priority}
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[meta.priorityColor] || PRIORITY_COLORS[meta.priority?.toLowerCase()] || PRIORITY_COLORS.default}`}>
+                    <Flag className="h-2.5 w-2.5" />{meta.priority}
                   </span>
                 )}
-                {/* Deadline */}
                 {deadlineStr && (
                   <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${isOverdue ? "border-red-500/30 bg-red-500/10 text-red-400" : "border-white/10 bg-white/5 text-gray-400"}`}>
                     {isOverdue ? <AlertCircle className="h-2.5 w-2.5" /> : <Calendar className="h-2.5 w-2.5" />}
                     {deadlineStr}
                   </span>
                 )}
-                {/* Assignees */}
                 {meta.assignees?.map((name) => (
                   <span key={name} className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">
-                    <User className="h-2.5 w-2.5" />
-                    {name}
+                    <User className="h-2.5 w-2.5" />{name}
                   </span>
                 ))}
-                {/* Edited date (smaller, at end) */}
                 <span className="text-[10px] text-gray-600 ml-auto shrink-0">
                   {new Date(item.last_edited_time).toLocaleDateString("sv-SE")}
                 </span>
               </div>
             </div>
-
             <div className="flex items-center gap-1.5 shrink-0 self-center">
               {item.url && (
                 <a href={item.url} target="_blank" rel="noopener noreferrer"
@@ -249,6 +366,8 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
     </div>
   );
 }
+
+// ─── useNotionSearch ──────────────────────────────────────────────────────────
 
 function useNotionSearch() {
   const [results, setResults] = useState([]);
@@ -269,8 +388,10 @@ function useNotionSearch() {
     }
   };
 
-  return { results, loading, error, search };
+  return { results, setResults, loading, error, search };
 }
+
+// ─── SearchTab ────────────────────────────────────────────────────────────────
 
 function SearchTab() {
   const [query, setQuery] = useState("");
@@ -315,14 +436,14 @@ function SearchTab() {
   );
 }
 
+// ─── DocumentsTab ─────────────────────────────────────────────────────────────
+
 function DocumentsTab() {
   const [selected, setSelected] = useState(null);
   const { results, loading, error, search } = useNotionSearch();
-  const [loaded, setLoaded] = useState(false);
 
   const load = () => {
     setSelected(null);
-    setLoaded(true);
     search({ filter: { value: "page", property: "object" }, page_size: 50 });
   };
 
@@ -349,42 +470,16 @@ function DocumentsTab() {
   );
 }
 
-function TasksTab({ onCountChange }) {
+// ─── TasksTab ─────────────────────────────────────────────────────────────────
+
+function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
   const [selected, setSelected] = useState(null);
-  const { results, loading, error, search } = useNotionSearch();
-
-  const load = () => {
-    setSelected(null);
-    search({ query: "", page_size: 100 });
-  };
-
-  useEffect(() => { load(); }, []);
-
-  // Filter: only pages that have a checkbox=false (not done) or a non-done status
-  const tasks = results.filter((item) => {
-    if (item.object !== "page") return false;
-    const checkbox = getCheckboxStatus(item);
-    if (checkbox === true) return false; // done
-    if (checkbox === false) return true; // todo
-    // Check status property
-    if (!item.properties) return false;
-    for (const [, prop] of Object.entries(item.properties)) {
-      if (prop.type === "status") {
-        const name = prop.status?.name?.toLowerCase() || "";
-        if (name.includes("done") || name.includes("complete") || name.includes("finished")) return false;
-        return true;
-      }
-    }
-    return false;
-  });
-
-  useEffect(() => { onCountChange(tasks.length); }, [tasks.length]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-400">{!loading && `${tasks.length} open tasks`}</p>
-        <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}
+        <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={loading}
           className="border-white/10 bg-transparent text-gray-300 hover:bg-white/5">
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
@@ -399,7 +494,17 @@ function TasksTab({ onCountChange }) {
       )}
       {!loading && tasks.length > 0 && (
         <div className={`grid gap-4 ${selected ? "lg:grid-cols-2" : "grid-cols-1"}`}>
-          <ResultList items={tasks} selectedId={selected?.id} onSelect={setSelected} emptyMessage="No open tasks." />
+          <div className="space-y-2">
+            {tasks.map((item) => (
+              <TaskCard
+                key={item.id}
+                item={item}
+                selectedId={selected?.id}
+                onSelect={setSelected}
+                onMarkDone={onMarkDone}
+              />
+            ))}
+          </div>
           {selected && <PageContent key={selected.id} page={selected} onClose={() => setSelected(null)} />}
         </div>
       )}
@@ -407,8 +512,59 @@ function TasksTab({ onCountChange }) {
   );
 }
 
+// ─── NotionPage ───────────────────────────────────────────────────────────────
+
 export default function NotionPage() {
-  const [taskCount, setTaskCount] = React.useState(0);
+  const [allResults, setAllResults] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksError, setTasksError] = useState(null);
+
+  const fetchTasks = useCallback(async () => {
+    setTasksLoading(true);
+    setTasksError(null);
+    try {
+      const res = await base44.functions.invoke("notionProxy", {
+        path: "search", method: "POST", body: { query: "", page_size: 100 }
+      });
+      setAllResults(res.data?.results || []);
+    } catch (e) {
+      setTasksError(e?.response?.data?.error || e?.message || "Failed to load.");
+    } finally {
+      setTasksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTasks(); }, []);
+
+  const tasks = allResults.filter((item) => {
+    if (item.object !== "page") return false;
+    return !isTaskDone(item);
+  });
+
+  const handleMarkDone = async (item) => {
+    const checkboxKey = getCheckboxPropertyKey(item);
+    const statusKey = getStatusPropertyKey(item);
+
+    let properties = {};
+    if (checkboxKey) {
+      properties[checkboxKey] = { checkbox: true };
+    } else if (statusKey) {
+      // Try to set status to "Done" — Notion requires the exact option name that exists
+      properties[statusKey] = { status: { name: "Done" } };
+    }
+
+    if (Object.keys(properties).length === 0) return;
+
+    await base44.functions.invoke("notionProxy", {
+      path: `pages/${item.id}`,
+      method: "PATCH",
+      body: { properties },
+    });
+
+    // Remove from local list optimistically
+    setAllResults((prev) => prev.filter((p) => p.id !== item.id));
+  };
+
   return (
     <div className="min-h-screen bg-[#111111] text-white">
       {/* Header */}
@@ -428,7 +584,7 @@ export default function NotionPage() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Tabs defaultValue="search" className="space-y-6">
+        <Tabs defaultValue="tasks" className="space-y-6">
           <TabsList className="bg-[#1a1a1a] border border-white/10 p-1 h-auto gap-1">
             <TabsTrigger value="search" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
               <Search className="h-4 w-4 mr-2" /> Search
@@ -438,17 +594,27 @@ export default function NotionPage() {
             </TabsTrigger>
             <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
               <CheckSquare className="h-4 w-4 mr-2" /> Open Tasks
-              {taskCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/30 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 leading-none">
-                  {taskCount}
-                </span>
-              )}
+              {tasksLoading
+                ? <Loader2 className="ml-1.5 h-3 w-3 animate-spin text-yellow-400" />
+                : tasks.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/30 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 leading-none">
+                    {tasks.length}
+                  </span>
+                )}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="search" className="mt-0"><SearchTab /></TabsContent>
           <TabsContent value="documents" className="mt-0"><DocumentsTab /></TabsContent>
-          <TabsContent value="tasks" className="mt-0"><TasksTab onCountChange={setTaskCount} /></TabsContent>
+          <TabsContent value="tasks" className="mt-0">
+            <TasksTab
+              tasks={tasks}
+              loading={tasksLoading}
+              error={tasksError}
+              onRefresh={fetchTasks}
+              onMarkDone={handleMarkDone}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
