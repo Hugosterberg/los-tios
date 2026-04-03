@@ -1057,7 +1057,7 @@ export default function CustomerOrder() {
                       { emoji: "🍺", line1: "Cerveza", line2: "bien fria" },
                       { emoji: "🍕", line1: "Tios", line2: "Fritos" },
                       { emoji: "✨", line1: "Buena", line2: "vibra" },
-                      { emoji: "🎉", line1: "Nodo", line2: "Zicatela" },
+                      { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
                     ].map(({ emoji, line1, line2 }) => (
                       <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("beerfestcondido") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
@@ -1115,10 +1115,10 @@ export default function CustomerOrder() {
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "BEER", line1: "Chela", line2: "fria" },
-                      { emoji: "PIZZA", line1: "Pizza", line2: "recien hecha" },
-                      { emoji: "MEZCAL", line1: "Shots de", line2: "mezcal" },
-                      { emoji: "BALL", line1: "Futbol", line2: "en vivo" },
+                      { emoji: "🍺", line1: "Chela", line2: "fria" },
+                      { emoji: "🍕", line1: "Pizza", line2: "recien hecha" },
+                      { emoji: "🥃", line1: "Shots de", line2: "mezcal" },
+                      { emoji: "⚽", line1: "Futbol", line2: "en vivo" },
                     ].map(({ emoji, line1, line2 }) => (
                       <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
@@ -1144,10 +1144,10 @@ export default function CustomerOrder() {
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "BEER", line1: "Cold", line2: "beer" },
-                      { emoji: "PIZZA", line1: "Fresh", line2: "pizza" },
-                      { emoji: "MEZCAL", line1: "Mezcal", line2: "shots" },
-                      { emoji: "BALL", line1: "Live", line2: "football" },
+                      { emoji: "🍺", line1: "Cold", line2: "beer" },
+                      { emoji: "🍕", line1: "Fresh", line2: "pizza" },
+                      { emoji: "🥃", line1: "Mezcal", line2: "shots" },
+                      { emoji: "⚽", line1: "Live", line2: "football" },
                     ].map(({ emoji, line1, line2 }) => (
                       <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
@@ -1214,10 +1214,10 @@ export default function CustomerOrder() {
                     </p>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
-                        { emoji: "BEER", line1: "Chela", line2: "fria" },
-                        { emoji: "PIZZA", line1: "Pizza", line2: "recien hecha" },
-                        { emoji: "MEZCAL", line1: "Shots de", line2: "mezcal" },
-                        { emoji: "BALL", line1: "Futbol", line2: "en vivo" },
+                        { emoji: "🍺", line1: "Chela", line2: "fria" },
+                        { emoji: "🍕", line1: "Pizza", line2: "recien hecha" },
+                        { emoji: "🥃", line1: "Shots de", line2: "mezcal" },
+                        { emoji: "⚽", line1: "Futbol", line2: "en vivo" },
                       ].map(({ emoji, line1, line2 }) => (
                         <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                           <span className="text-base leading-none">{emoji}</span>
@@ -1243,10 +1243,10 @@ export default function CustomerOrder() {
                     </p>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
-                        { emoji: "BEER", line1: "Cold", line2: "beer" },
-                        { emoji: "PIZZA", line1: "Fresh", line2: "pizza" },
-                        { emoji: "MEZCAL", line1: "Mezcal", line2: "shots" },
-                        { emoji: "BALL", line1: "Live", line2: "football" },
+                        { emoji: "🍺", line1: "Cold", line2: "beer" },
+                        { emoji: "🍕", line1: "Fresh", line2: "pizza" },
+                        { emoji: "🥃", line1: "Mezcal", line2: "shots" },
+                        { emoji: "⚽", line1: "Live", line2: "football" },
                       ].map(({ emoji, line1, line2 }) => (
                         <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                           <span className="text-base leading-none">{emoji}</span>
@@ -1276,10 +1276,10 @@ export default function CustomerOrder() {
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "DRINK", line1: "Welcome", line2: "drink" },
-                      { emoji: "PIZZA", line1: "Pizza", line2: "deals" },
-                      { emoji: "BEER", line1: "Cerveza", line2: "deals" },
-                      { emoji: "MUSIC", line1: "Buena", line2: "musica" },
+                      { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                      { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                      { emoji: "🍺", line1: "Cerveza", line2: "deals" },
+                      { emoji: "🎵", line1: "Buena", line2: "musica" },
                     ].map(({ emoji, line1, line2 }) => (
                       <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("opening-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>
@@ -1307,10 +1307,10 @@ export default function CustomerOrder() {
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "DRINK", line1: "Welcome", line2: "drink" },
-                      { emoji: "PIZZA", line1: "Pizza", line2: "deals" },
-                      { emoji: "BEER", line1: "Beer", line2: "deals" },
-                      { emoji: "MUSIC", line1: "Great", line2: "music" },
+                      { emoji: "🥂", line1: "Welcome", line2: "drink" },
+                      { emoji: "🍕", line1: "Pizza", line2: "deals" },
+                      { emoji: "🍺", line1: "Beer", line2: "deals" },
+                      { emoji: "🎵", line1: "Great", line2: "music" },
                     ].map(({ emoji, line1, line2 }) => (
                       <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("opening-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
                         <span className="text-base leading-none">{emoji}</span>

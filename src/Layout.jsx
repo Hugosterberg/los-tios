@@ -16,6 +16,7 @@ import {
   Users,
   Receipt,
   CreditCard,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -32,6 +33,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Pedidos Loyverse", shortName: "LV Ped", url: createPageUrl("LoyverseOrders"), icon: Receipt },
     { name: "LV Finanzas", shortName: "LV Fin", url: createPageUrl("LVFinanzas"), icon: Wallet },
     { name: "Clip", shortName: "Clip", url: createPageUrl("Clip"), icon: CreditCard },
+    { name: "Integraciones", shortName: "Keys", url: createPageUrl("Integrations"), icon: KeyRound },
     { name: "Estadisticas", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
     { name: "Loyverse", shortName: "Loyverse", url: createPageUrl("Loyverse"), icon: Store },
     { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },

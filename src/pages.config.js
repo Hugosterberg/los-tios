@@ -8,6 +8,7 @@ import LVFinanzas from './pages/LVFinanzas';
 import Clip from './pages/Clip';
 import CustomerOrder from './pages/CustomerOrder';
 import Customization from './pages/Customization';
+import Integrations from './pages/Integrations';
 import ShoppingList from './pages/ShoppingList';
 import CompanyAccount from './pages/CompanyAccount';
 import EmployeeCalendar from './pages/EmployeeCalendar';
@@ -25,6 +26,7 @@ export const PAGES = {
     "Clip": Clip,
     "CustomerOrder": CustomerOrder,
     "Customization": Customization,
+    "Integrations": Integrations,
     "ShoppingList": ShoppingList,
     "CompanyAccount": CompanyAccount,
     "EmployeeCalendar": EmployeeCalendar,
