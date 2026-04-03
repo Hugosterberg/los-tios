@@ -54,7 +54,11 @@ export default function Integrations() {
           path: "payments",
           apiType: "payments",
           authToken,
-          searchParams: { from: from.toISOString().slice(0, 10), to: yesterday.toISOString().slice(0, 10), size: 1 },
+          searchParams: {
+            from: from.toISOString().replace(/\.\d{3}Z$/, "Z"),
+            to: yesterday.toISOString().replace(/\.\d{3}Z$/, "Z"),
+            size: 1,
+          },
         });
         setTestResults((r) => ({ ...r, clip: { ok: true, message: "Conexión exitosa con Clip." } }));
       }
