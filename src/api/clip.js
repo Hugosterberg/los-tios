@@ -219,6 +219,8 @@ function getDefaultSettlementsRange() {
   const from = new Date(now);
   from.setUTCDate(from.getUTCDate() - 89);
   from.setUTCHours(0, 0, 0, 0);
+  // Use yesterday as "to" to avoid timezone edge cases with Clip API
+  to.setUTCDate(to.getUTCDate() - 1);
   to.setUTCHours(23, 59, 59, 999);
 
   return {
@@ -249,7 +251,7 @@ export async function getClipOverview(settings = {}) {
       },
       apiType: "settlements",
       authToken: config.authToken,
-    }),
+    }).catch(() => null),
   ]);
 
   const payments = extractArray(paymentsPayload).sort((a, b) => {
