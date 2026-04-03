@@ -246,9 +246,7 @@ export default function Integrations() {
                       </TabsTrigger>
                     );
                   })}
-                </TabsList>
-
-                {/* Notion Tab Trigger */}
+                  {/* Notion Tab Trigger */}
                   <TabsTrigger
                     value="notion"
                     className="rounded-xl border border-white/10 bg-[#101010] px-4 py-3 text-left text-gray-300 data-[state=active]:border-yellow-400/50 data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300"
@@ -262,6 +260,7 @@ export default function Integrations() {
                       <Badge className="bg-emerald-500/15 text-emerald-300">Ready</Badge>
                     </div>
                   </TabsTrigger>
+                </TabsList>
 
                 {INTEGRATION_SETTINGS_SECTIONS.map((section) => (
                   <TabsContent key={section.id} value={section.id} className="mt-0">
