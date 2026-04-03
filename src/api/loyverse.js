@@ -1,4 +1,5 @@
 import { buildLoyverseResolvedConfig } from "@/lib/integrationSettings";
+import { base44 } from "@/api/base44Client";
 const DEFAULT_LOYVERSE_API_BASE_URL = "https://api.loyverse.com/v1.0";
 const DEFAULT_LOYVERSE_PROXY_PATH = "/api/loyverse";
 
@@ -96,22 +97,17 @@ async function loyverseFetch(path, searchParams = {}, settings = {}) {
     throw new LoyverseApiError("Missing Loyverse API token");
   }
 
-  const response = await fetch(buildLoyverseUrl(getLoyverseRequestBaseUrl(config), path, searchParams), {
-    headers: {
-      Authorization: `Bearer ${config.apiToken}`,
-      Accept: "application/json",
-    },
+  const response = await base44.functions.invoke("loyverseProxy", {
+    path,
+    searchParams,
+    apiToken: config.apiToken,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new LoyverseApiError(
-      `Loyverse API error ${response.status}: ${errorText || response.statusText}`,
-      response.status,
-    );
+  if (response.data?.error) {
+    throw new LoyverseApiError(response.data.error);
   }
 
-  return response.json();
+  return response.data;
 }
 
 function extractCollection(payload, collectionKey) {
