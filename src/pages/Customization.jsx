@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { appParams } from "@/lib/app-params";
+import { saveStoredIntegrationSettings } from "@/lib/integrationSettings";
 
 export default function Customization() {
   const queryClient = useQueryClient();
@@ -42,13 +43,22 @@ export default function Customization() {
     bank_account_holder: "",
     clabe: "",
     clip_payment_link: "",
+    clip_api_key: "",
+    clip_api_secret: "",
+    clip_api_token: "",
+    clip_payments_api_base_url: "https://api.payclip.com",
+    clip_settlements_api_base_url: "https://api-gw.payclip.com",
+    loyverse_api_token: "",
+    loyverse_api_base_url: "https://api.loyverse.com/v1.0",
   };
 
   const [formData, setFormData] = useState(currentSettings);
 
   React.useEffect(() => {
     if (settings[0]) {
-      setFormData(settings[0]);
+      const mergedSettings = { ...currentSettings, ...settings[0] };
+      setFormData(mergedSettings);
+      saveStoredIntegrationSettings(mergedSettings);
     }
   }, [settings]);
 
@@ -62,6 +72,7 @@ export default function Customization() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appSettings'] });
+      saveStoredIntegrationSettings(formData);
       alert('¡Configuración guardada exitosamente! / Settings saved successfully!');
     },
   });
@@ -112,6 +123,13 @@ export default function Customization() {
         bank_account_holder: "",
         clabe: "",
         clip_payment_link: "",
+        clip_api_key: "",
+        clip_api_secret: "",
+        clip_api_token: "",
+        clip_payments_api_base_url: "https://api.payclip.com",
+        clip_settlements_api_base_url: "https://api-gw.payclip.com",
+        loyverse_api_token: "",
+        loyverse_api_base_url: "https://api.loyverse.com/v1.0",
       });
     }
   };
@@ -625,6 +643,108 @@ export default function Customization() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle>Integraciones / Integrations</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-4 rounded-xl border border-yellow-500/20 bg-yellow-50 p-5">
+                <div>
+                  <h4 className="font-semibold text-gray-900">Clip API</h4>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Guarda aqui la clave API, la clave secreta y cualquier override necesario para Clip.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="clip_api_key">Clip API key / Clave API</Label>
+                    <Input
+                      id="clip_api_key"
+                      value={formData.clip_api_key || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_api_key: e.target.value })}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clip_api_secret">Clip API secret / Clave secreta</Label>
+                    <Input
+                      id="clip_api_secret"
+                      value={formData.clip_api_secret || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_api_secret: e.target.value })}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="clip_api_token">Clip auth token opcional / Optional auth token</Label>
+                    <Input
+                      id="clip_api_token"
+                      value={formData.clip_api_token || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_api_token: e.target.value })}
+                      placeholder="Basic base64(api_key:api_secret)"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Si este campo queda vacio, la app genera el token automaticamente desde key + secret.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clip_payments_api_base_url">Clip payments base URL</Label>
+                    <Input
+                      id="clip_payments_api_base_url"
+                      value={formData.clip_payments_api_base_url || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_payments_api_base_url: e.target.value })}
+                      placeholder="https://api.payclip.com"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clip_settlements_api_base_url">Clip settlements base URL</Label>
+                    <Input
+                      id="clip_settlements_api_base_url"
+                      value={formData.clip_settlements_api_base_url || ""}
+                      onChange={(e) => setFormData({ ...formData, clip_settlements_api_base_url: e.target.value })}
+                      placeholder="https://api-gw.payclip.com"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-xl border border-blue-500/20 bg-blue-50 p-5">
+                <div>
+                  <h4 className="font-semibold text-gray-900">Loyverse API</h4>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Guarda aqui el token y la URL base de Loyverse para que todas las vistas lo lean desde settings.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="loyverse_api_token">Loyverse API token</Label>
+                    <Input
+                      id="loyverse_api_token"
+                      value={formData.loyverse_api_token || ""}
+                      onChange={(e) => setFormData({ ...formData, loyverse_api_token: e.target.value })}
+                      placeholder="your_loyverse_token"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="loyverse_api_base_url">Loyverse API base URL</Label>
+                    <Input
+                      id="loyverse_api_base_url"
+                      value={formData.loyverse_api_base_url || ""}
+                      onChange={(e) => setFormData({ ...formData, loyverse_api_base_url: e.target.value })}
+                      placeholder="https://api.loyverse.com/v1.0"
+                    />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

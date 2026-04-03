@@ -10,9 +10,12 @@ import {
   X,
   LogOut,
   Globe,
+  Store,
   ShoppingCart,
   Wallet,
   Users,
+  Receipt,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -26,7 +29,11 @@ export default function Layout({ children, currentPageName }) {
   const navItems = [
     { name: "Panel Principal", shortName: "Panel", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
     { name: "Pedidos", shortName: "Pedidos", url: createPageUrl("Orders"), icon: ShoppingBag },
+    { name: "Pedidos Loyverse", shortName: "LV Ped", url: createPageUrl("LoyverseOrders"), icon: Receipt },
+    { name: "LV Finanzas", shortName: "LV Fin", url: createPageUrl("LVFinanzas"), icon: Wallet },
+    { name: "Clip", shortName: "Clip", url: createPageUrl("Clip"), icon: CreditCard },
     { name: "Estadisticas", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
+    { name: "Loyverse", shortName: "Loyverse", url: createPageUrl("Loyverse"), icon: Store },
     { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
     { name: "Finanzas", shortName: "Finanzas", url: createPageUrl("CompanyAccount"), icon: Wallet },
     { name: "Lista de Compras", shortName: "Compras", url: createPageUrl("ShoppingList"), icon: ShoppingCart },

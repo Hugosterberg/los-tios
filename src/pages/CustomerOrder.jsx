@@ -990,6 +990,7 @@ export default function CustomerOrder() {
       {/* Eventos */}
       {(() => {
         const eventStatuses = [
+          { id: "beerfestcondido", isPast: isEventPast(2026, 4, 5) },
           { id: "football-night", isPast: isEventPast(2026, 3, 28) },
           { id: "opening-night", isPast: isEventPast(2026, 3, 20) },
         ];
@@ -1038,6 +1039,66 @@ export default function CustomerOrder() {
                   </div>
                 </div>
               </div>
+              {!isEventInPast("beerfestcondido") && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
+                    <span className="font-black text-3xl leading-none">4-5</span>
+                    <span className="font-bold text-xs tracking-widest uppercase leading-tight">ABRIL</span>
+                  </div>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
+                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Tios Fritos en Beerfestcondido</h3>
+                  <p className="leading-relaxed text-sm text-gray-300">
+                    Este <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estaremos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestros <span className="text-yellow-400 font-semibold">Tios Fritos</span> bien dorados y crujientes. Va a haber chela, buena vibra, pizza frita y ambiente de festival para pasarla brutal con banda chida junto al mar. Caele con hambre, con amigos y con ganas de echar unas frias.
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🍺", line1: "Cerveza", line2: "bien fria" },
+                      { emoji: "🍕", line1: "Tios", line2: "Fritos" },
+                      { emoji: "✨", line1: "Buena", line2: "vibra" },
+                      { emoji: "🎉", line1: "Nodo", line2: "Zicatela" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("beerfestcondido") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
+                  <EventShareButtons title="Tios Fritos en Beerfestcondido - 4 y 5 Abril" text="Nos vemos en Nodo Brewery con Tios Fritos, cerveza y buena vibra!" url={`${window.location.origin}/#eventos`} />
+                </div>
+
+                <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
+                    <span className="font-black text-3xl leading-none">4-5</span>
+                    <span className="font-bold text-xs tracking-widest uppercase leading-tight">APRIL</span>
+                  </div>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
+                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Tios Fritos at Beerfestcondido</h3>
+                  <p className="leading-relaxed text-sm text-gray-300">
+                    On <span className="text-yellow-400 font-semibold">April 4-5</span> we will be at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving up crispy, golden <span className="text-yellow-400 font-semibold">Tios Fritos</span>. Expect cold beer, fried pizza, a great crowd and the kind of easy festival vibe that makes you want to stay all day. Pull up hungry, bring your people, and come catch us by the beer.
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { emoji: "🍺", line1: "Cold", line2: "beer" },
+                      { emoji: "🍕", line1: "Tios", line2: "Fritos" },
+                      { emoji: "✨", line1: "Great", line2: "vibe" },
+                      { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
+                    ].map(({ emoji, line1, line2 }) => (
+                      <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("beerfestcondido") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
+                        <span className="text-base leading-none">{emoji}</span>
+                        <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
+                  <EventShareButtons title="Tios Fritos at Beerfestcondido - April 4-5" text="Catch us at Nodo Brewery for Tios Fritos, cold beer and good vibes!" lang="en" url={`${window.location.origin}/#eventos`} />
+                </div>
+              </div>
+              )}
+
               {!isEventInPast("football-night") && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Football Night - Spanish */}
