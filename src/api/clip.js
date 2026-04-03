@@ -310,8 +310,8 @@ export async function getClipOverview(settings = {}) {
     }),
     clipFetch(settlementsRequestBaseUrl, "settlements", {
       searchParams: {
-        date_gte: settlementsRange.from,
-        date_lte: settlementsRange.to,
+        from: settlementsRange.from,
+        to: settlementsRange.to,
       },
       authHeader: "x-api-key",
       authToken: config.authToken,
