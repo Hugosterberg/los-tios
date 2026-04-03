@@ -40,7 +40,7 @@ export default function Integrations() {
       if (sectionId === "loyverse") {
         const token = formData.loyverse_api_token?.trim();
         if (!token) throw new Error("Falta el token de Loyverse.");
-        await base44.functions.invoke("loyverseProxy", { path: "me", apiToken: token });
+        await base44.functions.invoke("loyverseProxy", { path: "merchants", apiToken: token });
         setTestResults((r) => ({ ...r, loyverse: { ok: true, message: "Conexión exitosa con Loyverse." } }));
       } else if (sectionId === "clip") {
         const key = formData.clip_api_key?.trim();
