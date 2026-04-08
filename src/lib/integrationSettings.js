@@ -24,8 +24,48 @@ function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function stripEmptyStringValues(settings = {}) {
+  return Object.fromEntries(
+    Object.entries(settings).filter(([, value]) => {
+      if (typeof value === "string") {
+        return value.trim().length > 0;
+      }
+
+      return value !== undefined && value !== null;
+    }),
+  );
+}
+
+function readEnvSettings() {
+  return {
+    clip_api_key: normalizeString(import.meta.env.VITE_CLIP_API_KEY),
+    clip_api_secret: normalizeString(import.meta.env.VITE_CLIP_API_SECRET),
+    clip_api_token: normalizeString(import.meta.env.VITE_CLIP_API_TOKEN),
+    clip_payments_api_base_url: normalizeString(import.meta.env.VITE_CLIP_PAYMENTS_API_BASE_URL),
+    clip_settlements_api_base_url: normalizeString(import.meta.env.VITE_CLIP_SETTLEMENTS_API_BASE_URL),
+    loyverse_api_token: normalizeString(import.meta.env.VITE_LOYVERSE_API_TOKEN),
+    loyverse_api_base_url: normalizeString(import.meta.env.VITE_LOYVERSE_API_BASE_URL),
+  };
+}
+
+function buildResolvedSettings(settings = {}) {
+  return {
+    ...stripEmptyStringValues(readEnvSettings()),
+    ...stripEmptyStringValues(parseStoredSettings()),
+    ...stripEmptyStringValues(settings),
+  };
+}
+
 export function getStoredIntegrationSettings() {
   return parseStoredSettings();
+}
+
+export function getEnvIntegrationSettings() {
+  return readEnvSettings();
+}
+
+export function getResolvedIntegrationSettings(settings = {}) {
+  return buildResolvedSettings(settings);
 }
 
 export function saveStoredIntegrationSettings(settings) {
@@ -44,30 +84,22 @@ export function saveStoredIntegrationSettings(settings) {
 }
 
 export function buildClipResolvedConfig(settings = {}) {
-  const stored = parseStoredSettings();
-  const merged = { ...stored, ...settings };
+  const merged = buildResolvedSettings(settings);
 
   return {
-    apiKey: normalizeString(merged.clip_api_key) || normalizeString(import.meta.env.VITE_CLIP_API_KEY),
-    apiSecret: normalizeString(merged.clip_api_secret) || normalizeString(import.meta.env.VITE_CLIP_API_SECRET),
-    authToken: normalizeString(merged.clip_api_token) || normalizeString(import.meta.env.VITE_CLIP_API_TOKEN),
-    paymentsBaseUrl:
-      normalizeString(merged.clip_payments_api_base_url) ||
-      normalizeString(import.meta.env.VITE_CLIP_PAYMENTS_API_BASE_URL),
-    settlementsBaseUrl:
-      normalizeString(merged.clip_settlements_api_base_url) ||
-      normalizeString(import.meta.env.VITE_CLIP_SETTLEMENTS_API_BASE_URL),
+    apiKey: normalizeString(merged.clip_api_key),
+    apiSecret: normalizeString(merged.clip_api_secret),
+    authToken: normalizeString(merged.clip_api_token),
+    paymentsBaseUrl: normalizeString(merged.clip_payments_api_base_url),
+    settlementsBaseUrl: normalizeString(merged.clip_settlements_api_base_url),
   };
 }
 
 export function buildLoyverseResolvedConfig(settings = {}) {
-  const stored = parseStoredSettings();
-  const merged = { ...stored, ...settings };
+  const merged = buildResolvedSettings(settings);
 
   return {
-    apiToken: normalizeString(merged.loyverse_api_token) || normalizeString(import.meta.env.VITE_LOYVERSE_API_TOKEN),
-    baseUrl:
-      normalizeString(merged.loyverse_api_base_url) ||
-      normalizeString(import.meta.env.VITE_LOYVERSE_API_BASE_URL),
+    apiToken: normalizeString(merged.loyverse_api_token),
+    baseUrl: normalizeString(merged.loyverse_api_base_url),
   };
 }

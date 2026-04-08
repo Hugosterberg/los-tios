@@ -1,6 +1,5 @@
 import React from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +25,7 @@ export default function TableServiceManager({
   const [specialInstructions, setSpecialInstructions] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState("cash");
 
-  const activeOrder = activeTableOrders.find(
-    (order) => Number.parseInt(order.table_number, 10) === selectedTable
-  );
+  const activeOrder = activeTableOrders.find((order) => Number.parseInt(order.table_number, 10) === selectedTable);
 
   React.useEffect(() => {
     if (!activeOrder) {
@@ -38,7 +35,7 @@ export default function TableServiceManager({
       return;
     }
 
-    setCustomerName(activeOrder.customer_name || `Mesa ${selectedTable}`);
+    setCustomerName(activeOrder.customer_name || `Table ${selectedTable}`);
     setSpecialInstructions(activeOrder.special_instructions || "");
     setPaymentMethod(activeOrder.payment_method || "cash");
   }, [activeOrder, selectedTable]);
@@ -53,19 +50,17 @@ export default function TableServiceManager({
           <div>
             <CardTitle className="flex items-center gap-2 text-yellow-400">
               <Table2 className="w-5 h-5" />
-              Servicio en Mesas
+              Table Service
             </CardTitle>
-            <p className="text-sm text-gray-500 mt-1">
-              6 mesas activas con nota, cobro y cierre con historico
-            </p>
+            <p className="text-sm text-gray-500 mt-1">Six active tables with tabs, payment flow, and closeout history</p>
           </div>
           <div className="flex gap-3 text-sm">
             <div className="rounded-xl border border-yellow-500/20 bg-[#1a1a1a] px-4 py-2">
-              <p className="text-gray-500">Ocupadas</p>
+              <p className="text-gray-500">Occupied</p>
               <p className="font-bold text-yellow-400">{occupiedTables}</p>
             </div>
             <div className="rounded-xl border border-yellow-500/20 bg-[#1a1a1a] px-4 py-2">
-              <p className="text-gray-500">Libres</p>
+              <p className="text-gray-500">Available</p>
               <p className="font-bold text-gray-200">{6 - occupiedTables}</p>
             </div>
           </div>
@@ -76,43 +71,25 @@ export default function TableServiceManager({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {Array.from({ length: 6 }, (_, index) => {
             const tableNumber = index + 1;
-            const tableOrder = activeTableOrders.find(
-              (order) => Number.parseInt(order.table_number, 10) === tableNumber
-            );
+            const tableOrder = activeTableOrders.find((order) => Number.parseInt(order.table_number, 10) === tableNumber);
 
             return (
               <button
                 key={tableNumber}
                 type="button"
                 onClick={() => setSelectedTable(tableNumber)}
-                className={`rounded-2xl border p-4 text-left transition-all ${
-                  selectedTable === tableNumber
-                    ? "border-yellow-300 bg-yellow-400 text-black shadow-lg"
-                    : tableOrder
-                      ? "border-yellow-500/30 bg-yellow-400/10 text-white"
-                      : "border-yellow-500/20 bg-[#1a1a1a] text-gray-200 hover:border-yellow-400/50"
-                }`}
+                className={`rounded-2xl border p-4 text-left transition-all ${selectedTable === tableNumber ? "border-yellow-300 bg-yellow-400 text-black shadow-lg" : tableOrder ? "border-yellow-500/30 bg-yellow-400/10 text-white" : "border-yellow-500/20 bg-[#1a1a1a] text-gray-200 hover:border-yellow-400/50"}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-black">Mesa {tableNumber}</span>
-                  <Badge
-                    className={
-                      tableOrder
-                        ? "bg-black/15 text-current border-transparent"
-                        : "bg-transparent text-gray-400 border border-yellow-500/20"
-                    }
-                  >
-                    {tableOrder ? "Ocupada" : "Libre"}
+                  <span className="text-lg font-black">Table {tableNumber}</span>
+                  <Badge className={tableOrder ? "bg-black/15 text-current border-transparent" : "bg-transparent text-gray-400 border border-yellow-500/20"}>
+                    {tableOrder ? "Occupied" : "Available"}
                   </Badge>
                 </div>
                 <p className={`mt-3 text-sm ${selectedTable === tableNumber ? "text-black/75" : "text-gray-500"}`}>
-                  {tableOrder
-                    ? `${tableOrder.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} productos`
-                    : "Sin nota activa"}
+                  {tableOrder ? `${tableOrder.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} items` : "No open tab"}
                 </p>
-                <p className={`text-xl font-bold mt-1 ${selectedTable === tableNumber ? "text-black" : "text-yellow-400"}`}>
-                  {tableOrder ? formatMoney(tableOrder.total_amount) : "$0.00"}
-                </p>
+                <p className={`text-xl font-bold mt-1 ${selectedTable === tableNumber ? "text-black" : "text-yellow-400"}`}>{tableOrder ? formatMoney(tableOrder.total_amount) : "$0.00"}</p>
               </button>
             );
           })}
@@ -123,99 +100,58 @@ export default function TableServiceManager({
             <div className="rounded-2xl border border-yellow-500/20 bg-[#1a1a1a] p-4">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-white">Mesa {selectedTable}</h3>
-                  <p className="text-sm text-gray-500">
-                    {activeOrder
-                      ? `Orden #${activeOrder.id.slice(0, 8)}`
-                      : "Selecciona productos para abrir la nota"}
-                  </p>
+                  <h3 className="text-lg font-bold text-white">Table {selectedTable}</h3>
+                  <p className="text-sm text-gray-500">{activeOrder ? `Order #${activeOrder.id.slice(0, 8)}` : "Select items to open a table tab"}</p>
                 </div>
                 {activeOrder && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onPrintReceipt(activeOrder)}
-                    className="gap-2 border-yellow-500/30 bg-transparent text-gray-200 hover:bg-yellow-400/10"
-                  >
+                  <Button type="button" variant="outline" onClick={() => onPrintReceipt(activeOrder)} className="gap-2 border-yellow-500/30 bg-transparent text-gray-200 hover:bg-yellow-400/10">
                     <Receipt className="w-4 h-4" />
-                    Recibo
+                    Receipt
                   </Button>
                 )}
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 mb-4">
                 <div>
-                  <label className="text-sm text-gray-400 block mb-2">Nombre en la nota</label>
-                  <Input
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder={`Mesa ${selectedTable}`}
-                    className="bg-[#242424] border-yellow-500/20 text-white"
-                  />
+                  <label className="text-sm text-gray-400 block mb-2">Name on tab</label>
+                  <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={`Table ${selectedTable}`} className="bg-[#242424] border-yellow-500/20 text-white" />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 block mb-2">Metodo de pago al cerrar</label>
+                  <label className="text-sm text-gray-400 block mb-2">Payment method at checkout</label>
                   <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => setPaymentMethod("cash")}
-                      className={`flex-1 ${paymentMethod === "cash" ? "bg-yellow-400 text-black hover:bg-yellow-300" : "bg-[#242424] text-gray-200 border border-yellow-500/20 hover:bg-yellow-400/10"}`}
-                    >
-                      Efectivo
+                    <Button type="button" onClick={() => setPaymentMethod("cash")} className={`flex-1 ${paymentMethod === "cash" ? "bg-yellow-400 text-black hover:bg-yellow-300" : "bg-[#242424] text-gray-200 border border-yellow-500/20 hover:bg-yellow-400/10"}`}>
+                      Cash
                     </Button>
-                    <Button
-                      type="button"
-                      onClick={() => setPaymentMethod("card")}
-                      className={`flex-1 ${paymentMethod === "card" ? "bg-yellow-400 text-black hover:bg-yellow-300" : "bg-[#242424] text-gray-200 border border-yellow-500/20 hover:bg-yellow-400/10"}`}
-                    >
-                      Tarjeta
+                    <Button type="button" onClick={() => setPaymentMethod("card")} className={`flex-1 ${paymentMethod === "card" ? "bg-yellow-400 text-black hover:bg-yellow-300" : "bg-[#242424] text-gray-200 border border-yellow-500/20 hover:bg-yellow-400/10"}`}>
+                      Card
                     </Button>
                   </div>
                 </div>
               </div>
 
               <div className="mb-4">
-                <label className="text-sm text-gray-400 block mb-2">Notas</label>
-                <Textarea
-                  value={specialInstructions}
-                  onChange={(e) => setSpecialInstructions(e.target.value)}
-                  placeholder="Cumpleanos, alergias, cuenta separada, etc."
-                  rows={3}
-                  className="bg-[#242424] border-yellow-500/20 text-white"
-                />
+                <label className="text-sm text-gray-400 block mb-2">Notes</label>
+                <Textarea value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Birthday, allergies, split bill, etc." rows={3} className="bg-[#242424] border-yellow-500/20 text-white" />
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
                   disabled={!activeOrder || isSaving}
-                  onClick={() =>
-                    activeOrder &&
-                    onSaveOrderDetails(activeOrder, {
-                      customer_name: customerName.trim() || `Mesa ${selectedTable}`,
-                      special_instructions: specialInstructions.trim(),
-                    })
-                  }
+                  onClick={() => activeOrder && onSaveOrderDetails(activeOrder, { customer_name: customerName.trim() || `Table ${selectedTable}`, special_instructions: specialInstructions.trim() })}
                   className="bg-yellow-400 hover:bg-yellow-300 text-black"
                 >
-                  Guardar nota
+                  Save tab
                 </Button>
 
                 <Button
                   type="button"
                   disabled={!activeOrder || !activeOrder.items?.length || isSaving}
-                  onClick={() =>
-                    activeOrder &&
-                    onClearPaidTable(activeOrder, {
-                      payment_method: paymentMethod,
-                      customer_name: customerName.trim() || `Mesa ${selectedTable}`,
-                      special_instructions: specialInstructions.trim(),
-                    })
-                  }
+                  onClick={() => activeOrder && onClearPaidTable(activeOrder, { payment_method: paymentMethod, customer_name: customerName.trim() || `Table ${selectedTable}`, special_instructions: specialInstructions.trim() })}
                   className="bg-green-600 hover:bg-green-500 text-white gap-2"
                 >
                   <Wallet className="w-4 h-4" />
-                  Cobrado y cerrar mesa
+                  Mark paid and close table
                 </Button>
               </div>
             </div>
@@ -223,17 +159,11 @@ export default function TableServiceManager({
             <div className="rounded-2xl border border-yellow-500/20 bg-[#1a1a1a] p-4">
               <div className="flex items-center gap-2 mb-4">
                 <ShoppingBag className="w-4 h-4 text-yellow-400" />
-                <h4 className="font-semibold text-white">Menu para agregar a la nota</h4>
+                <h4 className="font-semibold text-white">Menu to add to the tab</h4>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[420px] overflow-y-auto pr-1">
                 {availableItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onAddItem(selectedTable, item)}
-                    disabled={isSaving}
-                    className="rounded-xl border border-yellow-500/20 bg-[#242424] p-3 text-left transition-colors hover:border-yellow-400 hover:bg-yellow-400/10"
-                  >
+                  <button key={item.id} type="button" onClick={() => onAddItem(selectedTable, item)} disabled={isSaving} className="rounded-xl border border-yellow-500/20 bg-[#242424] p-3 text-left transition-colors hover:border-yellow-400 hover:bg-yellow-400/10">
                     <p className="font-semibold text-white text-sm">{item.name}</p>
                     <p className="text-yellow-400 font-bold mt-1">{formatMoney(item.price)}</p>
                   </button>
@@ -243,59 +173,36 @@ export default function TableServiceManager({
           </div>
 
           <div className="rounded-2xl border border-yellow-500/20 bg-[#1a1a1a] p-4">
-            <h4 className="font-semibold text-white mb-4">Nota actual</h4>
+            <h4 className="font-semibold text-white mb-4">Current tab</h4>
 
             {activeOrder ? (
               <div className="space-y-3">
                 <div className="rounded-xl bg-[#242424] p-3 border border-yellow-500/10">
-                  <p className="text-sm text-gray-400">Cliente</p>
-                  <p className="font-semibold text-white">{customerName || `Mesa ${selectedTable}`}</p>
+                  <p className="text-sm text-gray-400">Customer</p>
+                  <p className="font-semibold text-white">{customerName || `Table ${selectedTable}`}</p>
                 </div>
 
                 <div className="space-y-2">
                   {activeOrder.items?.map((item, index) => (
-                    <div
-                      key={`${item.menu_item_id || item.item_name}-${index}`}
-                      className="rounded-xl bg-[#242424] p-3 border border-yellow-500/10"
-                    >
+                    <div key={`${item.menu_item_id || item.item_name}-${index}`} className="rounded-xl bg-[#242424] p-3 border border-yellow-500/10">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium text-white">{item.item_name}</p>
-                          <p className="text-sm text-gray-500">{formatMoney(item.price)} c/u</p>
+                          <p className="text-sm text-gray-500">{formatMoney(item.price)} each</p>
                         </div>
-                        <p className="font-bold text-yellow-400">
-                          {formatMoney((item.price || 0) * (item.quantity || 0))}
-                        </p>
+                        <p className="font-bold text-yellow-400">{formatMoney((item.price || 0) * (item.quantity || 0))}</p>
                       </div>
 
                       <div className="flex items-center gap-2 mt-3">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onChangeItemQuantity(activeOrder, index, -1)}
-                          className="border-yellow-500/20 bg-transparent text-gray-200 hover:bg-yellow-400/10"
-                        >
+                        <Button type="button" size="sm" variant="outline" onClick={() => onChangeItemQuantity(activeOrder, index, -1)} className="border-yellow-500/20 bg-transparent text-gray-200 hover:bg-yellow-400/10">
                           -
                         </Button>
                         <span className="min-w-8 text-center font-semibold text-white">{item.quantity}</span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onChangeItemQuantity(activeOrder, index, 1)}
-                          className="border-yellow-500/20 bg-transparent text-gray-200 hover:bg-yellow-400/10"
-                        >
+                        <Button type="button" size="sm" variant="outline" onClick={() => onChangeItemQuantity(activeOrder, index, 1)} className="border-yellow-500/20 bg-transparent text-gray-200 hover:bg-yellow-400/10">
                           +
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onChangeItemQuantity(activeOrder, index, -item.quantity)}
-                          className="ml-auto border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10"
-                        >
-                          Quitar
+                        <Button type="button" size="sm" variant="outline" onClick={() => onChangeItemQuantity(activeOrder, index, -item.quantity)} className="ml-auto border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10">
+                          Remove
                         </Button>
                       </div>
                     </div>
@@ -304,52 +211,40 @@ export default function TableServiceManager({
 
                 <div className="rounded-xl border border-yellow-500/20 bg-yellow-400/10 p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-300 font-medium">Total de la mesa</span>
-                    <span className="text-2xl font-black text-yellow-400">
-                      {formatMoney(activeOrder.total_amount)}
-                    </span>
+                    <span className="text-gray-300 font-medium">Table total</span>
+                    <span className="text-2xl font-black text-yellow-400">{formatMoney(activeOrder.total_amount)}</span>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-yellow-500/20 bg-[#242424] p-8 text-center">
-                <p className="text-gray-400">Mesa libre.</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Agrega productos desde el menu para abrir la nota de la mesa {selectedTable}.
-                </p>
+                <p className="text-gray-400">Table is free.</p>
+                <p className="text-sm text-gray-500 mt-2">Add items from the menu to open the tab for table {selectedTable}.</p>
               </div>
             )}
           </div>
         </div>
 
         <div className="rounded-2xl border border-yellow-500/20 bg-[#1a1a1a] p-4">
-          <h4 className="font-semibold text-white mb-4">Historico de mesas cobradas</h4>
-          {tableHistory.length > 0 ? (
+          <h4 className="font-semibold text-white mb-4">Paid table history</h4>
+          {tableHistory.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {tableHistory.map((order) => (
                 <div key={order.id} className="rounded-xl border border-yellow-500/10 bg-[#242424] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-white">Mesa {order.table_number}</p>
-                      <p className="text-sm text-gray-500">
-                        {format(
-                          new Date(order.updated_date || order.created_date),
-                          "d MMM yyyy, h:mm a",
-                          { locale: es }
-                        )}
-                      </p>
+                      <p className="font-bold text-white">Table {order.table_number}</p>
+                      <p className="text-sm text-gray-500">{format(new Date(order.updated_date || order.created_date), "d MMM yyyy, h:mm a")}</p>
                     </div>
-                    <Badge className="bg-green-500/15 text-green-400 border-transparent">
-                      Pagada
-                    </Badge>
+                    <Badge className="bg-green-500/15 text-green-400 border-transparent">Paid</Badge>
                   </div>
-                  <p className="text-sm text-gray-300 mt-3">Pedido #{order.id.slice(0, 8)}</p>
+                  <p className="text-sm text-gray-300 mt-3">Order #{order.id.slice(0, 8)}</p>
                   <p className="text-yellow-400 font-bold mt-1">{formatMoney(order.total_amount)}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Aun no hay mesas cerradas hoy.</p>
+            <p className="text-sm text-gray-500">No tables have been closed today yet.</p>
           )}
         </div>
       </CardContent>

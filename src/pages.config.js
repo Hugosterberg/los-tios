@@ -12,6 +12,8 @@ import Integrations from './pages/Integrations';
 import ShoppingList from './pages/ShoppingList';
 import CompanyAccount from './pages/CompanyAccount';
 import EmployeeCalendar from './pages/EmployeeCalendar';
+import FinanceSummary from './pages/FinanceSummary';
+import ManagementInsight from './pages/ManagementInsight';
 import __Layout from './Layout.jsx';
 
 
@@ -28,6 +30,8 @@ export const PAGES = {
     "Customization": Customization,
     "Integrations": Integrations,
     "ShoppingList": ShoppingList,
+    "Finance": FinanceSummary,
+    "ManagementInsight": ManagementInsight,
     "CompanyAccount": CompanyAccount,
     "EmployeeCalendar": EmployeeCalendar,
 }

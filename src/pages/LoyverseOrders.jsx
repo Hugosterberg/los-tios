@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getLoyverseOverview, hasLoyverseApiConfig, LOYVERSE_API_BASE_URL } from "@/api/loyverse";
+import { appParams } from "@/lib/app-params";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { listOrders } from "@/lib/local-dev-orders";
 
 const formatCurrency = (value) =>
@@ -124,11 +126,15 @@ function EmptyState({ title, description }) {
 
 export default function LoyverseOrders() {
   const [selectedView, setSelectedView] = React.useState("all");
+  const isLocalOnlyMode =
+    import.meta.env.DEV &&
+    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
+    enabled: !isLocalOnlyMode,
   });
-  const appSettings = settings[0] || {};
+  const appSettings = React.useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const overviewQuery = useQuery({
     queryKey: ["loyverseOverview", settings[0]?.id || "none"],
@@ -187,7 +193,7 @@ export default function LoyverseOrders() {
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-yellow-400" />
               <div>
-                <h1 className="text-lg font-bold text-yellow-400">Pedidos Loyverse</h1>
+                <h1 className="text-lg font-bold text-yellow-400">Loyverse Orders</h1>
                 <p className="text-xs text-gray-500">Loyverse receipts feed</p>
               </div>
             </div>
@@ -211,7 +217,7 @@ export default function LoyverseOrders() {
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-yellow-400" />
               <div>
-                <h1 className="text-lg font-bold text-yellow-400">Pedidos Loyverse</h1>
+                <h1 className="text-lg font-bold text-yellow-400">Loyverse Orders</h1>
                 <p className="text-xs text-gray-500">Receipts and payment data from {overviewQuery.data?.config?.baseUrl || LOYVERSE_API_BASE_URL}</p>
               </div>
             </div>
@@ -290,7 +296,7 @@ export default function LoyverseOrders() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-lg font-bold text-white">Mesa {table.tableNumber}</p>
+                      <p className="text-lg font-bold text-white">Table {table.tableNumber}</p>
                       <Badge
                         className={
                           table.activeOrder
@@ -350,7 +356,7 @@ export default function LoyverseOrders() {
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-white">Mesa {normalizeTableNumber(order.table_number)}</p>
+                        <p className="font-semibold text-white">Table {normalizeTableNumber(order.table_number)}</p>
                         <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
                           {order.payment_method || "paid"}
                         </Badge>
@@ -388,7 +394,7 @@ export default function LoyverseOrders() {
                 : "border-yellow-500/20 bg-[#242424]"
             }`}
           >
-            <p className="mb-1 text-xs text-gray-500">Todos</p>
+            <p className="mb-1 text-xs text-gray-500">All</p>
             <p className={`text-xl font-bold ${selectedView === "all" ? "text-black" : "text-gray-300"}`}>{receipts.length}</p>
           </button>
           <button
@@ -400,7 +406,7 @@ export default function LoyverseOrders() {
                 : "border-yellow-500/20 bg-[#242424]"
             }`}
           >
-            <p className="mb-1 text-xs text-gray-500">Completados</p>
+            <p className="mb-1 text-xs text-gray-500">Completed</p>
             <p className={`text-xl font-bold ${selectedView === "completed" ? "text-black" : "text-yellow-400"}`}>{completedReceipts.length}</p>
           </button>
           <button
@@ -412,7 +418,7 @@ export default function LoyverseOrders() {
                 : "border-yellow-500/20 bg-[#242424]"
             }`}
           >
-            <p className="mb-1 text-xs text-gray-500">Cancelados</p>
+            <p className="mb-1 text-xs text-gray-500">Cancelled</p>
             <p className={`text-xl font-bold ${selectedView === "cancelled" ? "text-black" : "text-yellow-400"}`}>{cancelledReceipts.length}</p>
           </button>
         </div>

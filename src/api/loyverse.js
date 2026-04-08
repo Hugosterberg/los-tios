@@ -160,6 +160,14 @@ async function fetchCollection(path, collectionKey, { maxPages = 10, searchParam
   return allRecords;
 }
 
+async function fetchOptionalCollection(path, collectionKey, options = {}) {
+  try {
+    return await fetchCollection(path, collectionKey, options);
+  } catch {
+    return [];
+  }
+}
+
 function getMoneyAmount(value) {
   if (typeof value === "number") {
     return value;
@@ -200,18 +208,18 @@ export async function getLoyverseOverview(settings = {}) {
     shifts,
     inventoryLevels,
   ] = await Promise.all([
-    fetchCollection("stores", "stores", { maxPages: 5, settings }),
-    fetchCollection("items", "items", { maxPages: 20, settings }),
-    fetchCollection("customers", "customers", { maxPages: 20, settings }),
+    fetchOptionalCollection("stores", "stores", { maxPages: 5, settings }),
+    fetchOptionalCollection("items", "items", { maxPages: 20, settings }),
+    fetchOptionalCollection("customers", "customers", { maxPages: 20, settings }),
     fetchCollection("receipts", "receipts", { maxPages: 20, settings }),
-    fetchCollection("categories", "categories", { maxPages: 10, settings }),
-    fetchCollection("modifiers", "modifiers", { maxPages: 20, settings }),
-    fetchCollection("discounts", "discounts", { maxPages: 10, settings }),
-    fetchCollection("taxes", "taxes", { maxPages: 10, settings }),
-    fetchCollection("employees", "employees", { maxPages: 10, settings }),
-    fetchCollection("pos_devices", "pos_devices", { maxPages: 10, settings }),
-    fetchCollection("shifts", "shifts", { maxPages: 20, settings }),
-    fetchCollection("inventory", "inventory_levels", { maxPages: 20, settings }),
+    fetchOptionalCollection("categories", "categories", { maxPages: 10, settings }),
+    fetchOptionalCollection("modifiers", "modifiers", { maxPages: 20, settings }),
+    fetchOptionalCollection("discounts", "discounts", { maxPages: 10, settings }),
+    fetchOptionalCollection("taxes", "taxes", { maxPages: 10, settings }),
+    fetchOptionalCollection("employees", "employees", { maxPages: 10, settings }),
+    fetchOptionalCollection("pos_devices", "pos_devices", { maxPages: 10, settings }),
+    fetchOptionalCollection("shifts", "shifts", { maxPages: 20, settings }),
+    fetchOptionalCollection("inventory", "inventory_levels", { maxPages: 20, settings }),
   ]);
 
   const receiptsSorted = [...receipts].sort((a, b) => {

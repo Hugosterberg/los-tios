@@ -384,7 +384,7 @@ export default function Clip() {
               <CreditCard className="h-5 w-5 text-yellow-400" />
               <div>
                 <h1 className="text-lg font-bold text-yellow-400">Clip</h1>
-                <p className="text-xs text-gray-500">Pagos, terminales y depósitos de Clip</p>
+                <p className="text-xs text-gray-500">Payments, terminales y depÃƒÂ³sitos de Clip</p>
               </div>
             </div>
           </div>
@@ -440,37 +440,37 @@ export default function Clip() {
 
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
           <MetricCard
-            label="Pagos"
+            label="Payments"
             value={formatNumber(overview?.metrics?.paymentsCount)}
             hint={`${formatNumber(approvedPayments.length)} approved in current range`}
             icon={CreditCard}
           />
           <MetricCard
-            label="Volumen Bruto"
+            label="Gross Volume"
             value={formatCurrency(overview?.metrics?.grossVolume)}
             hint={`${formatCurrency(overview?.metrics?.tipsVolume)} in tips`}
             icon={CircleDollarSign}
           />
           <MetricCard
-            label="Reembolsos"
+            label="Refunds"
             value={formatCurrency(overview?.metrics?.refundedVolume)}
             hint={`${formatNumber(refundedPayments.length)} refunded payments`}
             icon={Wallet}
           />
           <MetricCard
-            label="Depositos"
+            label="Deposits"
             value={formatCurrency(overview?.metrics?.netDeposits)}
             hint={`${formatNumber(overview?.metrics?.settlementsCount)} settlements synced`}
             icon={Landmark}
           />
           <MetricCard
-            label="Terminales"
+            label="Terminals"
             value={formatNumber(syncedTerminalCount)}
             hint={`${formatNumber(knownBrandCount)} card brands detected`}
             icon={MonitorSmartphone}
           />
           <MetricCard
-            label="Cobertura API"
+            label="API Coverage"
             value={`${formatNumber(liveApiCount)} live`}
             hint={`${formatNumber(documentedApiCount)} documented next`}
             icon={Workflow}

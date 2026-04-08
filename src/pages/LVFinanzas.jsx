@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getLoyverseOverview, hasLoyverseApiConfig, LOYVERSE_API_BASE_URL } from "@/api/loyverse";
+import { appParams } from "@/lib/app-params";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { listOrders } from "@/lib/local-dev-orders";
 
 const formatCurrency = (value) =>
@@ -86,11 +88,16 @@ function MetricCard({ label, value, hint, icon: Icon }) {
 }
 
 export default function LVFinanzas() {
+  const isLocalOnlyMode =
+    import.meta.env.DEV &&
+    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
+
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
+    enabled: !isLocalOnlyMode,
   });
-  const appSettings = settings[0] || {};
+  const appSettings = React.useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
   const overviewQuery = useQuery({
     queryKey: ["loyverseOverview", settings[0]?.id || "none"],
     queryFn: () => getLoyverseOverview(appSettings),

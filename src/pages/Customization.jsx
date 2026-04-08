@@ -48,7 +48,7 @@ export default function Customization() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appSettings'] });
       saveStoredIntegrationSettings(formData);
-      alert('¡Configuración guardada exitosamente! / Settings saved successfully!');
+      alert('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ConfiguraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n guardada exitosamente! / Settings saved successfully!');
     },
   });
 
@@ -65,7 +65,7 @@ export default function Customization() {
       const result = await base44.integrations.Core.UploadFile({ file });
       setFormData({ ...formData, logo_url: result.file_url });
     } catch (error) {
-      alert('Error al subir el logo / Error uploading logo');
+      alert('Error uploading logo');
     } finally {
       setUploadingLogo(false);
     }
@@ -77,35 +77,35 @@ export default function Customization() {
   };
 
   const resetToDefaults = () => {
-    if (confirm('¿Estás seguro de restablecer a los valores predeterminados? / Are you sure you want to reset to defaults?')) {
+    if (confirm('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿EstÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡s seguro de restablecer a los valores predeterminados? / Are you sure you want to reset to defaults?')) {
       setFormData(buildDefaultAppSettings());
     }
   };
 
   const presetThemes = [
     {
-      name: "Rojo Clásico / Classic Red",
+      name: "Rojo ClÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡sico / Classic Red",
       primary: "#DC2626",
       secondary: "#F97316",
       accent: "#10B981",
       style: "classic"
     },
     {
-      name: "Azul Elegante / Elegant Blue",
+      name: "Azul Elegant Blue",
       primary: "#2563EB",
       secondary: "#7C3AED",
       accent: "#10B981",
       style: "elegant"
     },
     {
-      name: "Verde Fresco / Fresh Green",
+      name: "Fresh Green",
       primary: "#059669",
       secondary: "#10B981",
       accent: "#F59E0B",
       style: "modern"
     },
     {
-      name: "Naranja Vibrante / Vibrant Orange",
+      name: "Vibrant Orange",
       primary: "#EA580C",
       secondary: "#F97316",
       accent: "#8B5CF6",
@@ -135,7 +135,7 @@ export default function Customization() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando configuración... / Loading settings...</p>
+          <p className="text-gray-600">Cargando configuraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n... / Loading settings...</p>
         </div>
       </div>
     );
@@ -151,9 +151,9 @@ export default function Customization() {
           >
             <div className="flex items-center gap-3 mb-2">
               <Palette className="w-10 h-10" />
-              <h1 className="text-4xl font-bold">Personalización / Customization</h1>
+              <h1 className="text-4xl font-bold">Customization</h1>
             </div>
-            <p className="text-purple-100">Personaliza la apariencia de tu restaurante / Customize your restaurant's appearance</p>
+            <p className="text-purple-100">Customize your restaurant's appearance</p>
           </motion.div>
         </div>
       </div>
@@ -187,7 +187,7 @@ export default function Customization() {
                     <h2 className="text-3xl font-bold" style={{ color: formData.text_color }}>
                       {formData.restaurant_name}
                     </h2>
-                    <p className="text-gray-500">Vista Previa / Preview</p>
+                    <p className="text-gray-500">Preview</p>
                   </div>
                 </div>
                 <div className="mt-6 flex gap-3">
@@ -212,11 +212,11 @@ export default function Customization() {
             {/* Restaurant Info */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle>Información del Restaurante / Restaurant Info</CardTitle>
+                <CardTitle>InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n del Restaurante / Restaurant Info</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nombre del Restaurante / Restaurant Name</Label>
+                  <Label htmlFor="name">Restaurant Name</Label>
                   <Input
                     id="name"
                     value={formData.restaurant_name}
@@ -226,7 +226,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono / Phone</Label>
+                  <Label htmlFor="phone">TelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono / Phone</Label>
                   <Input
                     id="phone"
                     value={formData.phone_number}
@@ -247,7 +247,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">Dirección / Address</Label>
+                  <Label htmlFor="address">DirecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n / Address</Label>
                   <Textarea
                     id="address"
                     value={formData.address}
@@ -264,12 +264,12 @@ export default function Customization() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ImageIcon className="w-5 h-5" />
-                  Logo del Restaurante / Restaurant Logo
+                  Restaurant Logo
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Logo Actual / Current Logo</Label>
+                  <Label>Current Logo</Label>
                   <div className="border-2 border-dashed rounded-xl p-8 text-center">
                     {formData.logo_url ? (
                       <img
@@ -286,7 +286,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="logo-upload">Subir Logo Personalizado / Upload Custom Logo</Label>
+                  <Label htmlFor="logo-upload">Upload Custom Logo</Label>
                   <Input
                     id="logo-upload"
                     type="file"
@@ -295,7 +295,7 @@ export default function Customization() {
                     disabled={uploadingLogo || !canUploadImages}
                   />
                   {uploadingLogo && (
-                    <p className="text-sm text-gray-500">Subiendo... / Uploading...</p>
+                    <p className="text-sm text-gray-500">Uploading...</p>
                   )}
                   {!canUploadImages && (
                     <p className="text-sm text-amber-600">
@@ -305,7 +305,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>O Usar URL de Imagen / Or Use Image URL</Label>
+                  <Label>Or Use Image URL</Label>
                   <Input
                     value={formData.logo_url}
                     onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
@@ -314,7 +314,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Logos Predefinidos / Preset Logos</Label>
+                  <Label>Preset Logos</Label>
                   <div className="grid grid-cols-4 gap-3">
                     {logoPresets.map((url, index) => (
                       <button
@@ -335,7 +335,7 @@ export default function Customization() {
           {/* Theme Presets */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Temas Predefinidos / Preset Themes</CardTitle>
+              <CardTitle>Preset Themes</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -361,12 +361,12 @@ export default function Customization() {
           {/* Color Settings */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Colores Personalizados / Custom Colors</CardTitle>
+              <CardTitle>Custom Colors</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="primary">Color Primario / Primary Color</Label>
+                  <Label htmlFor="primary">Primary Color</Label>
                   <div className="flex gap-2">
                     <Input
                       id="primary"
@@ -385,7 +385,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="secondary">Color Secundario / Secondary Color</Label>
+                  <Label htmlFor="secondary">Secondary Color</Label>
                   <div className="flex gap-2">
                     <Input
                       id="secondary"
@@ -404,7 +404,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="accent">Color de Acento / Accent Color</Label>
+                  <Label htmlFor="accent">Accent Color</Label>
                   <div className="flex gap-2">
                     <Input
                       id="accent"
@@ -423,7 +423,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="text">Color de Texto / Text Color</Label>
+                  <Label htmlFor="text">Text Color</Label>
                   <div className="flex gap-2">
                     <Input
                       id="text"
@@ -442,7 +442,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="background">Color de Fondo / Background Color</Label>
+                  <Label htmlFor="background">Background Color</Label>
                   <div className="flex gap-2">
                     <Input
                       id="background"
@@ -461,7 +461,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="theme-style">Estilo de Tema / Theme Style</Label>
+                  <Label htmlFor="theme-style">Theme Style</Label>
                   <Select
                     value={formData.theme_style}
                     onValueChange={(value) => setFormData({ ...formData, theme_style: value })}
@@ -470,10 +470,10 @@ export default function Customization() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="modern">Moderno / Modern</SelectItem>
-                      <SelectItem value="classic">Clásico / Classic</SelectItem>
-                      <SelectItem value="elegant">Elegante / Elegant</SelectItem>
-                      <SelectItem value="playful">Divertido / Playful</SelectItem>
+                      <SelectItem value="modern">Modern</SelectItem>
+                      <SelectItem value="classic">ClÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡sico / Classic</SelectItem>
+                      <SelectItem value="elegant">Elegant</SelectItem>
+                      <SelectItem value="playful">Playful</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -486,12 +486,12 @@ export default function Customization() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
-                Configuración de Pagos / Payment Settings
+                ConfiguraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de Pagos / Payment Settings
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <Label>Métodos de Pago Aceptados / Accepted Payment Methods</Label>
+                <Label>MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©todos de Pago Aceptados / Accepted Payment Methods</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3 p-4 border rounded-lg">
                     <input
@@ -504,8 +504,8 @@ export default function Customization() {
                     <Label htmlFor="accept_cash" className="flex items-center gap-2 cursor-pointer">
                       <Banknote className="w-5 h-5 text-green-600" />
                       <div>
-                        <p className="font-semibold">Efectivo / Cash</p>
-                        <p className="text-xs text-gray-500">Pago al entregar</p>
+                        <p className="font-semibold">Cash</p>
+                        <p className="text-xs text-gray-500">Payment on delivery</p>
                       </div>
                     </Label>
                   </div>
@@ -521,8 +521,8 @@ export default function Customization() {
                     <Label htmlFor="accept_card" className="flex items-center gap-2 cursor-pointer">
                       <CreditCard className="w-5 h-5 text-blue-600" />
                       <div>
-                        <p className="font-semibold">Tarjeta / Card</p>
-                        <p className="text-xs text-gray-500">Transferencia bancaria</p>
+                        <p className="font-semibold">Card</p>
+                        <p className="text-xs text-gray-500">Bank transfer</p>
                       </div>
                     </Label>
                   </div>
@@ -531,11 +531,11 @@ export default function Customization() {
 
               {formData.accept_card && (
                 <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-semibold text-blue-900">Información Bancaria / Bank Information</h4>
-                  <p className="text-sm text-blue-700">Esta información se mostrará en el recibo cuando el cliente seleccione pago con tarjeta / This information will be shown on the receipt when customer selects card payment</p>
+                  <h4 className="font-semibold text-blue-900">InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n Bancaria / Bank Information</h4>
+                  <p className="text-sm text-blue-700">Esta informaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n se mostrarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ en el recibo cuando el cliente seleccione pago con tarjeta / This information will be shown on the receipt when customer selects card payment</p>
 
                   <div className="space-y-2">
-                    <Label htmlFor="clip_payment_link">Liga de pago de Clip / Clip payment link</Label>
+                    <Label htmlFor="clip_payment_link">Clip payment link</Label>
                     <Input
                       id="clip_payment_link"
                       value={formData.clip_payment_link || ""}
@@ -543,13 +543,13 @@ export default function Customization() {
                       placeholder="https://..."
                     />
                     <p className="text-xs text-blue-700">
-                      Esta liga se abre cuando el cliente elige tarjeta en checkout.
+                      This link opens when the customer chooses card payment at checkout.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="bank_name">Nombre del Banco / Bank Name</Label>
+                      <Label htmlFor="bank_name">Bank Name</Label>
                       <Input
                         id="bank_name"
                         value={formData.bank_name}
@@ -559,7 +559,7 @@ export default function Customization() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="account_holder">Titular de la Cuenta / Account Holder</Label>
+                      <Label htmlFor="account_holder">Account Holder</Label>
                       <Input
                         id="account_holder"
                         value={formData.bank_account_holder}
@@ -569,7 +569,7 @@ export default function Customization() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="account_number">Número de Cuenta / Account Number</Label>
+                      <Label htmlFor="account_number">NÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºmero de Cuenta / Account Number</Label>
                       <Input
                         id="account_number"
                         value={formData.bank_account_number}
@@ -596,23 +596,23 @@ export default function Customization() {
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Integraciones</CardTitle>
+              <CardTitle>Integrations</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
-                Las llaves y secretos ahora viven en una pantalla dedicada dentro del admin para no mezclarlos con la personalizacion visual.
+                Keys and secrets now live in a dedicated admin screen so they do not get mixed into visual customization.
               </p>
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
-                <p className="font-semibold text-purple-950">Abre la pestaña de Integraciones</p>
+                <p className="font-semibold text-purple-950">Abre la pestaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±a de Integrations</p>
                 <p className="mt-1 text-sm text-purple-800">
-                  Alli puedes actualizar todas las claves publicas y secretas de Clip y Loyverse desde un solo lugar.
+                  There you can update all Clip and Loyverse public and secret keys from one place.
                 </p>
                 <Button
                   type="button"
                   className="mt-4 bg-purple-600 hover:bg-purple-700"
-                  onClick={() => window.location.assign(createPageUrl("Integraciones"))}
+                  onClick={() => window.location.assign(createPageUrl("Integrations"))}
                 >
-                  Ir a Integraciones
+                  Go to Integrations
                 </Button>
               </div>
             </CardContent>
@@ -627,7 +627,7 @@ export default function Customization() {
               className="gap-2"
             >
               <RefreshCw className="w-4 h-4" />
-              Restablecer / Reset
+              Reset
             </Button>
             <Button
               type="submit"
@@ -635,7 +635,7 @@ export default function Customization() {
               className="bg-purple-600 hover:bg-purple-700 gap-2"
             >
               <Save className="w-4 h-4" />
-              {saveSettings.isPending ? "Guardando... / Saving..." : "Guardar Cambios / Save Changes"}
+              {saveSettings.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

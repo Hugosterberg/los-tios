@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, Plus } from "lucide-react";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { createOrderEntity, deleteOrderEntity, listOrders, updateOrderEntity } from "@/lib/local-dev-orders";
-
 import OrderCard from "../components/orders/OrderCard";
 import ReceiptDialog from "../components/orders/ReceiptDialog";
 import NewOrderForm from "../components/orders/NewOrderForm";
@@ -21,8 +19,7 @@ const normalizeTableNumber = (value) => {
   return match ? match[0] : String(value).trim();
 };
 
-const calculateOrderTotal = (items = []) =>
-  items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+const calculateOrderTotal = (items = []) => items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
 
 export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -31,56 +28,48 @@ export default function Orders() {
   const [selectedView, setSelectedView] = useState("active");
   const queryClient = useQueryClient();
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders'],
-    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), '-created_date'),
+  const { data: orders = [] } = useQuery({
+    queryKey: ["orders"],
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),
   });
 
   const { data: menuItems = [] } = useQuery({
-    queryKey: ['menuItems'],
+    queryKey: ["menuItems"],
     queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
   });
 
   const updateOrder = useMutation({
     mutationFn: ({ id, data }) => updateOrderEntity(id, data, (orderId, payload) => base44.entities.Order.update(orderId, payload)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
   });
 
   const deleteOrder = useMutation({
     mutationFn: (id) => deleteOrderEntity(id, (orderId) => base44.entities.Order.delete(orderId)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
   });
 
   const createOrder = useMutation({
     mutationFn: (data) => createOrderEntity(data, (payload) => base44.entities.Order.create(payload)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
       setShowNewOrderForm(false);
     },
   });
 
-  const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
-  const completedOrders = orders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
-  const displayedOrders =
-    selectedView === "active"
-      ? activeOrders
-      : selectedView === "completed"
-        ? completedOrders
-        : orders;
+  const activeOrders = orders.filter((order) => order.status !== "delivered" && order.status !== "cancelled");
+  const completedOrders = orders.filter((order) => order.status === "delivered" || order.status === "cancelled");
+  const displayedOrders = selectedView === "active" ? activeOrders : selectedView === "completed" ? completedOrders : orders;
   const activeTableOrders = orders.filter((order) => {
     const normalizedTable = normalizeTableNumber(order.table_number);
     return order.order_type === "dine-in" && TABLE_NUMBERS.has(normalizedTable) && ACTIVE_ORDER_STATUSES.includes(order.status);
   });
+
   const tableHistory = orders
     .filter((order) => {
       const normalizedTable = normalizeTableNumber(order.table_number);
       return order.order_type === "dine-in" && TABLE_NUMBERS.has(normalizedTable) && order.status === "delivered";
     })
-    .sort((a, b) => new Date(b.updated_date || b.created_date).getTime() - new Date(a.updated_date || a.created_date).getTime())
+    .sort((left, right) => new Date(right.updated_date || right.created_date).getTime() - new Date(left.updated_date || left.created_date).getTime())
     .slice(0, 12);
 
   const handlePrintReceipt = (order) => {
@@ -89,71 +78,51 @@ export default function Orders() {
   };
 
   const handleDeleteOrder = (id) => {
-    if (confirm('Are you sure you want to delete this order? This cannot be undone.')) {
+    if (confirm("Are you sure you want to delete this order? This cannot be undone.")) {
       deleteOrder.mutate(id);
     }
   };
 
-  const handleCompleteOrder = async (order) => {
+  const handleCompleteOrder = (order) => {
     const paymentMethod = prompt(
-      '¿Cómo pagó el cliente? / How did the customer pay?\n\n1 = Efectivo / Cash\n2 = Tarjeta / Card\n\nIngrese 1 o 2:',
-      order.payment_method === 'card' ? '2' : '1'
+      "How did the customer pay?\n\n1 = Cash\n2 = Card\n\nEnter 1 or 2:",
+      order.payment_method === "card" ? "2" : "1",
     );
-    
+
     if (!paymentMethod) return;
-    
-    const method = paymentMethod === '2' ? 'card' : 'cash';
-    
+
     updateOrder.mutate({
       id: order.id,
       data: {
-        status: 'delivered',
-        payment_method: method,
-        payment_status: 'paid'
-      }
+        status: "delivered",
+        payment_method: paymentMethod === "2" ? "card" : "cash",
+        payment_status: "paid",
+      },
     });
   };
 
   const handleAddItemToTable = async (tableNumber, menuItem) => {
     const normalizedTable = String(tableNumber);
-    const existingOrder = activeTableOrders.find(
-      (order) => normalizeTableNumber(order.table_number) === normalizedTable
-    );
+    const existingOrder = activeTableOrders.find((order) => normalizeTableNumber(order.table_number) === normalizedTable);
 
     if (existingOrder) {
-      const existingIndex = existingOrder.items?.findIndex(
-        (item) => !item.is_custom && item.menu_item_id === menuItem.id
-      ) ?? -1;
-
+      const existingIndex = existingOrder.items?.findIndex((item) => !item.is_custom && item.menu_item_id === menuItem.id) ?? -1;
       const nextItems = existingIndex >= 0
-        ? existingOrder.items.map((item, index) =>
-            index === existingIndex
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          )
+        ? existingOrder.items.map((item, index) => (index === existingIndex ? { ...item, quantity: item.quantity + 1 } : item))
         : [
             ...(existingOrder.items || []),
-            {
-              menu_item_id: menuItem.id,
-              item_name: menuItem.name,
-              quantity: 1,
-              price: menuItem.price,
-              is_custom: false,
-            },
+            { menu_item_id: menuItem.id, item_name: menuItem.name, quantity: 1, price: menuItem.price, is_custom: false },
           ];
 
       await updateOrder.mutateAsync({
         id: existingOrder.id,
-        data: {
-          items: nextItems,
-          total_amount: calculateOrderTotal(nextItems),
-        },
+        data: { items: nextItems, total_amount: calculateOrderTotal(nextItems) },
       });
       return;
     }
 
     await createOrder.mutateAsync({
-      customer_name: `Mesa ${normalizedTable}`,
+      customer_name: `Table ${normalizedTable}`,
       customer_phone: "",
       delivery_address: "",
       special_instructions: "",
@@ -161,15 +130,7 @@ export default function Orders() {
       payment_status: "pending",
       order_type: "dine-in",
       table_number: normalizedTable,
-      items: [
-        {
-          menu_item_id: menuItem.id,
-          item_name: menuItem.name,
-          quantity: 1,
-          price: menuItem.price,
-          is_custom: false,
-        },
-      ],
+      items: [{ menu_item_id: menuItem.id, item_name: menuItem.name, quantity: 1, price: menuItem.price, is_custom: false }],
       total_amount: menuItem.price || 0,
       status: "pending",
     });
@@ -177,33 +138,24 @@ export default function Orders() {
 
   const handleChangeTableItemQuantity = async (order, itemIndex, delta) => {
     const nextItems = (order.items || [])
-      .map((item, index) => {
-        if (index !== itemIndex) return item;
-        return { ...item, quantity: item.quantity + delta };
-      })
+      .map((item, index) => (index === itemIndex ? { ...item, quantity: item.quantity + delta } : item))
       .filter((item) => item.quantity > 0);
 
-    if (nextItems.length === 0) {
+    if (!nextItems.length) {
       await deleteOrder.mutateAsync(order.id);
       return;
     }
 
     await updateOrder.mutateAsync({
       id: order.id,
-      data: {
-        items: nextItems,
-        total_amount: calculateOrderTotal(nextItems),
-      },
+      data: { items: nextItems, total_amount: calculateOrderTotal(nextItems) },
     });
   };
 
   const handleSaveTableOrderDetails = async (order, details) => {
     await updateOrder.mutateAsync({
       id: order.id,
-      data: {
-        customer_name: details.customer_name,
-        special_instructions: details.special_instructions,
-      },
+      data: { customer_name: details.customer_name, special_instructions: details.special_instructions },
     });
   };
 
@@ -228,16 +180,13 @@ export default function Orders() {
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-yellow-400" />
               <div>
-                <h1 className="text-lg font-bold text-yellow-400">Gestión de Pedidos</h1>
-                <p className="text-gray-500 text-xs">Crear y gestionar pedidos</p>
+                <h1 className="text-lg font-bold text-yellow-400">Order Management</h1>
+                <p className="text-gray-500 text-xs">Create and manage orders</p>
               </div>
             </div>
-            <Button
-              onClick={() => setShowNewOrderForm(true)}
-              className="bg-yellow-400 hover:bg-yellow-300 text-black text-sm gap-2 h-8 px-3"
-            >
+            <Button onClick={() => setShowNewOrderForm(true)} className="bg-yellow-400 hover:bg-yellow-300 text-black text-sm gap-2 h-8 px-3">
               <Plus className="w-3 h-3" />
-              Nuevo Pedido
+              New Order
             </Button>
           </div>
         </div>
@@ -256,80 +205,48 @@ export default function Orders() {
           isSaving={createOrder.isPending || updateOrder.isPending}
         />
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-          <button
-            type="button"
-            onClick={() => setSelectedView("active")}
-            className={`rounded-xl p-3 text-left border transition-colors ${
-              selectedView === "active"
-                ? "bg-yellow-400 text-black border-yellow-300"
-                : "bg-[#242424] border-yellow-500/20"
-            }`}
-          >
-            <p className="text-xs text-gray-500 mb-1">Pedidos Activos</p>
+          <button type="button" onClick={() => setSelectedView("active")} className={`rounded-xl p-3 text-left border transition-colors ${selectedView === "active" ? "bg-yellow-400 text-black border-yellow-300" : "bg-[#242424] border-yellow-500/20"}`}>
+            <p className="text-xs text-gray-500 mb-1">Active Orders</p>
             <p className={`text-xl font-bold ${selectedView === "active" ? "text-black" : "text-yellow-400"}`}>{activeOrders.length}</p>
           </button>
-          <button
-            type="button"
-            onClick={() => setSelectedView("completed")}
-            className={`rounded-xl p-3 text-left border transition-colors ${
-              selectedView === "completed"
-                ? "bg-yellow-400 text-black border-yellow-300"
-                : "bg-[#242424] border-yellow-500/20"
-            }`}
-          >
-            <p className="text-xs text-gray-500 mb-1">Completados</p>
+          <button type="button" onClick={() => setSelectedView("completed")} className={`rounded-xl p-3 text-left border transition-colors ${selectedView === "completed" ? "bg-yellow-400 text-black border-yellow-300" : "bg-[#242424] border-yellow-500/20"}`}>
+            <p className="text-xs text-gray-500 mb-1">Completed</p>
             <p className={`text-xl font-bold ${selectedView === "completed" ? "text-black" : "text-yellow-400"}`}>{completedOrders.length}</p>
           </button>
-          <button
-            type="button"
-            onClick={() => setSelectedView("all")}
-            className={`rounded-xl p-3 text-left border transition-colors ${
-              selectedView === "all"
-                ? "bg-yellow-400 text-black border-yellow-300"
-                : "bg-[#242424] border-yellow-500/20"
-            }`}
-          >
-            <p className="text-xs text-gray-500 mb-1">Total Pedidos</p>
+          <button type="button" onClick={() => setSelectedView("all")} className={`rounded-xl p-3 text-left border transition-colors ${selectedView === "all" ? "bg-yellow-400 text-black border-yellow-300" : "bg-[#242424] border-yellow-500/20"}`}>
+            <p className="text-xs text-gray-500 mb-1">Total Orders</p>
             <p className={`text-xl font-bold ${selectedView === "all" ? "text-black" : "text-gray-300"}`}>{orders.length}</p>
           </button>
         </div>
 
-        {/* New Order Form */}
         {showNewOrderForm && (
-          <NewOrderForm
-            menuItems={menuItems}
-            onSubmit={(data) => createOrder.mutate(data)}
-            onCancel={() => setShowNewOrderForm(false)}
-            isLoading={createOrder.isPending}
-          />
+          <NewOrderForm menuItems={menuItems} onSubmit={(data) => createOrder.mutate(data)} onCancel={() => setShowNewOrderForm(false)} isLoading={createOrder.isPending} />
         )}
 
         <div className="space-y-3">
-          {displayedOrders.length > 0 ? displayedOrders.map((order) => (
-            <OrderCard key={order.id} order={order}
-              onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
-              onPrintReceipt={handlePrintReceipt} onDelete={handleDeleteOrder} onCompleteOrder={handleCompleteOrder} />
-          )) : (
+          {displayedOrders.length ? (
+            displayedOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onUpdateStatus={(status) => updateOrder.mutate({ id: order.id, data: { status } })}
+                onPrintReceipt={handlePrintReceipt}
+                onDelete={handleDeleteOrder}
+                onCompleteOrder={handleCompleteOrder}
+              />
+            ))
+          ) : (
             <div className="bg-[#242424] border border-yellow-500/10 rounded-xl text-center py-10">
               <p className="text-gray-600 text-sm">
-                {selectedView === "active"
-                  ? "No hay pedidos activos"
-                  : selectedView === "completed"
-                    ? "No hay pedidos completados"
-                    : "No hay pedidos"}
+                {selectedView === "active" ? "No active orders" : selectedView === "completed" ? "No completed orders" : "No orders"}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      <ReceiptDialog
-        order={selectedOrder}
-        open={showReceipt}
-        onClose={() => setShowReceipt(false)}
-      />
+      <ReceiptDialog order={selectedOrder} open={showReceipt} onClose={() => setShowReceipt(false)} />
     </div>
   );
 }

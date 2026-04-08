@@ -12,6 +12,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { getLoyverseOverview, hasLoyverseApiConfig, LOYVERSE_API_BASE_URL, saveLoyverseItemModifierAssignments } from "@/api/loyverse";
+import { appParams } from "@/lib/app-params";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { listOrders } from "@/lib/local-dev-orders";
 
 const formatCurrency = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value || 0);
@@ -98,8 +100,15 @@ function ItemModifierDialog({ item, modifiers, selectedModifierIds, onModifierTo
 }
 
 export default function Loyverse() {
-  const { data: settings = [] } = useQuery({ queryKey: ["appSettings"], queryFn: () => base44.entities.AppSettings.list() });
-  const appSettings = settings[0] || {};
+  const isLocalOnlyMode =
+    import.meta.env.DEV &&
+    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
+  const { data: settings = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    enabled: !isLocalOnlyMode,
+  });
+  const appSettings = React.useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
   const queryClient = useQueryClient();
   const [selectedItem, setSelectedItem] = React.useState(null);
   const [selectedModifierIds, setSelectedModifierIds] = React.useState([]);

@@ -39,7 +39,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Statistics", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
     { name: "Loyverse", shortName: "Loyverse", url: createPageUrl("Loyverse"), icon: Store },
     { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
-    { name: "Finance", shortName: "Finance", url: createPageUrl("CompanyAccount"), icon: Wallet },
+    { name: "Finance", shortName: "Finance", url: createPageUrl("Finance"), icon: Wallet },
     { name: "Shopping List", shortName: "Shopping", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
     { name: "Employees", shortName: "Employees", url: createPageUrl("EmployeeCalendar"), icon: Users },
     { name: "Customer Page", shortName: "Customers", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
@@ -93,7 +93,7 @@ export default function Layout({ children, currentPageName }) {
 
       <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-[#1a1a1a]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-11 items-center justify-between gap-3" lang="en">
+          <div className="flex h-10 items-center justify-between gap-2.5" lang="en">
             <Link to={createPageUrl("Dashboard")} className="shrink-0">
               <img
                 src={losTiosLogo}
@@ -102,13 +102,13 @@ export default function Layout({ children, currentPageName }) {
               />
             </Link>
 
-            <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex">
+            <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.url}
                   title={item.name}
-                  className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-all 2xl:px-2.5 ${
+                  className={`flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium transition-all 2xl:px-2 ${
                     item.highlight
                       ? "bg-yellow-400 text-black hover:bg-yellow-300"
                       : location.pathname === item.url
@@ -126,7 +126,7 @@ export default function Layout({ children, currentPageName }) {
             <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={handleLogout}
-                className="hidden items-center gap-1.5 rounded bg-yellow-400/10 px-2 py-1.5 text-[11px] font-medium text-yellow-400 transition-all hover:bg-yellow-400/20 xl:flex 2xl:px-2.5"
+                className="hidden items-center gap-1 rounded bg-yellow-400/10 px-1.5 py-1 text-[10px] font-medium text-yellow-400 transition-all hover:bg-yellow-400/20 xl:flex 2xl:px-2"
               >
                 <LogOut className="h-3 w-3" />
                 <span className="2xl:hidden">Logout</span>

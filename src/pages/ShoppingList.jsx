@@ -78,12 +78,12 @@ export default function ShoppingList() {
   });
 
   const categories = [
-    { id: "all", name: "Todos / All", color: "bg-gray-100 text-gray-800", icon: "📋" },
-    { id: "ingredients", name: "Ingredientes / Ingredients", color: "bg-yellow-400/20 text-yellow-400", icon: "🥗" },
-    { id: "supplies", name: "Suministros / Supplies", color: "bg-yellow-400/20 text-yellow-400", icon: "📦" },
-    { id: "equipment", name: "Equipo / Equipment", color: "bg-yellow-400/20 text-yellow-400", icon: "🔧" },
-    { id: "cleaning", name: "Limpieza / Cleaning", color: "bg-yellow-400/20 text-yellow-400", icon: "🧹" },
-    { id: "other", name: "Otros / Other", color: "bg-yellow-400/10 text-yellow-400/70", icon: "📌" },
+    { id: "all", name: "All", color: "bg-gray-100 text-gray-800", icon: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹" },
+    { id: "ingredients", name: "Ingredients", color: "bg-yellow-400/20 text-yellow-400", icon: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â" },
+    { id: "supplies", name: "Suministros / Supplies", color: "bg-yellow-400/20 text-yellow-400", icon: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¦" },
+    { id: "equipment", name: "Equipment", color: "bg-yellow-400/20 text-yellow-400", icon: "🔧" },
+    { id: "cleaning", name: "Cleaning", color: "bg-yellow-400/20 text-yellow-400", icon: "🧹" },
+    { id: "other", name: "Other", color: "bg-yellow-400/10 text-yellow-400/70", icon: "📌" },
   ];
 
   const priorityColors = {
@@ -98,9 +98,9 @@ export default function ShoppingList() {
     { value: "g", label: "Gramos / g" },
     { value: "l", label: "Litros / L" },
     { value: "ml", label: "Mililitros / ml" },
-    { value: "units", label: "Unidades / Units" },
-    { value: "pieces", label: "Piezas / Pieces" },
-    { value: "other", label: "Otro / Other" },
+    { value: "units", label: "Units" },
+    { value: "pieces", label: "Pieces" },
+    { value: "other", label: "Other" },
   ];
 
   const filteredItems = shoppingItems.filter(item => {
@@ -129,7 +129,7 @@ export default function ShoppingList() {
   };
 
   const handleDelete = (id) => {
-    if (confirm('¿Estás seguro de eliminar este producto? / Are you sure you want to delete this item?')) {
+    if (confirm('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿EstÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡s seguro de eliminar este producto? / Are you sure you want to delete this item?')) {
       deleteItem.mutate(id);
     }
   };
@@ -143,7 +143,7 @@ export default function ShoppingList() {
 
   const confirmPurchase = async () => {
     if (!purchasePaymentSource) {
-      alert('Selecciona un método de pago / Select a payment method');
+      alert('Selecciona un mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©todo de pago / Select a payment method');
       return;
     }
 
@@ -198,12 +198,12 @@ export default function ShoppingList() {
       setPurchasingItem(null);
     } catch (error) {
       console.error("Error:", error);
-      alert('Error al procesar / Error processing');
+      alert('Error processing');
     }
   };
 
   const convertToExpense = async (item) => {
-    if (confirm('¿Convertir este producto a gasto? / Convert this item to expense?')) {
+    if (confirm('Convert this item to expense?')) {
       // Map shopping list category to expense category
       const categoryMap = {
         'ingredients': 'ingredients',
@@ -241,10 +241,10 @@ export default function ShoppingList() {
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
         queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
 
-        alert('✓ Producto convertido a gasto exitosamente / Item converted to expense successfully');
+        alert('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Producto convertido a gasto exitosamente / Item converted to expense successfully');
       } catch (error) {
         console.error("Error converting to expense:", error);
-        alert('Error al convertir a gasto / Error converting to expense');
+        alert('Error converting to expense');
       }
     }
   };
@@ -284,8 +284,8 @@ export default function ShoppingList() {
             <div className="flex items-center gap-3">
               <ShoppingCart className="w-6 h-6 text-yellow-400" />
               <div>
-                <h1 className="text-xl font-bold text-yellow-400">Lista de Compras</h1>
-                <p className="text-xs text-gray-500">Gestión de compras</p>
+                <h1 className="text-xl font-bold text-yellow-400">Shopping List</h1>
+                <p className="text-xs text-gray-500">GestiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de compras</p>
               </div>
             </div>
             <Button
@@ -293,7 +293,7 @@ export default function ShoppingList() {
               className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
             >
               <Plus className="w-4 h-4" />
-              Agregar Producto / Add Item
+              Add Item
             </Button>
           </div>
         </div>
@@ -306,7 +306,7 @@ export default function ShoppingList() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
-                Productos Pendientes / Pending Items
+                Pending Items
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -319,7 +319,7 @@ export default function ShoppingList() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
-                Productos Urgentes / Urgent Items
+                Urgent Items
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -365,9 +365,9 @@ export default function ShoppingList() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos / All</SelectItem>
-              <SelectItem value="pending">Pendientes / Pending</SelectItem>
-              <SelectItem value="purchased">Comprados / Purchased</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="purchased">Purchased</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -381,14 +381,14 @@ export default function ShoppingList() {
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
                 <CardTitle className="text-2xl">
-                  {editingItem ? 'Editar Producto / Edit Item' : 'Agregar Producto / Add Item'}
+                  {editingItem ? 'Edit Item' : 'Add Item'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="item_name">Nombre del Producto / Item Name *</Label>
+                      <Label htmlFor="item_name">Item Name *</Label>
                       <Input
                         id="item_name"
                         required
@@ -399,7 +399,7 @@ export default function ShoppingList() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="category">Categoría / Category *</Label>
+                      <Label htmlFor="category">CategorÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a / Category *</Label>
                       <Select
                         value={formData.category}
                         onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -418,7 +418,7 @@ export default function ShoppingList() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="quantity">Cantidad / Quantity *</Label>
+                      <Label htmlFor="quantity">Quantity *</Label>
                       <Input
                         id="quantity"
                         type="number"
@@ -431,7 +431,7 @@ export default function ShoppingList() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="unit">Unidad / Unit *</Label>
+                      <Label htmlFor="unit">Unit *</Label>
                       <Select
                         value={formData.unit}
                         onValueChange={(value) => setFormData({ ...formData, unit: value })}
@@ -450,7 +450,7 @@ export default function ShoppingList() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="priority">Prioridad / Priority</Label>
+                      <Label htmlFor="priority">Priority</Label>
                       <Select
                         value={formData.priority}
                         onValueChange={(value) => setFormData({ ...formData, priority: value })}
@@ -459,16 +459,16 @@ export default function ShoppingList() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">Baja / Low</SelectItem>
-                          <SelectItem value="medium">Media / Medium</SelectItem>
-                          <SelectItem value="high">Alta / High</SelectItem>
-                          <SelectItem value="urgent">Urgente / Urgent</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="estimated_cost">Costo Estimado / Estimated Cost (MXN)</Label>
+                      <Label htmlFor="estimated_cost">Estimated Cost (MXN)</Label>
                       <Input
                         id="estimated_cost"
                         type="number"
@@ -482,7 +482,7 @@ export default function ShoppingList() {
 
                     {editingItem && editingItem.status === 'purchased' && (
                       <div className="space-y-2">
-                        <Label htmlFor="actual_cost">Costo Real / Actual Cost (MXN)</Label>
+                        <Label htmlFor="actual_cost">Actual Cost (MXN)</Label>
                         <Input
                           id="actual_cost"
                           type="number"
@@ -496,17 +496,17 @@ export default function ShoppingList() {
                     )}
 
                     <div className="space-y-2">
-                      <Label htmlFor="supplier">Proveedor / Supplier</Label>
+                      <Label htmlFor="supplier">Supplier</Label>
                       <Input
                         id="supplier"
                         value={formData.supplier}
                         onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                        placeholder="Nombre del proveedor..."
+                        placeholder="Supplier name..."
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="status">Estado / Status</Label>
+                      <Label htmlFor="status">Status</Label>
                       <Select
                         value={formData.status}
                         onValueChange={(value) => setFormData({ ...formData, status: value })}
@@ -515,19 +515,19 @@ export default function ShoppingList() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pendiente / Pending</SelectItem>
-                          <SelectItem value="purchased">Comprado / Purchased</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="purchased">Purchased</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="notes">Notas / Notes</Label>
+                      <Label htmlFor="notes">Notes</Label>
                       <Textarea
                         id="notes"
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Información adicional..."
+                        placeholder="InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n adicional..."
                         rows={3}
                       />
                     </div>
@@ -535,14 +535,14 @@ export default function ShoppingList() {
 
                   <div className="flex gap-3 justify-end">
                     <Button type="button" variant="outline" onClick={resetForm}>
-                      Cancelar / Cancel
+                      Cancel / Cancel
                     </Button>
                     <Button 
                       type="submit" 
                       disabled={createItem.isPending || updateItem.isPending}
                       className="bg-yellow-400 hover:bg-yellow-300 text-black"
                       >
-                      {editingItem ? 'Actualizar / Update' : 'Guardar / Save'}
+                      {editingItem ? 'Update' : 'Save'}
                     </Button>
                   </div>
                 </form>
@@ -556,7 +556,7 @@ export default function ShoppingList() {
           {isLoading ? (
             <div className="text-center py-20">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Cargando lista... / Loading list...</p>
+              <p className="mt-4 text-gray-600">Loading list...</p>
             </div>
           ) : filteredItems.length > 0 ? (
             filteredItems.map((item) => {
@@ -584,17 +584,17 @@ export default function ShoppingList() {
                                   {category.name.split('/')[0].trim()}
                                 </Badge>
                                 <Badge className={priorityColors[item.priority]}>
-                                  {item.priority === 'urgent' && '⚠️ '}
+                                  {item.priority === 'urgent' && 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â '}
                                   {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
                                 </Badge>
                                 {item.status === 'purchased' && (
                                   <Badge className="bg-yellow-400/20 text-yellow-400">
-                                    ✓ Comprado / Purchased
+                                    ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Purchased
                                   </Badge>
                                 )}
                                 {item.converted_to_expense && (
                                   <Badge className="bg-yellow-400/10 text-yellow-400/80">
-                                     💰 Convertido a Gasto / Converted to Expense
+                                     ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â° Convertido a Gasto / Converted to Expense
                                   </Badge>
                                 )}
                               </div>
@@ -603,30 +603,30 @@ export default function ShoppingList() {
                           
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mt-3">
                             <div>
-                              <p className="text-gray-600">Cantidad:</p>
+                              <p className="text-gray-600">Quantity:</p>
                               <p className="font-semibold">{item.quantity} {item.unit}</p>
                             </div>
                             {item.estimated_cost > 0 && (
                               <div>
-                                <p className="text-gray-600">Costo Estimado:</p>
+                                <p className="text-gray-600">Costo Estimated:</p>
                                 <p className="font-semibold">${item.estimated_cost?.toFixed(2)} MXN</p>
                               </div>
                             )}
                             {item.actual_cost > 0 && (
                               <div>
-                                <p className="text-gray-600">Costo Real:</p>
+                                <p className="text-gray-600">Actual Cost:</p>
                                 <p className="font-semibold text-yellow-400">${item.actual_cost?.toFixed(2)} MXN</p>
                               </div>
                             )}
                             {item.supplier && (
                               <div>
-                                <p className="text-gray-600">Proveedor:</p>
+                                <p className="text-gray-600">Supplier:</p>
                                 <p className="font-semibold">{item.supplier}</p>
                               </div>
                             )}
                             {item.purchased_date && (
                               <div>
-                                <p className="text-gray-600">Fecha Compra:</p>
+                                <p className="text-gray-600">Purchase Date:</p>
                                 <p className="font-semibold">{format(new Date(item.purchased_date), 'dd MMM yyyy', { locale: es })}</p>
                               </div>
                             )}
@@ -648,7 +648,7 @@ export default function ShoppingList() {
                                 className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2"
                               >
                                 <Check className="w-4 h-4" />
-                                Marcar Comprado / Mark Purchased
+                                Mark Purchased
                               </Button>
                             ) : (
                               <>
@@ -657,7 +657,7 @@ export default function ShoppingList() {
                                   variant="outline"
                                   onClick={() => markAsPending(item)}
                                 >
-                                  Marcar Pendiente / Mark Pending
+                                  Mark Pending
                                 </Button>
                                 {!item.converted_to_expense && (
                                   <Button
@@ -666,7 +666,7 @@ export default function ShoppingList() {
                                     className="bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 border border-yellow-500/30 gap-2"
                                   >
                                     <ArrowRight className="w-4 h-4" />
-                                    Convertir a Gasto / Convert to Expense
+                                    Convert to Expense
                                   </Button>
                                 )}
                               </>
@@ -701,7 +701,7 @@ export default function ShoppingList() {
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardContent className="text-center py-20">
                 <ShoppingCart className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-500 text-lg">No hay productos en la lista</p>
+                <p className="text-gray-500 text-lg">No items in the shopping list</p>
                 <p className="text-gray-400 text-sm">No items in the shopping list</p>
               </CardContent>
             </Card>
@@ -713,7 +713,7 @@ export default function ShoppingList() {
       <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Marcar como Comprado / Mark as Purchased</DialogTitle>
+            <DialogTitle>Mark as Purchased</DialogTitle>
           </DialogHeader>
           
           {purchasingItem && (
@@ -721,13 +721,13 @@ export default function ShoppingList() {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h3 className="font-bold text-lg">{purchasingItem.item_name}</h3>
                 <p className="text-sm text-gray-600">
-                  {purchasingItem.quantity} {purchasingItem.unit} • 
-                  Estimado: ${(purchasingItem.estimated_cost || 0).toFixed(2)} MXN
+                  {purchasingItem.quantity} {purchasingItem.unit} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ 
+                  Estimated: ${(purchasingItem.estimated_cost || 0).toFixed(2)} MXN
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label>Costo Real Pagado / Actual Cost Paid (MXN)</Label>
+                <Label>Actual Cost Paid (MXN)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -739,7 +739,7 @@ export default function ShoppingList() {
               </div>
 
               <div className="space-y-3">
-                <Label>¿Cómo se pagó? / How was it paid? *</Label>
+                <Label>ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿CÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³mo se pagÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³? / How was it paid? *</Label>
                 <div className="grid gap-2">
                   <button
                     type="button"
@@ -750,9 +750,9 @@ export default function ShoppingList() {
                         : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
-                    <span className="text-2xl">💵</span>
+                    <span className="text-2xl">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Âµ</span>
                     <div>
-                      <p className="font-semibold">Efectivo Empresa</p>
+                      <p className="font-semibold">Company Cash</p>
                       <p className="text-xs text-gray-600">Company Cash</p>
                     </div>
                   </button>
@@ -766,9 +766,9 @@ export default function ShoppingList() {
                         : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
-                    <span className="text-2xl">🏦</span>
+                    <span className="text-2xl">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦</span>
                     <div>
-                      <p className="font-semibold">Cuenta Empresa</p>
+                      <p className="font-semibold">Company Account</p>
                       <p className="text-xs text-gray-600">Company Account</p>
                     </div>
                   </button>
@@ -782,9 +782,9 @@ export default function ShoppingList() {
                         : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                     }`}
                   >
-                    <span className="text-2xl">👤</span>
+                    <span className="text-2xl">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤</span>
                     <div>
-                      <p className="font-semibold">Persona Individual</p>
+                      <p className="font-semibold">Individual Person</p>
                       <p className="text-xs text-gray-600">Individual Person</p>
                     </div>
                   </button>
@@ -797,7 +797,7 @@ export default function ShoppingList() {
                   onClick={() => setPurchaseDialogOpen(false)}
                   className="flex-1"
                 >
-                  Cancelar
+                  Cancel
                 </Button>
                 <Button
                   onClick={confirmPurchase}
@@ -805,7 +805,7 @@ export default function ShoppingList() {
                   className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black"
                 >
                   <Check className="w-4 h-4 mr-2" />
-                  Confirmar
+                  Confirm
                 </Button>
               </div>
             </div>

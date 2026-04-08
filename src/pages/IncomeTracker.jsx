@@ -76,8 +76,8 @@ export default function IncomeTracker() {
           <div className="flex items-center gap-3">
             <TrendingUp className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-xl font-bold text-yellow-400">Ingresos Diarios</h1>
-              <p className="text-xs text-gray-500">Resumen de ingresos por fuente</p>
+              <h1 className="text-xl font-bold text-yellow-400">Daily Income</h1>
+              <p className="text-xs text-gray-500">Income summary by source</p>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function IncomeTracker() {
         {/* Date Picker */}
         <div className="flex gap-4 items-end">
           <div className="space-y-2">
-            <Label htmlFor="date">Seleccionar Fecha</Label>
+            <Label htmlFor="date">Select Date</Label>
             <Input
               id="date"
               type="date"
@@ -106,11 +106,11 @@ export default function IncomeTracker() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400 mb-1">Total Ingresos del Día</p>
+                <p className="text-sm text-gray-400 mb-1">Total Daily Income</p>
                 <div className="text-5xl font-bold text-yellow-400">${totalIncome.toFixed(2)}</div>
               </div>
               <div className="text-right text-sm text-gray-500">
-                {loyverseIncome.length} órdenes
+                {loyverseIncome.length} orders
               </div>
             </div>
           </CardContent>
@@ -119,10 +119,10 @@ export default function IncomeTracker() {
         {/* Income Sources Tabs */}
         <Tabs defaultValue="all" className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 bg-[#242424] border border-yellow-500/20">
-            <TabsTrigger value="all" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Todo</TabsTrigger>
+            <TabsTrigger value="all" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">All</TabsTrigger>
             <TabsTrigger value="clip" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Clip</TabsTrigger>
             <TabsTrigger value="loyverse" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Loyverse</TabsTrigger>
-            <TabsTrigger value="cash" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Efectivo</TabsTrigger>
+            <TabsTrigger value="cash" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Cash</TabsTrigger>
             <TabsTrigger value="revolut" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Revolut</TabsTrigger>
           </TabsList>
 
@@ -133,7 +133,7 @@ export default function IncomeTracker() {
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                    💳 Clip (Tarjetas)
+                    ðŸ’³ Clip (Tarjetas)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -141,7 +141,7 @@ export default function IncomeTracker() {
                     ${loyverseCard.toFixed(2)}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {loyverseIncome.filter(o => o.payment_method === 'card').length} órdenes
+                    {loyverseIncome.filter(o => o.payment_method === 'card').length} orders
                   </p>
                 </CardContent>
               </Card>
@@ -150,7 +150,7 @@ export default function IncomeTracker() {
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                    💵 Loyverse (Efectivo)
+                    ðŸ’µ Loyverse (Efectivo)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -158,7 +158,7 @@ export default function IncomeTracker() {
                     ${loyverseCash.toFixed(2)}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {loyverseIncome.filter(o => o.payment_method === 'cash').length} órdenes
+                    {loyverseIncome.filter(o => o.payment_method === 'cash').length} orders
                   </p>
                 </CardContent>
               </Card>
@@ -167,14 +167,14 @@ export default function IncomeTracker() {
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                    🏷️ Efectivo Manual
+                    ðŸ·ï¸ Manual Cash
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-yellow-400">
                     ${manualCash.toFixed(2)}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Registros manuales</p>
+                  <p className="text-xs text-gray-500 mt-1">Manual records</p>
                 </CardContent>
               </Card>
 
@@ -182,14 +182,14 @@ export default function IncomeTracker() {
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                    🏦 Revolut/Banco
+                    ðŸ¦ Revolut/Banco
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-yellow-400">
                     ${revolut.toFixed(2)}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Transferencias</p>
+                  <p className="text-xs text-gray-500 mt-1">Transfers</p>
                 </CardContent>
               </Card>
             </div>
@@ -199,14 +199,14 @@ export default function IncomeTracker() {
           <TabsContent value="clip" className="space-y-4">
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
-                <CardTitle>Clip - Pagos con Tarjeta</CardTitle>
+                <CardTitle>Clip - Card Payments</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-yellow-400 mb-4">
                   ${loyverseCard.toFixed(2)}
                 </div>
                 <div className="text-sm text-gray-400">
-                  {loyverseIncome.filter(o => o.payment_method === 'card').length} órdenes completadas
+                  {loyverseIncome.filter(o => o.payment_method === 'card').length} orders completadas
                 </div>
               </CardContent>
             </Card>
@@ -217,28 +217,28 @@ export default function IncomeTracker() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader>
-                  <CardTitle>Loyverse - Efectivo</CardTitle>
+                  <CardTitle>Loyverse - Cash</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-yellow-400 mb-2">
                     ${loyverseCash.toFixed(2)}
                   </div>
                   <p className="text-sm text-gray-400">
-                    {loyverseIncome.filter(o => o.payment_method === 'cash').length} órdenes
+                    {loyverseIncome.filter(o => o.payment_method === 'cash').length} orders
                   </p>
                 </CardContent>
               </Card>
 
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardHeader>
-                  <CardTitle>Loyverse - Tarjeta</CardTitle>
+                  <CardTitle>Loyverse - Card</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-yellow-400 mb-2">
                     ${loyverseCard.toFixed(2)}
                   </div>
                   <p className="text-sm text-gray-400">
-                    {loyverseIncome.filter(o => o.payment_method === 'card').length} órdenes
+                    {loyverseIncome.filter(o => o.payment_method === 'card').length} orders
                   </p>
                 </CardContent>
               </Card>
@@ -249,7 +249,7 @@ export default function IncomeTracker() {
           <TabsContent value="cash" className="space-y-4">
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
-                <CardTitle>Efectivo Manual Registrado</CardTitle>
+                <CardTitle>Manual Cash Registrado</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-yellow-400 mb-4">
@@ -283,7 +283,7 @@ export default function IncomeTracker() {
           <TabsContent value="revolut" className="space-y-4">
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
-                <CardTitle>Revolut / Transferencias Bancarias</CardTitle>
+                <CardTitle>Revolut / Transfers Bancarias</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-yellow-400 mb-4">
@@ -307,7 +307,7 @@ export default function IncomeTracker() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">No hay transferencias para esta fecha</p>
+                  <p className="text-sm text-gray-500">No hay Transfers para esta fecha</p>
                 )}
               </CardContent>
             </Card>

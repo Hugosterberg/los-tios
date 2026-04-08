@@ -184,8 +184,8 @@ export default function Statistics() {
           <div className="flex items-center gap-3">
             <BarChart3 className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-xl font-bold text-yellow-400">Estadísticas</h1>
-              <p className="text-xs text-gray-500">Ventas y Rentabilidad</p>
+              <h1 className="text-xl font-bold text-yellow-400">Statistics</h1>
+              <p className="text-xs text-gray-500">Sales and profitability</p>
             </div>
           </div>
         </div>
@@ -194,10 +194,10 @@ export default function Statistics() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
         {/* Date Filters */}
         <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4 no-print">
-          <h3 className="text-sm font-bold text-yellow-400 mb-3">Seleccionar Período</h3>
+          <h3 className="text-sm font-bold text-yellow-400 mb-3">Select Period</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-400">Ver por Mes:</label>
+                <label className="text-xs font-medium text-gray-400">View by Month:</label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger className="bg-[#1a1a1a] border-yellow-500/20 text-white">
                     <SelectValue />
@@ -213,7 +213,7 @@ export default function Statistics() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ver Día Específico / View Specific Day:</label>
+                <label className="text-sm font-medium">View Specific Day:</label>
                 <input
                   type="date"
                   value={selectedDay}
@@ -228,11 +228,11 @@ export default function Statistics() {
         <div className="flex gap-4 no-print">
           <Button onClick={handlePrintDaily} className="h-8 text-xs bg-yellow-400 hover:bg-yellow-300 text-black gap-2">
             <Printer className="w-4 h-4" />
-            Imprimir Reporte Diario / Print Daily Report
+            Print Daily Report
           </Button>
           <Button onClick={handlePrintMonthly} className="h-8 text-xs bg-[#242424] border border-yellow-500/20 text-gray-300 hover:text-white gap-2">
             <Printer className="w-4 h-4" />
-            Imprimir Reporte Mensual / Print Monthly Report
+            Print Monthly Report
           </Button>
         </div>
 
@@ -245,12 +245,12 @@ export default function Statistics() {
                 <h1 className="text-3xl font-bold mb-2">Los Tios Pizzeria</h1>
                 <h2 className="text-xl text-gray-700">
                   {printMode === 'daily' 
-                    ? `Reporte Diario / Daily Report - ${format(new Date(selectedDay), 'dd MMMM yyyy', { locale: es })}`
-                    : `Reporte Mensual / Monthly Report - ${monthOptions.find(m => m.value === selectedMonth)?.label}`
+                    ? `Daily Report - ${format(new Date(selectedDay), 'dd MMMM yyyy', { locale: es })}`
+                    : `Monthly Report - ${monthOptions.find(m => m.value === selectedMonth)?.label}`
                   }
                 </h2>
                 <p className="text-sm text-gray-500 mt-2">
-                  Generado el / Generated on: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}
+                  Generated on: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}
                 </p>
               </div>
             </div>
@@ -260,14 +260,14 @@ export default function Statistics() {
           {(!printMode || printMode === 'daily') && (
             <div className="mb-8">
               <h2 className="text-xl sm:text-2xl font-bold mb-4">
-                Estadísticas Diarias / Daily Statistics - {format(new Date(selectedDay), 'MMMM d, yyyy', { locale: es })}
+                Daily Statistics - {format(new Date(selectedDay), 'MMMM d, yyyy', { locale: es })}
               </h2>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      Ingresos del Día / Daily Revenue
+                      Daily Revenue
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -279,7 +279,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingDown className="w-4 h-4" />
-                      Gastos del Día / Daily Expenses
+                      Daily Expenses
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -291,7 +291,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
-                      Ganancia del Día / Daily Profit
+                      Daily Profit
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -299,7 +299,7 @@ export default function Statistics() {
                       ${dayStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Margen: {dayStats.profitMargin.toFixed(1)}%
+                      Margin: {dayStats.profitMargin.toFixed(1)}%
                     </p>
                   </CardContent>
                 </Card>
@@ -308,7 +308,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Pedidos / Orders
+                      Orders
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -321,7 +321,7 @@ export default function Statistics() {
               {printMode === 'daily' && dayOrders.length > 0 && (
                 <Card className="mt-6 border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle>Detalle de Pedidos / Orders Detail</CardTitle>
+                    <CardTitle>Order Details</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
@@ -356,15 +356,15 @@ export default function Statistics() {
               {printMode === 'daily' && dayExpenses.length > 0 && (
                 <Card className="mt-6 border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle>Detalle de Gastos / Expenses Detail</CardTitle>
+                    <CardTitle>Expense Details</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-2">Concepto / Item</th>
-                          <th className="text-left py-2">Categoría / Category</th>
-                          <th className="text-right py-2">Monto / Amount</th>
+                          <th className="text-left py-2">Item</th>
+                          <th className="text-left py-2">Category</th>
+                          <th className="text-right py-2">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -389,14 +389,14 @@ export default function Statistics() {
           {(!printMode || printMode === 'monthly') && (
             <div>
               <h2 className="text-xl sm:text-2xl font-bold mb-4">
-                Estadísticas Mensuales / Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
+                Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
               </h2>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      Ingresos Mensuales / Monthly Revenue
+                      Monthly Revenue
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -408,7 +408,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingDown className="w-4 h-4" />
-                      Gastos Mensuales / Monthly Expenses
+                      Monthly Expenses
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -420,7 +420,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
-                      Ganancia Mensual / Monthly Profit
+                      Monthly Profit
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -428,7 +428,7 @@ export default function Statistics() {
                       ${monthStats.totalProfit.toFixed(2)}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Margen: {monthStats.profitMargin.toFixed(1)}%
+                      Margin: {monthStats.profitMargin.toFixed(1)}%
                     </p>
                   </CardContent>
                 </Card>
@@ -437,7 +437,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Total Pedidos / Total Orders
+                      Total Orders
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -449,7 +449,7 @@ export default function Statistics() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
-                      Valor Promedio / Avg Order
+                      Avg Order
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -464,7 +464,7 @@ export default function Statistics() {
                   {/* Revenue vs Expenses vs Profit Chart */}
                   <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
-                      <CardTitle>Ingresos, Gastos y Ganancias Diarias</CardTitle>
+                      <CardTitle>Daily Revenue, Expenses and Profit</CardTitle>
                       <p className="text-sm text-gray-500">Daily Revenue, Expenses & Profit</p>
                     </CardHeader>
                     <CardContent>
@@ -477,9 +477,9 @@ export default function Statistics() {
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                             formatter={(value) => `$${value.toFixed(2)}`}
                           />
-                          <Line type="monotone" dataKey="revenue" stroke="#facc15" strokeWidth={3} name="Ingresos" dot={{ fill: '#facc15', r: 4 }} />
-                          <Line type="monotone" dataKey="expenses" stroke="#a16207" strokeWidth={3} name="Gastos" dot={{ fill: '#a16207', r: 4 }} />
-                          <Line type="monotone" dataKey="profit" stroke="#fef08a" strokeWidth={3} name="Ganancias" dot={{ fill: '#fef08a', r: 4 }} />
+                          <Line type="monotone" dataKey="revenue" stroke="#facc15" strokeWidth={3} name="Revenue" dot={{ fill: '#facc15', r: 4 }} />
+                          <Line type="monotone" dataKey="expenses" stroke="#a16207" strokeWidth={3} name="Expenses" dot={{ fill: '#a16207', r: 4 }} />
+                          <Line type="monotone" dataKey="profit" stroke="#fef08a" strokeWidth={3} name="Profit" dot={{ fill: '#fef08a', r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -521,15 +521,15 @@ export default function Statistics() {
                   {/* Revenue Breakdown by Type */}
                   <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
-                      <CardTitle>Ingresos por Tipo de Pedido / Revenue by Order Type</CardTitle>
+                      <CardTitle>Revenue by Order Type</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-2">Tipo / Type</th>
-                            <th className="text-center py-2">Pedidos / Orders</th>
-                            <th className="text-right py-2">Ingresos / Revenue</th>
+                            <th className="text-left py-2">Type</th>
+                            <th className="text-center py-2">Orders</th>
+                            <th className="text-right py-2">Revenue</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -553,14 +553,14 @@ export default function Statistics() {
                   {/* Expenses Summary by Category */}
                   <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                     <CardHeader>
-                      <CardTitle>Resumen de Gastos por Categoría / Expenses Summary by Category</CardTitle>
+                      <CardTitle>Expense Summary by Category</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-2">Categoría / Category</th>
-                            <th className="text-center py-2">Cantidad / Count</th>
+                            <th className="text-left py-2">Category</th>
+                            <th className="text-center py-2">Count</th>
                             <th className="text-right py-2">Total</th>
                           </tr>
                         </thead>
@@ -592,7 +592,7 @@ export default function Statistics() {
               {/* Top Items */}
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
                 <CardHeader>
-                  <CardTitle>Top 10 Productos Más Vendidos / Top Selling Items</CardTitle>
+                  <CardTitle>Top 10 Best-Selling Items</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {topItems.length > 0 ? (
@@ -605,7 +605,7 @@ export default function Statistics() {
                             </div>
                             <div>
                               <p className="font-semibold">{item.name}</p>
-                              <p className="text-sm text-gray-600">{item.count} vendidos</p>
+                              <p className="text-sm text-gray-600">{item.count} sold</p>
                             </div>
                           </div>
                           <div className="text-right">
@@ -616,7 +616,7 @@ export default function Statistics() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-center py-8">No hay datos de ventas para este período</p>
+                    <p className="text-gray-500 text-center py-8">No hay datos de ventas para este perÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­odo</p>
                   )}
                 </CardContent>
               </Card>
@@ -625,7 +625,7 @@ export default function Statistics() {
               {!printMode && (
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
                   <CardHeader>
-                    <CardTitle>Ingresos por Tipo de Pedido / Revenue by Order Type</CardTitle>
+                    <CardTitle>Revenue by Order Type</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -633,7 +633,7 @@ export default function Statistics() {
                         <div key={type.name} className="p-4 bg-[#1a1a1a] rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-semibold">{type.name}</span>
-                            <span className="text-sm text-gray-600">{type.value} pedidos</span>
+                            <span className="text-sm text-gray-600">{type.value} orders</span>
                           </div>
                           <div className="text-2xl font-bold" style={{ color: type.color }}>
                             ${type.revenue.toFixed(2)}

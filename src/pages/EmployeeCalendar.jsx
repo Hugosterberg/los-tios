@@ -87,8 +87,8 @@ export default function EmployeeCalendar() {
   });
 
   const roleLabels = {
-    cook: "👨‍🍳 Cocinero", waiter: "🍽️ Mesero", cashier: "💰 Cajero",
-    delivery: "🚚 Repartidor", manager: "👔 Gerente", cleaner: "🧹 Limpieza", other: "👤 Otro"
+    cook: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â³ Cocinero", waiter: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Mesero", cashier: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â° Cajero",
+    delivery: "Delivery", manager: "Manager", cleaner: "Cleaner", other: "Other"
   };
 
   const roleColors = {
@@ -161,7 +161,7 @@ export default function EmployeeCalendar() {
 
   const completeShiftAndPay = async (shift) => {
     const paymentMethod = prompt(
-      '¿Cómo se pagará? / How will it be paid?\n\n1 = Efectivo Empresa / Company Cash\n2 = Cuenta Empresa / Company Account\n\nIngrese 1 o 2:',
+      'How will it be paid?\n\n1 = Company Cash\n2 = Company Account\n\nEnter 1 or 2:',
       '1'
     );
     if (!paymentMethod) return;
@@ -184,7 +184,7 @@ export default function EmployeeCalendar() {
       data: { ...shift, status: 'paid', expense_id: createdExpense.id }
     });
 
-    alert('✓ Turno completado y salario agregado a gastos / Shift completed and salary added to expenses');
+    alert('Shift completed and salary added to expenses');
   };
 
   const handleEmployeeSubmit = (e) => {
@@ -223,8 +223,8 @@ export default function EmployeeCalendar() {
           <div className="flex items-center gap-3">
             <Calendar className="w-6 h-6 text-yellow-400" />
             <div>
-              <h1 className="text-xl font-bold text-yellow-400">Empleados</h1>
-              <p className="text-xs text-gray-500">Calendario y Turnos</p>
+              <h1 className="text-xl font-bold text-yellow-400">Employees</h1>
+              <p className="text-xs text-gray-500">Calendar and Shifts</p>
             </div>
           </div>
         </div>
@@ -233,8 +233,8 @@ export default function EmployeeCalendar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
         <Tabs defaultValue="calendar" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2 bg-[#242424] border border-yellow-500/20">
-            <TabsTrigger value="calendar" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">📅 Calendario</TabsTrigger>
-            <TabsTrigger value="employees" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">👥 Empleados</TabsTrigger>
+            <TabsTrigger value="calendar" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Calendar</TabsTrigger>
+            <TabsTrigger value="employees" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Employees</TabsTrigger>
           </TabsList>
 
           {/* Calendar Tab */}
@@ -244,13 +244,13 @@ export default function EmployeeCalendar() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <Button variant="outline" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}>
-                    <ChevronLeft className="w-4 h-4 mr-2" /> Semana Anterior
+                    <ChevronLeft className="w-4 h-4 mr-2" /> Previous Week
                   </Button>
                   <h2 className="text-xl font-bold">
                     {format(currentWeekStart, 'dd MMM', { locale: es })} - {format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy', { locale: es })}
                   </h2>
                   <Button variant="outline" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}>
-                    Semana Siguiente <ChevronRight className="w-4 h-4 ml-2" />
+                    Next Week <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardContent>
@@ -287,7 +287,7 @@ export default function EmployeeCalendar() {
                               <div className="font-semibold truncate">{shift.employee_name}</div>
                               <div className="text-gray-600">{shift.start_time} - {shift.end_time}</div>
                               <div className="font-bold text-yellow-400">${shift.amount?.toFixed(2)}</div>
-                              {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black text-xs mt-1">Pagado</Badge>}
+                              {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black text-xs mt-1">Paid</Badge>}
                             </div>
                           );
                         })}
@@ -309,7 +309,7 @@ export default function EmployeeCalendar() {
             {/* Today's Shifts Summary */}
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
-                <CardTitle>Turnos de Hoy / Today's Shifts</CardTitle>
+                <CardTitle>Today's Shifts</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -329,15 +329,15 @@ export default function EmployeeCalendar() {
                           <span className="font-bold text-lg">${shift.amount?.toFixed(2)}</span>
                           {shift.status === 'scheduled' && (
                             <Button size="sm" onClick={() => completeShiftAndPay(shift)} className="bg-yellow-400 hover:bg-yellow-300 text-black">
-                              <Check className="w-4 h-4 mr-2" /> Completar y Pagar
+                              <Check className="w-4 h-4 mr-2" /> Complete and Pay
                             </Button>
                           )}
-                          {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black">Pagado</Badge>}
+                          {shift.status === 'paid' && <Badge className="bg-yellow-400 text-black">Paid</Badge>}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-center text-gray-500 py-8">No hay turnos programados para hoy</p>
+                    <p className="text-center text-gray-500 py-8">No shifts scheduled for today</p>
                   )}
                 </div>
               </CardContent>
@@ -348,7 +348,7 @@ export default function EmployeeCalendar() {
           <TabsContent value="employees" className="space-y-6">
             <div className="flex justify-end">
               <Button onClick={() => setShowEmployeeForm(!showEmployeeForm)} className="bg-yellow-400 hover:bg-yellow-300 text-black gap-2">
-                <Plus className="w-4 h-4" /> Nuevo Empleado / New Employee
+                <Plus className="w-4 h-4" /> New Employee / New Employee
               </Button>
             </div>
 
@@ -356,17 +356,17 @@ export default function EmployeeCalendar() {
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader>
-                    <CardTitle>{editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}</CardTitle>
+                    <CardTitle>{editingEmployee ? 'Edit Employee' : 'New Employee'}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleEmployeeSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label>Nombre / Name *</Label>
+                          <Label>Name *</Label>
                           <Input required value={employeeForm.name} onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })} />
                         </div>
                         <div className="space-y-2">
-                          <Label>Rol / Role *</Label>
+                          <Label>Role *</Label>
                           <Select value={employeeForm.role} onValueChange={(v) => setEmployeeForm({ ...employeeForm, role: v })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -377,7 +377,7 @@ export default function EmployeeCalendar() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Teléfono / Phone</Label>
+                          <Label>TelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono / Phone</Label>
                           <Input value={employeeForm.phone} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} />
                         </div>
                         <div className="space-y-2">
@@ -385,38 +385,38 @@ export default function EmployeeCalendar() {
                           <Input type="email" value={employeeForm.email} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} />
                         </div>
                         <div className="space-y-2">
-                          <Label>Tipo de Pago / Payment Type</Label>
+                          <Label>Payment Type</Label>
                           <Select value={employeeForm.payment_type} onValueChange={(v) => setEmployeeForm({ ...employeeForm, payment_type: v })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="daily">Por Día / Daily</SelectItem>
-                              <SelectItem value="hourly">Por Hora / Hourly</SelectItem>
+                              <SelectItem value="daily">Por DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a / Daily</SelectItem>
+                              <SelectItem value="hourly">Hourly</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         {employeeForm.payment_type === 'daily' ? (
                           <div className="space-y-2">
-                            <Label>Pago por Día / Daily Rate (MXN)</Label>
+                            <Label>Pago por DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a / Daily Rate (MXN)</Label>
                             <Input type="number" step="0.01" value={employeeForm.daily_rate} onChange={(e) => setEmployeeForm({ ...employeeForm, daily_rate: parseFloat(e.target.value) || 0 })} />
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            <Label>Pago por Hora / Hourly Rate (MXN)</Label>
+                            <Label>Hourly Rate (MXN)</Label>
                             <Input type="number" step="0.01" value={employeeForm.hourly_rate} onChange={(e) => setEmployeeForm({ ...employeeForm, hourly_rate: parseFloat(e.target.value) || 0 })} />
                           </div>
                         )}
                         <div className="space-y-2 md:col-span-2">
-                          <Label>Notas / Notes</Label>
+                          <Label>Notes</Label>
                           <Textarea value={employeeForm.notes} onChange={(e) => setEmployeeForm({ ...employeeForm, notes: e.target.value })} rows={2} />
                         </div>
                         <div className="flex items-center gap-2">
                           <input type="checkbox" id="is_active" checked={employeeForm.is_active} onChange={(e) => setEmployeeForm({ ...employeeForm, is_active: e.target.checked })} />
-                          <Label htmlFor="is_active">Empleado Activo / Active Employee</Label>
+                          <Label htmlFor="is_active">Active Employee</Label>
                         </div>
                       </div>
                       <div className="flex gap-3 justify-end">
-                        <Button type="button" variant="outline" onClick={resetEmployeeForm}>Cancelar</Button>
-                        <Button type="submit" className="bg-yellow-400 hover:bg-yellow-300 text-black">{editingEmployee ? 'Actualizar' : 'Guardar'}</Button>
+                        <Button type="button" variant="outline" onClick={resetEmployeeForm}>Cancel</Button>
+                        <Button type="submit" className="bg-yellow-400 hover:bg-yellow-300 text-black">{editingEmployee ? 'Update' : 'Save'}</Button>
                       </div>
                     </form>
                   </CardContent>
@@ -444,15 +444,15 @@ export default function EmployeeCalendar() {
                           <Button size="icon" variant="outline" className="text-red-600" onClick={() => deleteEmployee.mutate(employee.id)}><Trash2 className="w-4 h-4" /></Button>
                         </div>
                       </div>
-                      {employee.phone && <p className="text-sm text-gray-600 mb-1">📱 {employee.phone}</p>}
-                      {employee.email && <p className="text-sm text-gray-600 mb-3">📧 {employee.email}</p>}
+                      {employee.phone && <p className="text-sm text-gray-600 mb-1">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â± {employee.phone}</p>}
+                      {employee.email && <p className="text-sm text-gray-600 mb-3">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â§ {employee.email}</p>}
                       <div className="pt-4 border-t">
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-yellow-400" />
                             <span className="font-bold text-yellow-400">
                             ${employee.payment_type === 'daily' ? employee.daily_rate?.toFixed(2) : employee.hourly_rate?.toFixed(2)} MXN
                           </span>
-                          <span className="text-sm text-gray-500">/ {employee.payment_type === 'daily' ? 'día' : 'hora'}</span>
+                          <span className="text-sm text-gray-500">/ {employee.payment_type === 'daily' ? 'dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a' : 'hora'}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -468,13 +468,13 @@ export default function EmployeeCalendar() {
       <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingShift ? 'Editar Turno' : 'Nuevo Turno'} - {selectedDate && format(selectedDate, 'dd MMM yyyy', { locale: es })}</DialogTitle>
+            <DialogTitle>{editingShift ? 'Edit Shift' : 'New Shift'} - {selectedDate && format(selectedDate, 'dd MMM yyyy', { locale: es })}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleShiftSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Empleado / Employee *</Label>
+              <Label>Employee *</Label>
               <Select value={shiftForm.employee_id} onValueChange={handleEmployeeSelect}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar empleado..." /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select employee..." /></SelectTrigger>
                 <SelectContent>
                   {activeEmployees.map((e) => (
                     <SelectItem key={e.id} value={e.id}>{e.name} - {roleLabels[e.role]}</SelectItem>
@@ -484,36 +484,36 @@ export default function EmployeeCalendar() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Hora Inicio / Start</Label>
+                <Label>Start Time</Label>
                 <Input type="time" value={shiftForm.start_time} onChange={(e) => handleTimeChange('start_time', e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Hora Fin / End</Label>
+                <Label>End Time</Label>
                 <Input type="time" value={shiftForm.end_time} onChange={(e) => handleTimeChange('end_time', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Horas / Hours</Label>
+                <Label>Hours</Label>
                 <Input type="number" step="0.5" value={shiftForm.hours_worked} onChange={(e) => setShiftForm({ ...shiftForm, hours_worked: parseFloat(e.target.value) })} />
               </div>
               <div className="space-y-2">
-                <Label>Monto / Amount (MXN)</Label>
+                <Label>Amount (MXN)</Label>
                 <Input type="number" step="0.01" value={shiftForm.amount} onChange={(e) => setShiftForm({ ...shiftForm, amount: parseFloat(e.target.value) })} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Notas / Notes</Label>
+              <Label>Notes</Label>
               <Textarea value={shiftForm.notes} onChange={(e) => setShiftForm({ ...shiftForm, notes: e.target.value })} rows={2} />
             </div>
             <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={resetShiftForm} className="flex-1">Cancelar</Button>
+              <Button type="button" variant="outline" onClick={resetShiftForm} className="flex-1">Cancel</Button>
               {editingShift && editingShift.status !== 'paid' && (
                 <Button type="button" variant="outline" className="text-red-600" onClick={() => { deleteShift.mutate(editingShift.id); resetShiftForm(); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
-              <Button type="submit" className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black">{editingShift ? 'Actualizar' : 'Guardar'}</Button>
+              <Button type="submit" className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black">{editingShift ? 'Update' : 'Save'}</Button>
             </div>
           </form>
         </DialogContent>

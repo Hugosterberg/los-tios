@@ -2,7 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { buildDefaultAppSettings, INTEGRATION_SETTINGS_SECTIONS } from "@/lib/appSettings";
-import { saveStoredIntegrationSettings } from "@/lib/integrationSettings";
+import { appParams } from "@/lib/app-params";
+import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,9 @@ export default function Integrations() {
   const [showSecrets, setShowSecrets] = useState({});
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
+  const isLocalOnlyMode =
+    import.meta.env.DEV &&
+    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
 
   const runTest = async (sectionId) => {
     setTesting((t) => ({ ...t, [sectionId]: true }));
@@ -41,37 +45,107 @@ export default function Integrations() {
       if (sectionId === "notion") {
         try {
           await base44.functions.invoke("notionProxy", { path: "users/me", method: "GET" });
-          setTestResults((r) => ({ ...r, notion: { ok: true, message: "Conexión exitosa con Notion." } }));
+          setTestResults((r) => ({ ...r, notion: { ok: true, message: "Notion connection successful." } }));
         } catch (e) {
-          throw new Error(e?.response?.data?.error || e?.message || "Error conectando Notion.");
+          throw new Error(e?.response?.data?.error || e?.message || "Error connecting to Notion.");
         }
       } else if (sectionId === "loyverse") {
         const token = formData.loyverse_api_token?.trim();
-        if (!token) throw new Error("Falta el token de Loyverse.");
-        await base44.functions.invoke("loyverseProxy", { path: "merchant", apiToken: token });
-        setTestResults((r) => ({ ...r, loyverse: { ok: true, message: "Conexión exitosa con Loyverse." } }));
+        if (!token) throw new Error("Loyverse token is missing.");
+        await base44.functions.invoke("loyverseProxy", {
+          path: "receipts",
+          apiToken: token,
+          searchParams: { limit: 1 },
+        });
+        setTestResults((r) => ({ ...r, loyverse: { ok: true, message: "Loyverse connection successful." } }));
       } else if (sectionId === "clip") {
         const key = formData.clip_api_key?.trim();
         const secret = formData.clip_api_secret?.trim();
         const manualToken = formData.clip_api_token?.trim();
         const authToken = manualToken || (key && secret ? `Basic ${btoa(`${key}:${secret}`)}` : null);
-        if (!authToken) throw new Error("Faltan credenciales de Clip.");
-        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-        const from = new Date(yesterday); from.setDate(from.getDate() - 1);
-        await base44.functions.invoke("clipProxy", {
-          path: "payments",
-          apiType: "payments",
-          authToken,
-          searchParams: {
-            from: from.toISOString().replace(/\.\d{3}Z$/, "Z"),
-            to: yesterday.toISOString().replace(/\.\d{3}Z$/, "Z"),
-            size: 1,
+        if (!authToken) throw new Error("Clip credentials are missing.");
+
+        let authOk = false;
+        const now = new Date();
+        const paymentsFrom = new Date(now);
+        paymentsFrom.setUTCDate(paymentsFrom.getUTCDate() - 29);
+        paymentsFrom.setUTCHours(0, 0, 0, 0);
+
+        const settlementsTo = new Date(now);
+        settlementsTo.setUTCDate(settlementsTo.getUTCDate() - 1);
+        settlementsTo.setUTCHours(23, 59, 59, 999);
+        const settlementsFrom = new Date(settlementsTo);
+        settlementsFrom.setUTCDate(settlementsFrom.getUTCDate() - 89);
+        settlementsFrom.setUTCHours(0, 0, 0, 0);
+
+        let paymentsOk = false;
+        let settlementsOk = false;
+        let lastClipError = null;
+
+        try {
+          await base44.functions.invoke("clipProxy", {
+            path: "payment_methods",
+            apiType: "payments",
+            authToken,
+          });
+          authOk = true;
+        } catch (e) {
+          lastClipError = e;
+        }
+
+        try {
+          await base44.functions.invoke("clipProxy", {
+            path: "payments",
+            apiType: "payments",
+            authToken,
+            searchParams: {
+              from: paymentsFrom.toISOString().replace(/\.\d{3}Z$/, "Z"),
+              to: now.toISOString().replace(/\.\d{3}Z$/, "Z"),
+              size: 1,
+            },
+          });
+          paymentsOk = true;
+        } catch (e) {
+          lastClipError = e;
+        }
+
+        try {
+          await base44.functions.invoke("clipProxy", {
+            path: "settlements",
+            apiType: "settlements",
+            authToken,
+            searchParams: {
+              from: settlementsFrom.toISOString().slice(0, 10),
+              to: settlementsTo.toISOString().slice(0, 10),
+            },
+          });
+          settlementsOk = true;
+        } catch (e) {
+          lastClipError = e;
+        }
+
+        if (!authOk && !paymentsOk && !settlementsOk) {
+          const status = lastClipError?.response?.status;
+          if (status === 404) {
+            throw new Error("Clip returned 404 for auth and reporting checks. This suggests the proxy route or Clip endpoint mapping is off, or this Clip account does not have access to the requested API surfaces.");
+          }
+          throw new Error(lastClipError?.response?.data?.error || lastClipError?.message || "Clip connection test failed.");
+        }
+
+        setTestResults((r) => ({
+          ...r,
+          clip: {
+            ok: true,
+            message: authOk && paymentsOk && settlementsOk
+              ? "Clip connection successful."
+              : authOk
+                ? "Clip auth works. Some reporting endpoints still need review."
+                : "Clip connection partially successful. One API responded, but the other should be reviewed.",
           },
-        });
-        setTestResults((r) => ({ ...r, clip: { ok: true, message: "Conexión exitosa con Clip." } }));
+        }));
       }
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.message || "Error desconocido.";
+      const msg = err?.response?.data?.error || err?.message || "Unknown error.";
       setTestResults((r) => ({ ...r, [sectionId]: { ok: false, message: msg } }));
     } finally {
       setTesting((t) => ({ ...t, [sectionId]: false }));
@@ -81,23 +155,29 @@ export default function Integrations() {
   const { data: settings = [], isLoading } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
+    enabled: !isLocalOnlyMode,
   });
 
   const currentSettings = useMemo(
-    () => buildDefaultAppSettings(settings[0] || {}),
+    () => buildDefaultAppSettings(getResolvedIntegrationSettings(settings[0] || {})),
     [settings],
   );
 
   const [formData, setFormData] = useState(currentSettings);
 
   React.useEffect(() => {
-    const mergedSettings = buildDefaultAppSettings(settings[0] || {});
+    const mergedSettings = buildDefaultAppSettings(getResolvedIntegrationSettings(settings[0] || {}));
     setFormData(mergedSettings);
     saveStoredIntegrationSettings(mergedSettings);
   }, [settings]);
 
   const saveSettings = useMutation({
     mutationFn: (data) => {
+      if (isLocalOnlyMode) {
+        saveStoredIntegrationSettings(data);
+        return Promise.resolve(data);
+      }
+
       if (settings[0]) {
         return base44.entities.AppSettings.update(settings[0].id, data);
       }
@@ -105,17 +185,23 @@ export default function Integrations() {
       return base44.entities.AppSettings.create(data);
     },
     onSuccess: (_, values) => {
-      queryClient.invalidateQueries({ queryKey: ["appSettings"] });
+      if (!isLocalOnlyMode) {
+        queryClient.invalidateQueries({ queryKey: ["appSettings"] });
+      }
       saveStoredIntegrationSettings(values);
-      window.alert("Settings saved successfully.");
+      window.alert(isLocalOnlyMode ? "Settings saved locally." : "Settings saved successfully.");
     },
   });
 
   const handleFieldChange = (key, value) => {
-    setFormData((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setFormData((current) => {
+      const next = {
+        ...current,
+        [key]: value,
+      };
+      saveStoredIntegrationSettings({ [key]: value });
+      return next;
+    });
   };
 
   const toggleSecretVisibility = (key) => {
@@ -144,6 +230,10 @@ export default function Integrations() {
       for (const field of section.fields) {
         next[field.key] = currentSettings[field.key] ?? "";
       }
+      const resetValues = Object.fromEntries(
+        section.fields.map((field) => [field.key, currentSettings[field.key] ?? ""]),
+      );
+      saveStoredIntegrationSettings(resetValues);
       return next;
     });
   };
@@ -182,7 +272,11 @@ export default function Integrations() {
               <ShieldCheck className="h-5 w-5 text-yellow-300" />
               <div className="text-sm">
                 <p className="font-medium text-white">Instant local sync</p>
-                  <p className="text-gray-400">Changes are saved to the database and also cached in localStorage for API views.</p>
+                  <p className="text-gray-400">
+                    {isLocalOnlyMode
+                      ? "Changes are cached locally for API views, with .env.local used as fallback."
+                      : "Changes are saved to the database and also cached in localStorage for API views."}
+                  </p>
               </div>
             </div>
           </div>
@@ -271,7 +365,7 @@ export default function Integrations() {
                         <BookOpen className="h-5 w-5 text-yellow-400" /> Notion
                       </h2>
                       <p className="mt-1 max-w-2xl text-sm text-gray-400">
-                        Connected via OAuth — no API keys needed. Test that the connection is alive.
+                        Connected via OAuth ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no API keys needed. Test that the connection is alive.
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -321,14 +415,14 @@ export default function Integrations() {
                               }
                               <div className="space-y-1">
                                 {hasManual ? (
-                                  <p className="text-emerald-300 font-medium">Manual token configured — will be used directly.</p>
+                                  <p className="text-emerald-300 font-medium">Manual token configured ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â will be used directly.</p>
                                 ) : hasAuto ? (
                                   <>
                                     <p className="text-emerald-300 font-medium">Token auto-generated from public key + secret.</p>
                                     <p className="font-mono text-xs text-gray-400 break-all">{generatedToken}</p>
                                   </>
                                 ) : (
-                                  <p className="text-yellow-300 font-medium">Missing credentials — configure the public key and secret to generate a Basic token.</p>
+                                  <p className="text-yellow-300 font-medium">Missing credentials ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â configure the public key and secret to generate a Basic token.</p>
                                 )}
                               </div>
                             </div>
