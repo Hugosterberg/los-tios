@@ -1087,16 +1087,16 @@ export default function Dashboard() {
     {
       id: "net-profit",
       label: "Net Profit",
-      value: netProfit ? formatCurrency(netProfit) : "—",
-      delta: rawIngredientExpenses ? primaryComparisonCard.deltaLabel : `Estimated ingredient cost only (MXN ${PIZZA_COST_ESTIMATE}/order). Labor, fees, and fixed costs are missing.`,
+      value: laborExpenses && rawIngredientExpenses ? formatCurrency(netProfit) : "—",
+      delta: laborExpenses && rawIngredientExpenses ? primaryComparisonCard.deltaLabel : "Missing cost data — see below",
       trend: primaryComparisonCard.trend,
-      comparisonLabel: rawIngredientExpenses
+      comparisonLabel: laborExpenses && rawIngredientExpenses
         ? `Derived from ingredients, labor, recurring costs, other expenses, and Clip fees for ${selectedDateRange.toLowerCase()}.`
-        : `Net Profit = Revenue − Ingredients − Labor − Fixed Costs − Other Expenses − Clip Fees. Add salary expenses in Finance, complete shifts in Employee Calendar, and log recurring costs to get a real number.`,
-      sparkTone: "positive",
+        : `⚠️ Net Profit needs: (1) Ingredient expenses — log purchases in Finance with category "ingredients" or convert Shopping List items to expenses. (2) Labor expenses — complete shifts in Employee Calendar or add salary expenses in Finance. (3) Optional: recurring fixed costs and Clip fees for full accuracy.`,
+      sparkTone: "negative",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=net-profit",
-      dataSource: rawIngredientExpenses ? "live" : "mock",
+      dataSource: laborExpenses && rawIngredientExpenses ? "live" : "mock",
     },
     {
       id: "food-cost",
