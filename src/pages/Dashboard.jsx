@@ -1324,13 +1324,7 @@ export default function Dashboard() {
 
       <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
         <section id="executive-summary">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Executive Summary</p>
-              <h2 className="mt-1 text-2xl font-bold text-yellow-400">Today at a glance</h2>
-            </div>
-            <Badge className="border border-yellow-500/20 bg-[#242424] text-gray-300">{selectedDateRange}</Badge>
-          </div>
+
           <details className="mb-4 group">
             <summary className="flex cursor-pointer items-center gap-2 rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-2.5 text-xs uppercase tracking-[0.2em] text-gray-500 hover:bg-[#242424] select-none list-none">
               <span className="mr-1 text-yellow-500/60 group-open:rotate-90 transition-transform inline-block">▶</span>
