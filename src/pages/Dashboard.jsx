@@ -1088,11 +1088,11 @@ export default function Dashboard() {
       id: "net-profit",
       label: "Net Profit",
       value: laborExpenses && rawIngredientExpenses ? formatCurrency(netProfit) : "—",
-      delta: laborExpenses && rawIngredientExpenses ? primaryComparisonCard.deltaLabel : "Missing cost data — see below",
+      delta: laborExpenses && rawIngredientExpenses ? primaryComparisonCard.deltaLabel : "Missing ingredient and labor expenses.",
       trend: primaryComparisonCard.trend,
       comparisonLabel: laborExpenses && rawIngredientExpenses
         ? `Derived from ingredients, labor, recurring costs, other expenses, and Clip fees for ${selectedDateRange.toLowerCase()}.`
-        : `⚠️ Net Profit needs: (1) Ingredient expenses — log purchases in Finance with category "ingredients" or convert Shopping List items to expenses. (2) Labor expenses — complete shifts in Employee Calendar or add salary expenses in Finance. (3) Optional: recurring fixed costs and Clip fees for full accuracy.`,
+        : `Needs ingredient expenses — log purchases in Finance with category "ingredients" or convert Shopping List items. Also needs labor — complete shifts in Employee Calendar or add salary expenses in Finance. Optional: recurring fixed costs and Clip fees for full accuracy.`,
       sparkTone: "negative",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=net-profit",
