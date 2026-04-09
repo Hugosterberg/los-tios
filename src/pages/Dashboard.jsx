@@ -722,7 +722,12 @@ export default function Dashboard() {
   const totalExpenseLedger = filteredExpenses.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const shoppingIngredientExpenses = shoppingIngredientExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const manualIngredientExpenses = manualIngredientExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const ingredientExpenses = shoppingIngredientExpenses || manualIngredientExpenses;
+  const rawIngredientExpenses = shoppingIngredientExpenses || manualIngredientExpenses;
+  // Fallback: estimate ingredient cost at MXN 80 per order when no expense data exists
+  const PIZZA_COST_ESTIMATE = 80;
+  const estimatedIngredientCost = filteredOrders.length * PIZZA_COST_ESTIMATE;
+  const ingredientExpenses = rawIngredientExpenses || estimatedIngredientCost;
+  const isIngredientCostEstimated = !rawIngredientExpenses && estimatedIngredientCost > 0;
   const shiftLaborExpenses = shiftLaborExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const manualLaborExpenses = manualLaborExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const laborExpenses = shiftLaborExpenses || manualLaborExpenses;
@@ -1069,15 +1074,15 @@ export default function Dashboard() {
       id: "gross-profit",
       label: "Gross Profit",
       value: ingredientExpenses ? formatCurrency(grossProfit) : mockCostsSummary[0].value,
-      delta: ingredientExpenses ? primaryComparisonCard.deltaLabel : "Waiting for ingredient purchase mapping",
-      trend: ingredientExpenses ? primaryComparisonCard.trend : "down",
-      comparisonLabel: ingredientExpenses
+      delta: rawIngredientExpenses ? primaryComparisonCard.deltaLabel : isIngredientCostEstimated ? `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order × ${filteredOrders.length} orders` : "Waiting for ingredient purchase mapping",
+      trend: primaryComparisonCard.trend,
+      comparisonLabel: rawIngredientExpenses
         ? `Calculated for ${selectedDateRange.toLowerCase()} using ${shoppingIngredientExpenses ? "Shopping List purchase expenses" : "ingredient expense entries"}.`
-        : "Currently hardcoded because ingredient costs are incomplete",
-      sparkTone: ingredientExpenses ? "positive" : "negative",
-      sparkline: ingredientExpenses ? revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)) : [74, 78, 79, 84, 90, 96, 103],
+        : `Estimated using MXN ${PIZZA_COST_ESTIMATE} average ingredient cost per order. Add real expenses to replace this.`,
+      sparkTone: "positive",
+      sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=gross-profit",
-      dataSource: ingredientExpenses ? "live" : "mock",
+      dataSource: rawIngredientExpenses ? "live" : "mock",
     },
     {
       id: "net-profit",
@@ -1097,13 +1102,13 @@ export default function Dashboard() {
       id: "food-cost",
       label: "Food Cost %",
       value: ingredientExpenses ? `${foodCostPct.toFixed(1)}%` : "HARDCODED",
-      delta: ingredientExpenses ? (shoppingIngredientExpenses ? "Purchase-based from Shopping List expenses" : "Based on ingredient expenses") : "Missing ingredient ledger",
+      delta: rawIngredientExpenses ? (shoppingIngredientExpenses ? "Purchase-based from Shopping List expenses" : "Based on ingredient expenses") : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order`,
       trend: "down",
-      comparisonLabel: ingredientExpenses ? "Purchase-based cost until recipe-level COGS is added" : "Replace with real supplier + COGS logic",
+      comparisonLabel: rawIngredientExpenses ? "Purchase-based cost until recipe-level COGS is added" : `Using MXN ${PIZZA_COST_ESTIMATE} average cost per order as estimate. Add ingredient expenses to replace.`,
       sparkTone: "negative",
-      sparkline: ingredientExpenses ? mockCostTrendVsBudget.map((item) => item.actual) : [25.2, 25.8, 26.1, 26.9, 27.5, 28.1, 28.4],
+      sparkline: mockCostTrendVsBudget.map((item) => item.actual),
       href: "/managementinsight?view=food-cost",
-      dataSource: ingredientExpenses ? "live" : "mock",
+      dataSource: rawIngredientExpenses ? "live" : "mock",
     },
     {
       id: "labor-cost",
@@ -1200,10 +1205,10 @@ export default function Dashboard() {
   ];
 
   const costsSummary = [
-    { label: "Ingredient Cost Today", value: ingredientExpensesToday ? formatCurrency(ingredientExpensesToday) : "HARDCODED", delta: ingredientExpensesToday ? "Purchase-based from ingredient expenses logged today" : "No ingredient expenses posted today", dataSource: ingredientExpensesToday ? "live" : "mock" },
-    { label: "Ingredient Cost This Week", value: ingredientExpensesWeek ? formatCurrency(ingredientExpensesWeek) : "HARDCODED", delta: ingredientExpensesWeek ? "Purchase-based from ingredient expenses this week" : "No weekly ingredient ledger", dataSource: ingredientExpensesWeek ? "live" : "mock" },
-    { label: "Ingredient Cost This Month", value: ingredientExpensesMonth ? formatCurrency(ingredientExpensesMonth) : "HARDCODED", delta: ingredientExpensesMonth ? "Purchase-based from ingredient expenses this month" : "No monthly ingredient ledger", dataSource: ingredientExpensesMonth ? "live" : "mock" },
-    { label: "Food Cost %", value: ingredientExpenses ? `${foodCostPct.toFixed(1)}%` : "HARDCODED", delta: ingredientExpenses ? "Calculated live from purchase-based ingredient cost" : "Needs ingredient ledger", dataSource: ingredientExpenses ? "live" : "mock" },
+    { label: "Ingredient Cost Today", value: ingredientExpensesToday ? formatCurrency(ingredientExpensesToday) : formatCurrency(todayOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesToday ? "Purchase-based from ingredient expenses logged today" : `Estimated: ${todayOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesToday ? "live" : "mock" },
+    { label: "Ingredient Cost This Week", value: ingredientExpensesWeek ? formatCurrency(ingredientExpensesWeek) : formatCurrency(weekOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesWeek ? "Purchase-based from ingredient expenses this week" : `Estimated: ${weekOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesWeek ? "live" : "mock" },
+    { label: "Ingredient Cost This Month", value: ingredientExpensesMonth ? formatCurrency(ingredientExpensesMonth) : formatCurrency(filteredOrders.filter(o => getRecordDate(o) >= monthStart).length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesMonth ? "Purchase-based from ingredient expenses this month" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order`, dataSource: ingredientExpensesMonth ? "live" : "mock" },
+    { label: "Food Cost %", value: `${foodCostPct.toFixed(1)}%`, delta: rawIngredientExpenses ? "Calculated live from purchase-based ingredient cost" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order avg. Add expenses to replace.`, dataSource: rawIngredientExpenses ? "live" : "mock" },
     { label: "Labor Cost Today", value: laborExpensesToday ? formatCurrency(laborExpensesToday) : "HARDCODED", delta: laborExpensesToday ? "Shift-linked and salary expenses posted today" : "No salary expenses posted today", dataSource: laborExpensesToday ? "live" : "mock" },
     { label: "Labor Cost This Week", value: laborExpensesWeek ? formatCurrency(laborExpensesWeek) : "HARDCODED", delta: laborExpensesWeek ? "Shift-linked and salary expenses this week" : "No weekly salary ledger", dataSource: laborExpensesWeek ? "live" : "mock" },
     { label: "Labor Cost This Month", value: laborExpensesMonth ? formatCurrency(laborExpensesMonth) : "HARDCODED", delta: laborExpensesMonth ? "Shift-linked and salary expenses this month" : "No monthly salary ledger", dataSource: laborExpensesMonth ? "live" : "mock" },
