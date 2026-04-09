@@ -745,8 +745,8 @@ export default function CustomerOrder() {
                 {/* Desktop nav */}
                 <div className="hidden md:flex items-center gap-4">
                   <a href="#menu" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Menu</a>
-                  <a href="#eventos" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Eventos</a>
                   <a href="#about" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Sobre nosotros</a>
+                  <a href="#eventos" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Eventos</a>
                   <a href="https://wa.me/529541307386" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -769,8 +769,8 @@ export default function CustomerOrder() {
                   {mobileNavOpen && (
                     <div className="absolute right-0 top-14 bg-yellow-400 rounded-2xl shadow-xl p-4 flex flex-col gap-2 min-w-[180px] z-50">
                       <a href="#menu" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Menu</a>
-                      <a href="#eventos" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Eventos</a>
                       <a href="#about" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Sobre nosotros</a>
+                      <a href="#eventos" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Eventos</a>
                       <a href="https://wa.me/529541307386" target="_blank" rel="noopener noreferrer" onClick={() => setMobileNavOpen(false)}
                         className="flex items-center justify-center gap-1.5 text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -986,6 +986,32 @@ export default function CustomerOrder() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Sobre nosotros */}
+      <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col items-center mb-10">
+            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Sobre nosotros</h2>
+            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide mt-2">About us</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Spanish */}
+            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
+              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ESPANOL</p>
+              <p className="text-gray-300 leading-relaxed">
+                Los Tios es una pizzeria con mucha vibra en Puerto Escondido, donde servimos deliciosa pizza estilo napolitano en un ambiente relajado y playero. Fundado por cuatro amigos con raices en Mexico, Francia, Italia y Suecia que se conocieron en Mexico, Los Tios une inspiracion internacional con la energia tranquila de Puerto Escondido. Si buscas buena pizza, buena vibra y un lugar chido y acogedor para pasar el rato, Los Tios es el lugar.
+              </p>
+            </div>
+            {/* English */}
+            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
+              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ENGLISH</p>
+              <p className="text-gray-300 leading-relaxed">
+                Los Tios is a vibrant pizza spot in Puerto Escondido serving delicious Neapolitan-style pizza in a relaxed beach atmosphere. Founded by four friends with roots in Mexico, France, Italy and Sweden who met in Mexico, Los Tios brings together international inspiration and the laid-back energy of Puerto Escondido. If you're looking for great pizza, good vibes and a welcoming place to hang out, Los Tios is the spot.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Eventos */}
       {(() => {
@@ -1382,32 +1408,6 @@ export default function CustomerOrder() {
           </div>
         );
       })()}
-
-      {/* Sobre nosotros */}
-      <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col items-center mb-10">
-            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Sobre nosotros</h2>
-            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide mt-2">About us</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Spanish */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ESPANOL</p>
-              <p className="text-gray-300 leading-relaxed">
-                Los Tios es una pizzeria con mucha vibra en Puerto Escondido, donde servimos deliciosa pizza estilo napolitano en un ambiente relajado y playero. Fundado por cuatro amigos con raices en Mexico, Francia, Italia y Suecia que se conocieron en Mexico, Los Tios une inspiracion internacional con la energia tranquila de Puerto Escondido. Si buscas buena pizza, buena vibra y un lugar chido y acogedor para pasar el rato, Los Tios es el lugar.
-              </p>
-            </div>
-            {/* English */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ENGLISH</p>
-              <p className="text-gray-300 leading-relaxed">
-                Los Tios is a vibrant pizza spot in Puerto Escondido serving delicious Neapolitan-style pizza in a relaxed beach atmosphere. Founded by four friends with roots in Mexico, France, Italy and Sweden who met in Mexico, Los Tios brings together international inspiration and the laid-back energy of Puerto Escondido. If you're looking for great pizza, good vibes and a welcoming place to hang out, Los Tios is the spot.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Footer */}
       <div className="relative mt-0 overflow-hidden bg-yellow-400 py-8 text-[#1a1a1a]">
