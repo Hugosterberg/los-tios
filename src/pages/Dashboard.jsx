@@ -1087,16 +1087,16 @@ export default function Dashboard() {
     {
       id: "net-profit",
       label: "Net Profit",
-      value: totalExpenses ? formatCurrency(netProfit) : mockCostsSummary[1].value,
-      delta: totalExpenses ? primaryComparisonCard.deltaLabel : "Needs full expense coverage",
-      trend: totalExpenses ? primaryComparisonCard.trend : "down",
-      comparisonLabel: totalExpenses
+      value: formatCurrency(netProfit),
+      delta: rawIngredientExpenses ? primaryComparisonCard.deltaLabel : `Estimated: ingredients MXN ${PIZZA_COST_ESTIMATE}/order`,
+      trend: primaryComparisonCard.trend,
+      comparisonLabel: rawIngredientExpenses
         ? `Derived from ingredients, labor, recurring costs, other expenses, and Clip fees for ${selectedDateRange.toLowerCase()}.`
-        : "Still hardcoded until more expenses are tracked",
-      sparkTone: totalExpenses ? "positive" : "negative",
-      sparkline: totalExpenses ? revenue7Days.map((item) => Math.max(item.revenue - totalExpenses / 7, 0)) : [63, 62, 61, 60, 58, 56, 54],
+        : `Using MXN ${PIZZA_COST_ESTIMATE} estimated ingredient cost per order. Add real expenses to improve accuracy.`,
+      sparkTone: "positive",
+      sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=net-profit",
-      dataSource: totalExpenses ? "live" : "mock",
+      dataSource: rawIngredientExpenses ? "live" : "mock",
     },
     {
       id: "food-cost",
