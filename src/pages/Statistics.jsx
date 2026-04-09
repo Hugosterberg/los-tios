@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, TrendingUp, Package, Calendar, TrendingDown, Printer } from "lucide-react";
+import { BarChart3, DollarSign, TrendingUp, Package, Calendar, TrendingDown, Printer, ShoppingCart, Percent, ChefHat, Users } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, startOfDay, endOfDay } from "date-fns";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +73,23 @@ export default function Statistics() {
 
   const monthStats = calculateStats(monthOrders, monthExpenses);
   const dayStats = calculateStats(dayOrders, dayExpenses);
+
+  // Dashboard-style KPIs for selected month
+  const PIZZA_COST_ESTIMATE = 80;
+  const ingredientExpenses = monthExpenses.filter(e => e.category === 'ingredients').reduce((sum, e) => sum + (e.amount || 0), 0);
+  const laborExpenses = monthExpenses.filter(e => e.category === 'salaries').reduce((sum, e) => sum + (e.amount || 0), 0);
+  const estimatedIngredientCost = ingredientExpenses || (monthOrders.length * PIZZA_COST_ESTIMATE);
+  const grossProfit = monthStats.totalRevenue - estimatedIngredientCost;
+  const netProfit = monthStats.totalRevenue - monthStats.totalExpenses;
+  const foodCostPct = monthStats.totalRevenue > 0 ? (estimatedIngredientCost / monthStats.totalRevenue) * 100 : 0;
+  const laborCostPct = monthStats.totalRevenue > 0 ? (laborExpenses / monthStats.totalRevenue) * 100 : 0;
+
+  // Comparison with previous month
+  const prevMonthStr = format(subMonths(new Date(selectedMonth + '-01'), 1), 'yyyy-MM');
+  const prevMonthOrders = orders.filter(o => format(new Date(o.created_date), 'yyyy-MM') === prevMonthStr);
+  const prevMonthRevenue = prevMonthOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const revenueChange = prevMonthRevenue ? ((monthStats.totalRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : null;
+  const ordersChange = prevMonthOrders.length ? ((monthOrders.length - prevMonthOrders.length) / prevMonthOrders.length) * 100 : null;
 
   // Revenue, Expenses, and Profit by day for selected month
   const monthStart = new Date(selectedMonth + '-01');
@@ -391,6 +408,64 @@ export default function Statistics() {
               <h2 className="text-xl sm:text-2xl font-bold mb-4">
                 Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
               </h2>
+
+              {/* Dashboard-style KPI cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+                {[
+                  {
+                    label: "Net Sales",
+                    value: `$${monthStats.totalRevenue.toFixed(0)}`,
+                    sub: revenueChange !== null ? `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs prev month` : "No prev month data",
+                    positive: revenueChange === null || revenueChange >= 0,
+                    icon: DollarSign,
+                  },
+                  {
+                    label: "Total Orders",
+                    value: monthStats.totalOrders,
+                    sub: ordersChange !== null ? `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}% vs prev month` : "No prev month data",
+                    positive: ordersChange === null || ordersChange >= 0,
+                    icon: ShoppingCart,
+                  },
+                  {
+                    label: "Avg Order Value",
+                    value: `$${monthStats.avgOrderValue.toFixed(0)}`,
+                    sub: "Per order this month",
+                    positive: true,
+                    icon: TrendingUp,
+                  },
+                  {
+                    label: "Gross Profit",
+                    value: `$${grossProfit.toFixed(0)}`,
+                    sub: ingredientExpenses ? "Based on ingredient expenses" : `Estimated at $${PIZZA_COST_ESTIMATE}/order`,
+                    positive: grossProfit >= 0,
+                    icon: TrendingUp,
+                  },
+                  {
+                    label: "Food Cost %",
+                    value: `${foodCostPct.toFixed(1)}%`,
+                    sub: ingredientExpenses ? "From ingredient expenses" : "Estimated",
+                    positive: foodCostPct < 35,
+                    icon: ChefHat,
+                  },
+                  {
+                    label: "Labor Cost %",
+                    value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—",
+                    sub: laborExpenses ? "From salary expenses" : "No salary expenses",
+                    positive: laborCostPct < 25,
+                    icon: Users,
+                  },
+                ].map((kpi) => (
+                  <div key={kpi.label} className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <kpi.icon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                      <p className="text-xs uppercase tracking-widest text-gray-500 truncate">{kpi.label}</p>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                    <p className={`text-xs mt-1 ${kpi.positive ? 'text-emerald-400' : 'text-red-400'}`}>{kpi.sub}</p>
+                  </div>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardHeader className="pb-3">
