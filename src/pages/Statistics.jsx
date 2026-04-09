@@ -1,14 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, TrendingUp, Package, Calendar, TrendingDown, Printer, ShoppingCart, Percent, ChefHat, Users } from "lucide-react";
+import { BarChart3, DollarSign, TrendingUp, Package, Calendar, TrendingDown, Printer, ShoppingCart, Percent, ChefHat, Users, CreditCard } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, startOfDay, endOfDay } from "date-fns";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { es } from "date-fns/locale";
 import { listOrders } from "@/lib/local-dev-orders";
+import { getClipOverview, hasClipApiConfig } from "@/api/clip";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 
 export default function Statistics() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -23,6 +25,19 @@ export default function Statistics() {
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
     queryFn: () => base44.entities.Expense.list('-date'),
+  });
+
+  const { data: settings = [] } = useQuery({
+    queryKey: ['appSettings'],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+  const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
+
+  const { data: clipOverview } = useQuery({
+    queryKey: ['clipOverview', settings[0]?.id || 'none'],
+    queryFn: () => getClipOverview(appSettings),
+    enabled: hasClipApiConfig(appSettings),
+    staleTime: 60_000,
   });
 
   // Generate month options (last 12 months)
@@ -83,6 +98,21 @@ export default function Statistics() {
   const netProfit = monthStats.totalRevenue - monthStats.totalExpenses;
   const foodCostPct = monthStats.totalRevenue > 0 ? (estimatedIngredientCost / monthStats.totalRevenue) * 100 : 0;
   const laborCostPct = monthStats.totalRevenue > 0 ? (laborExpenses / monthStats.totalRevenue) * 100 : 0;
+
+  // Clip payments filtered by selected month
+  const allClipPayments = clipOverview?.payments || [];
+  const monthClipPayments = allClipPayments.filter(p => {
+    const date = new Date(p.created_at || p.approved_at || 0);
+    return format(date, 'yyyy-MM') === selectedMonth;
+  });
+  const clipApprovedMonth = monthClipPayments.filter(p => {
+    const status = String(p.status || '').toLowerCase();
+    return status.includes('approved') || status.includes('paid');
+  });
+  const clipTotalMonth = clipApprovedMonth.reduce((sum, p) => {
+    const amt = p.amount ?? p.total_amount ?? p.approved_amount ?? 0;
+    return sum + (typeof amt === 'number' ? amt : Number(amt) || 0);
+  }, 0);
 
   // Comparison with previous month
   const prevMonthStr = format(subMonths(new Date(selectedMonth + '-01'), 1), 'yyyy-MM');
@@ -410,10 +440,10 @@ export default function Statistics() {
               </h2>
 
               {/* Dashboard-style KPI cards */}
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-3">
                 {[
                   {
-                    label: "Net Sales",
+                    label: "App Orders Revenue",
                     value: `$${monthStats.totalRevenue.toFixed(0)}`,
                     sub: revenueChange !== null ? `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs prev month` : "No prev month data",
                     positive: revenueChange === null || revenueChange >= 0,
@@ -439,6 +469,35 @@ export default function Statistics() {
                     sub: ingredientExpenses ? "Based on ingredient expenses" : `Estimated at $${PIZZA_COST_ESTIMATE}/order`,
                     positive: grossProfit >= 0,
                     icon: TrendingUp,
+                  },
+                ].map((kpi) => (
+                  <div key={kpi.label} className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <kpi.icon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                      <p className="text-xs uppercase tracking-widest text-gray-500 truncate">{kpi.label}</p>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                    <p className={`text-xs mt-1 ${kpi.positive ? 'text-emerald-400' : 'text-red-400'}`}>{kpi.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Second row of KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
+                {[
+                  {
+                    label: "Clip Card Payments",
+                    value: clipTotalMonth > 0 ? `$${clipTotalMonth.toFixed(0)}` : hasClipApiConfig(appSettings) ? "$0" : "Not connected",
+                    sub: clipTotalMonth > 0 ? `${clipApprovedMonth.length} approved transactions` : hasClipApiConfig(appSettings) ? "No Clip payments this month" : "Configure Clip in Integrations",
+                    positive: clipTotalMonth >= 0,
+                    icon: CreditCard,
+                  },
+                  {
+                    label: "Total Income (App+Clip)",
+                    value: `$${(monthStats.totalRevenue + clipTotalMonth).toFixed(0)}`,
+                    sub: "App orders + Clip card payments",
+                    positive: true,
+                    icon: DollarSign,
                   },
                   {
                     label: "Food Cost %",
