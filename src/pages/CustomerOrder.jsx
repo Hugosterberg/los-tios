@@ -824,9 +824,11 @@ export default function CustomerOrder() {
 
               return (
                 <div key={category.id}>
-                  <h2 className="text-2xl sm:text-3xl font-bold mb-5 text-yellow-400 text-center">
-                        {category.name}
-                      </h2>
+                  <div className="flex flex-col items-center mb-8">
+                    <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">
+                      {category.name}
+                    </h2>
+                  </div>
                       <div className="flex flex-wrap justify-center gap-6">
                         {items.map((item) => (
                           <motion.div
