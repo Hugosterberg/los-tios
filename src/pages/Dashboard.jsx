@@ -1101,7 +1101,7 @@ export default function Dashboard() {
     {
       id: "food-cost",
       label: "Food Cost %",
-      value: ingredientExpenses ? `${foodCostPct.toFixed(1)}%` : "HARDCODED",
+      value: `${foodCostPct.toFixed(1)}%`,
       delta: rawIngredientExpenses ? (shoppingIngredientExpenses ? "Purchase-based from Shopping List expenses" : "Based on ingredient expenses") : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order`,
       trend: "down",
       comparisonLabel: rawIngredientExpenses ? "Purchase-based cost until recipe-level COGS is added" : `Using MXN ${PIZZA_COST_ESTIMATE} average cost per order as estimate. Add ingredient expenses to replace.`,
@@ -1113,10 +1113,10 @@ export default function Dashboard() {
     {
       id: "labor-cost",
       label: "Labor Cost %",
-      value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "HARDCODED",
-      delta: laborExpenses ? (shiftLaborExpenses ? "Shift-linked salary expenses" : "Based on salary expenses") : "Missing salaries/overtime source",
+      value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—",
+      delta: laborExpenses ? (shiftLaborExpenses ? "Shift-linked salary expenses" : "Based on salary expenses") : "No salary expenses logged yet. Add shifts via Employee Calendar or log salary expenses in Finance to populate this.",
       trend: "down",
-      comparisonLabel: laborExpenses ? "Uses employee calendar payouts where available" : "Replace with employee calendar or payroll data",
+      comparisonLabel: laborExpenses ? "Uses employee calendar payouts where available" : "Needs salary expenses or completed shifts. Go to Employees → log shifts, or Finance → add a salary expense.",
       sparkTone: "negative",
       sparkline: laborExpenses ? mockLaborEfficiencyTrend.map((item) => item.efficiency / 20) : [16.8, 17.0, 17.3, 17.8, 18.0, 18.4, 18.7],
       href: "/managementinsight?view=labor-cost",
@@ -1139,10 +1139,10 @@ export default function Dashboard() {
   const liveOperations = [
     { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Live from app order statuses", href: "/managementinsight?view=live-operations", dataSource: "live" },
     { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: "Approximation until SLA timestamps are wired", href: "/managementinsight?view=live-operations", dataSource: orders.length ? "live" : "mock" },
-    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "HARDCODED", tone: "text-white", subtext: avgPrepTime ? "Current estimate based on open order flow" : "Replace with real kitchen timestamps", href: "/managementinsight?view=live-operations", dataSource: todayOrders.length ? "live" : "mock" },
+    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? "Current estimate based on open order flow" : "Needs preparation_minutes or estimated_delivery_minutes set on order records.", href: "/managementinsight?view=live-operations", dataSource: todayOrders.length ? "live" : "mock" },
     { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Orders with status preparing", href: "/managementinsight?view=live-operations", dataSource: "live" },
     { id: "out-for-delivery", label: "Out For Delivery", value: formatNumber(ordersOutForDelivery), tone: "text-yellow-400", subtext: "Orders with delivery handoff status", href: "/managementinsight?view=live-operations", dataSource: "live" },
-    { id: "reservations", label: "Reservations Today", value: "HARDCODED", tone: "text-white", subtext: "No live reservation source connected yet", href: "/managementinsight?view=live-operations", dataSource: "mock" },
+    { id: "reservations", label: "Reservations Today", value: "—", tone: "text-white", subtext: "Needs a Reservation entity with a date field. Once reservations are logged, today's count auto-populates.", href: "/managementinsight?view=live-operations", dataSource: "mock" },
     { id: "refunds", label: "Refund Count Today", value: formatNumber(todayRefundCount), tone: "text-red-300", subtext: "Live from Clip refund fields", href: "/managementinsight?view=payments-reconciliation", dataSource: clipOverview ? "live" : "mock" },
     { id: "cancelled", label: "Cancelled Orders Today", value: formatNumber(todayCancelledOrders), tone: "text-yellow-400", subtext: "Live from app order statuses", href: "/managementinsight?view=alerts-exceptions", dataSource: "live" },
   ];
@@ -1153,7 +1153,7 @@ export default function Dashboard() {
     { label: `Pending Settlements (${selectedDateRange})`, value: formatCurrency(pendingSettlements), subtext: clipOverview ? "Filtered Clip approved payments vs filtered net deposits" : "Needs Clip to calculate", dataSource: clipOverview ? "live" : "mock" },
     { label: `Settled Amounts (${selectedDateRange})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: clipOverview ? "live" : "mock" },
     { label: `Refunds (${selectedDateRange})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: clipOverview ? "live" : "mock" },
-    { label: "Payment Fees", value: paymentFees ? formatCurrency(paymentFees) : "HARDCODED", subtext: paymentFees ? "Live from Clip settlement fee fields" : "Clip settlement fee fields not present in current sync", dataSource: paymentFees ? "live" : "mock" },
+    { label: "Payment Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", subtext: paymentFees ? "Live from Clip settlement fee fields" : "Clip must return fee_amount, fees, or commission_amount in its settlement records for this to auto-fill.", dataSource: paymentFees ? "live" : "mock" },
   ];
 
   const cashVsCard = [
@@ -1209,14 +1209,14 @@ export default function Dashboard() {
     { label: "Ingredient Cost This Week", value: ingredientExpensesWeek ? formatCurrency(ingredientExpensesWeek) : formatCurrency(weekOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesWeek ? "Purchase-based from ingredient expenses this week" : `Estimated: ${weekOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesWeek ? "live" : "mock" },
     { label: "Ingredient Cost This Month", value: ingredientExpensesMonth ? formatCurrency(ingredientExpensesMonth) : formatCurrency(filteredOrders.filter(o => getRecordDate(o) >= monthStart).length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesMonth ? "Purchase-based from ingredient expenses this month" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order`, dataSource: ingredientExpensesMonth ? "live" : "mock" },
     { label: "Food Cost %", value: `${foodCostPct.toFixed(1)}%`, delta: rawIngredientExpenses ? "Calculated live from purchase-based ingredient cost" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order avg. Add expenses to replace.`, dataSource: rawIngredientExpenses ? "live" : "mock" },
-    { label: "Labor Cost Today", value: laborExpensesToday ? formatCurrency(laborExpensesToday) : "HARDCODED", delta: laborExpensesToday ? "Shift-linked and salary expenses posted today" : "No salary expenses posted today", dataSource: laborExpensesToday ? "live" : "mock" },
-    { label: "Labor Cost This Week", value: laborExpensesWeek ? formatCurrency(laborExpensesWeek) : "HARDCODED", delta: laborExpensesWeek ? "Shift-linked and salary expenses this week" : "No weekly salary ledger", dataSource: laborExpensesWeek ? "live" : "mock" },
-    { label: "Labor Cost This Month", value: laborExpensesMonth ? formatCurrency(laborExpensesMonth) : "HARDCODED", delta: laborExpensesMonth ? "Shift-linked and salary expenses this month" : "No monthly salary ledger", dataSource: laborExpensesMonth ? "live" : "mock" },
-    { label: "Labor Cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "HARDCODED", delta: laborExpenses ? "Calculated live from tracked labor expenses" : "Needs payroll mapping", dataSource: laborExpenses ? "live" : "mock" },
-    { label: "Payment Processing Fees", value: paymentFees ? formatCurrency(paymentFees) : "HARDCODED", delta: paymentFees ? "Live from Clip settlement reports" : "Clip fee fields unavailable in current data", dataSource: paymentFees ? "live" : "mock" },
-    { label: "Fixed Costs", value: recurringExpenses ? formatCurrency(recurringExpenses) : "HARDCODED", delta: recurringExpenses ? "Live from recurring expenses" : "Recurring expense mapping missing", dataSource: recurringExpenses ? "live" : "mock" },
-    { label: "Other Operating Expenses", value: otherOperatingExpenses ? formatCurrency(otherOperatingExpenses) : "HARDCODED", delta: otherOperatingExpenses ? "Live from non-ingredient, non-salary expenses" : "No other operating expenses tracked", dataSource: otherOperatingExpenses ? "live" : "mock" },
-    { label: "Cost Per Order", value: costPerOrder ? formatCurrency(costPerOrder) : "HARDCODED", delta: costPerOrder ? "Ingredient + labor + operating costs + Clip fees divided by orders" : "Needs live orders and expenses", dataSource: costPerOrder ? "live" : "mock" },
+    { label: "Labor Cost Today", value: laborExpensesToday ? formatCurrency(laborExpensesToday) : "—", delta: laborExpensesToday ? "Shift-linked and salary expenses posted today" : "Log today's shifts in Employee Calendar or add a salary expense in Finance.", dataSource: laborExpensesToday ? "live" : "mock" },
+    { label: "Labor Cost This Week", value: laborExpensesWeek ? formatCurrency(laborExpensesWeek) : "—", delta: laborExpensesWeek ? "Shift-linked and salary expenses this week" : "No salary expenses this week. Mark shifts as paid in Employee Calendar to populate this.", dataSource: laborExpensesWeek ? "live" : "mock" },
+    { label: "Labor Cost This Month", value: laborExpensesMonth ? formatCurrency(laborExpensesMonth) : "—", delta: laborExpensesMonth ? "Shift-linked and salary expenses this month" : "No salary expenses this month. Add salary expenses in Finance or complete shifts in Employee Calendar.", dataSource: laborExpensesMonth ? "live" : "mock" },
+    { label: "Labor Cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—", delta: laborExpenses ? "Calculated live from tracked labor expenses" : "Needs salary expenses. Log shifts with pay in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpenses ? "live" : "mock" },
+    { label: "Payment Processing Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", delta: paymentFees ? "Live from Clip settlement reports" : "Requires Clip to return fee fields (fee_amount / fees / commission_amount) in settlement records.", dataSource: paymentFees ? "live" : "mock" },
+    { label: "Fixed Costs", value: recurringExpenses ? formatCurrency(recurringExpenses) : "—", delta: recurringExpenses ? "Live from recurring expenses" : "Add recurring expenses in Finance (e.g. rent, utilities) and check the 'recurring' checkbox.", dataSource: recurringExpenses ? "live" : "mock" },
+    { label: "Other Operating Expenses", value: otherOperatingExpenses ? formatCurrency(otherOperatingExpenses) : "—", delta: otherOperatingExpenses ? "Live from non-ingredient, non-salary expenses" : "Add non-ingredient, non-salary expenses in Finance to track operational overhead.", dataSource: otherOperatingExpenses ? "live" : "mock" },
+    { label: "Cost Per Order", value: costPerOrder ? formatCurrency(costPerOrder) : "—", delta: costPerOrder ? "Ingredient + labor + operating costs + Clip fees divided by orders" : "Needs expenses in Finance. Once any cost is logged, this auto-calculates as total expenses ÷ order count.", dataSource: costPerOrder ? "live" : "mock" },
   ];
 
   const inventoryInsights = {
@@ -1231,11 +1231,11 @@ export default function Dashboard() {
   const bestSellingSource = bestSellingProducts.length ? "live" : "mock";
   const worstPerformingSource = worstPerformingProducts.length ? "live" : "mock";
   const staffMetrics = [
-    { label: "Total Worked Hours", value: totalWorkedHours ? `${formatNumber(totalWorkedHours)} h` : "HARDCODED", detail: totalWorkedHours ? "Live from Shift records in the last 7 days" : "Shift tracking is not populated yet", dataSource: totalWorkedHours ? "live" : "mock" },
-    { label: "Sales Per Labor Hour", value: salesPerLaborHour ? formatCurrency(salesPerLaborHour) : "HARDCODED", detail: salesPerLaborHour ? "Weekly sales divided by tracked shift hours" : "Needs both shifts and sales history", dataSource: salesPerLaborHour ? "live" : "mock" },
-    { label: "Labor Cost Per Shift", value: laborCostPerShift ? formatCurrency(laborCostPerShift) : "HARDCODED", detail: laborCostPerShift ? "Average from tracked shift payouts" : "No paid shifts recorded yet", dataSource: laborCostPerShift ? "live" : "mock" },
-    { label: "Current Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "HARDCODED", detail: currentShiftStaffing ? `Today's scheduled shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : "No shift schedule posted for today", dataSource: currentShiftStaffing ? "live" : "mock" },
-    { label: "Overtime Alerts", value: overtimeAlertsCount ? formatNumber(overtimeAlertsCount) : "HARDCODED", detail: overtimeAlertsCount ? "Triggered by shifts above 8 tracked hours" : "No overtime detected in current shift data", dataSource: overtimeAlertsCount ? "live" : "mock" },
+    { label: "Total Worked Hours", value: totalWorkedHours ? `${formatNumber(totalWorkedHours)} h` : "—", detail: totalWorkedHours ? "Live from Shift records in the last 7 days" : "Log shifts with hours_worked in Employee Calendar to populate this.", dataSource: totalWorkedHours ? "live" : "mock" },
+    { label: "Sales Per Labor Hour", value: salesPerLaborHour ? formatCurrency(salesPerLaborHour) : "—", detail: salesPerLaborHour ? "Weekly sales divided by tracked shift hours" : "Needs completed shifts with hours_worked. Auto-calculates as weekly revenue ÷ total shift hours.", dataSource: salesPerLaborHour ? "live" : "mock" },
+    { label: "Labor Cost Per Shift", value: laborCostPerShift ? formatCurrency(laborCostPerShift) : "—", detail: laborCostPerShift ? "Average from tracked shift payouts" : "Set an amount (payout) on each shift in Employee Calendar. Average auto-calculates.", dataSource: laborCostPerShift ? "live" : "mock" },
+    { label: "Current Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "—", detail: currentShiftStaffing ? `Today's scheduled shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : "Schedule today's shifts in Employee Calendar to see current staffing count.", dataSource: currentShiftStaffing ? "live" : "mock" },
+    { label: "Overtime Alerts", value: overtimeAlertsCount ? formatNumber(overtimeAlertsCount) : "—", detail: overtimeAlertsCount ? "Triggered by shifts above 8 tracked hours" : "Auto-triggers when any shift has more than 8 hours logged. No overtime in current data.", dataSource: overtimeAlertsCount ? "live" : "mock" },
   ];
   const staffDataSource = staffMetrics.some((metric) => metric.dataSource === "live") ? "live" : "mock";
   const laborEfficiencySource = laborEfficiencyTrend.some((item) => item.efficiency > 0) ? "live" : "mock";
