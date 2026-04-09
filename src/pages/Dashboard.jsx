@@ -742,7 +742,7 @@ export default function Dashboard() {
   const filteredRefundVolume = filteredClipPayments.reduce((sum, payment) => sum + getClipPaymentRefundAmount(payment), 0);
   const paymentFees = filteredClipSettlements.reduce((sum, settlement) => sum + getClipSettlementFeeAmount(settlement), 0);
   const grossSales = filteredReceipts.length ? filteredReceipts.reduce((sum, receipt) => sum + getReceiptGrossBeforeDiscount(receipt), 0) : totalRevenue;
-  const ordersCount = filteredReceipts.length || filteredOrders.length;
+  const ordersCount = filteredReceipts.length || (filteredOrders.length + unmatchedClipPayments.length);
   const totalExpenses = totalExpenseLedger + paymentFees;
   const grossProfit = grossSales - ingredientExpenses;
   const netProfit = grossSales - ingredientExpenses - laborExpenses - recurringExpenses - otherOperatingExpenses - paymentFees;
@@ -789,6 +789,18 @@ export default function Dashboard() {
   const bankTransferTotal = filteredTransactions
     .filter((transaction) => transaction.payment_method === "transfer")
     .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+
+  // Clip transactions without a matching app order (same amount) count as additional orders
+  const _appOrderAmounts = filteredOrders.map((o) => Number(o.total_amount || 0));
+  const unmatchedClipPayments = approvedClipPayments.filter((payment) => {
+    const amount = getClipPaymentAmount(payment);
+    const matchIndex = _appOrderAmounts.indexOf(amount);
+    if (matchIndex !== -1) {
+      _appOrderAmounts.splice(matchIndex, 1);
+      return false;
+    }
+    return true;
+  });
   const previousDayOrders = orders.filter((order) => {
     const date = getRecordDate(order);
     return date >= subDays(todayStart, 7) && date < subDays(todayStart, 6);
