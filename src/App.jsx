@@ -14,6 +14,7 @@ import CustomerOrder from './pages/CustomerOrder';
 import NotionPage from './pages/Notion';
 import LocalSetupHelp from '@/components/LocalSetupHelp';
 import IncomeTracker from './pages/IncomeTracker';
+import IntegrationsHub from './pages/IntegrationsHub';
 
 const { Pages, Layout } = pagesConfig;
 
@@ -78,6 +79,11 @@ const AuthenticatedApp = () => {
       <Route path="/IncomeTracker" element={
         <LayoutWrapper currentPageName="IncomeTracker">
           <IncomeTracker />
+        </LayoutWrapper>
+      } />
+      <Route path="/IntegrationsHub" element={
+        <LayoutWrapper currentPageName="IntegrationsHub">
+          <IntegrationsHub />
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => (
