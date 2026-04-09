@@ -1331,18 +1331,24 @@ export default function Dashboard() {
             </div>
             <Badge className="border border-yellow-500/20 bg-[#242424] text-gray-300">{selectedDateRange}</Badge>
           </div>
-          <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {comparisonCards.map((item) => (
-              <div key={item.id} className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{item.label}</p>
-                <p className="mt-3 text-2xl font-bold text-white">{item.currentLabel}</p>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className={`text-sm font-medium ${item.trend === "up" ? "text-emerald-300" : "text-red-300"}`}>{item.deltaLabel}</p>
-                  <p className="text-xs text-gray-500">Prev: {item.previousLabel}</p>
+          <details className="mb-4 group">
+            <summary className="flex cursor-pointer items-center gap-2 rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-2.5 text-xs uppercase tracking-[0.2em] text-gray-500 hover:bg-[#242424] select-none list-none">
+              <span className="mr-1 text-yellow-500/60 group-open:rotate-90 transition-transform inline-block">▶</span>
+              Period Comparisons
+            </summary>
+            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {comparisonCards.map((item) => (
+                <div key={item.id} className="rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-gray-600">{item.label}</p>
+                  <p className="mt-1.5 text-lg font-bold text-white">{item.currentLabel}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className={`text-xs font-medium ${item.trend === "up" ? "text-emerald-400" : "text-red-400"}`}>{item.deltaLabel}</p>
+                    <p className="text-[10px] text-gray-600">Prev: {item.previousLabel}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </details>
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {executiveKpis.map((item) => (
               <KpiCard key={item.id} item={item} />
