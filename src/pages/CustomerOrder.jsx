@@ -1048,14 +1048,14 @@ export default function CustomerOrder() {
                   </div>
                   <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
-                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Tios Fritos en Beerfestcondido</h3>
+                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio en Beerfestcondido</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    Este <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estaremos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestros <span className="text-yellow-400 font-semibold">Tios Fritos</span> bien dorados y crujientes. Va a haber chela, buena vibra, pizza frita y ambiente de festival para pasarla brutal con banda chida junto al mar. Caele con hambre, con amigos y con ganas de echar unas frias.
+                    El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "🍺", line1: "Cerveza", line2: "bien fria" },
-                      { emoji: "🍕", line1: "Tios", line2: "Fritos" },
+                      { emoji: "🍺", line1: "Cerveza", line2: "artesanal" },
+                      { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
                       { emoji: "✨", line1: "Buena", line2: "vibra" },
                       { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
                     ].map(({ emoji, line1, line2 }) => (
@@ -1066,7 +1066,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
-                  <EventShareButtons title="Tios Fritos en Beerfestcondido - 4 y 5 Abril" text="Nos vemos en Nodo Brewery con Tios Fritos, cerveza y buena vibra!" url={`${window.location.origin}/#eventos`} />
+                  <EventShareButtons title="Bolas del Tio en Beerfestcondido - 4 y 5 Abril" text="Nos vemos en Nodo Brewery con Bolas del Tio, cerveza artesanal y buena vibra!" url={`${window.location.origin}/#eventos`} />
                 </div>
 
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
@@ -1076,14 +1076,14 @@ export default function CustomerOrder() {
                   </div>
                   <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
-                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Tios Fritos at Beerfestcondido</h3>
+                  <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio at Beerfestcondido</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    On <span className="text-yellow-400 font-semibold">April 4-5</span> we will be at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving up crispy, golden <span className="text-yellow-400 font-semibold">Tios Fritos</span>. Expect cold beer, fried pizza, a great crowd and the kind of easy festival vibe that makes you want to stay all day. Pull up hungry, bring your people, and come catch us by the beer.
+                    On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { emoji: "🍺", line1: "Cold", line2: "beer" },
-                      { emoji: "🍕", line1: "Tios", line2: "Fritos" },
+                      { emoji: "🍺", line1: "Craft", line2: "beer" },
+                      { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
                       { emoji: "✨", line1: "Great", line2: "vibe" },
                       { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
                     ].map(({ emoji, line1, line2 }) => (
@@ -1094,7 +1094,7 @@ export default function CustomerOrder() {
                     ))}
                   </div>
                   <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
-                  <EventShareButtons title="Tios Fritos at Beerfestcondido - April 4-5" text="Catch us at Nodo Brewery for Tios Fritos, cold beer and good vibes!" lang="en" url={`${window.location.origin}/#eventos`} />
+                  <EventShareButtons title="Bolas del Tio at Beerfestcondido - April 4-5" text="Catch us at Nodo Brewery for Bolas del Tio, craft beer and great vibes!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
               </div>
               )}
@@ -1433,4 +1433,3 @@ export default function CustomerOrder() {
     </div>
   );
 }
-
