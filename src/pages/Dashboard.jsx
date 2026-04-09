@@ -742,7 +742,7 @@ export default function Dashboard() {
   const filteredRefundVolume = filteredClipPayments.reduce((sum, payment) => sum + getClipPaymentRefundAmount(payment), 0);
   const paymentFees = filteredClipSettlements.reduce((sum, settlement) => sum + getClipSettlementFeeAmount(settlement), 0);
   const grossSales = filteredReceipts.length ? filteredReceipts.reduce((sum, receipt) => sum + getReceiptGrossBeforeDiscount(receipt), 0) : totalRevenue;
-  const ordersCount = filteredReceipts.length || (filteredOrders.length + unmatchedClipPayments.length);
+
   const totalExpenses = totalExpenseLedger + paymentFees;
   const grossProfit = grossSales - ingredientExpenses;
   const netProfit = grossSales - ingredientExpenses - laborExpenses - recurringExpenses - otherOperatingExpenses - paymentFees;
@@ -801,6 +801,7 @@ export default function Dashboard() {
     }
     return true;
   });
+  const ordersCount = filteredReceipts.length || (filteredOrders.length + unmatchedClipPayments.length);
   const previousDayOrders = orders.filter((order) => {
     const date = getRecordDate(order);
     return date >= subDays(todayStart, 7) && date < subDays(todayStart, 6);
