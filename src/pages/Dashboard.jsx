@@ -748,7 +748,6 @@ export default function Dashboard() {
   const netProfit = grossSales - ingredientExpenses - laborExpenses - recurringExpenses - otherOperatingExpenses - paymentFees;
   const foodCostPct = grossSales ? (ingredientExpenses / grossSales) * 100 : 0;
   const laborCostPct = grossSales ? (laborExpenses / grossSales) * 100 : 0;
-  const costPerOrder = ordersCount ? totalExpenses / ordersCount : 0;
   const failedSettlementsCount = filteredClipSettlements.filter((settlement) => {
     const status = getClipSettlementStatus(settlement);
     return status.includes("fail") || status.includes("declin") || status.includes("error");
@@ -802,6 +801,7 @@ export default function Dashboard() {
     return true;
   });
   const ordersCount = filteredReceipts.length || (filteredOrders.length + unmatchedClipPayments.length);
+  const costPerOrder = ordersCount ? totalExpenses / ordersCount : 0;
   const previousDayOrders = orders.filter((order) => {
     const date = getRecordDate(order);
     return date >= subDays(todayStart, 7) && date < subDays(todayStart, 6);
