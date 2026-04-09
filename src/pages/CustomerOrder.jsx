@@ -1198,6 +1198,62 @@ export default function CustomerOrder() {
               {/* Divider */}
               <div className="border-t border-yellow-500/10 my-8"></div>
               <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">Evento pasado / Past event</p>
+              {isEventInPast("beerfestcondido") && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                  <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
+                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
+                      <span className="font-black text-3xl leading-none">4-5</span>
+                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">ABRIL</span>
+                    </div>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
+                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio en Beerfestcondido</h3>
+                    <p className="leading-relaxed text-sm text-gray-300">
+                      El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {[
+                        { emoji: "🍺", line1: "Cerveza", line2: "artesanal" },
+                        { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
+                        { emoji: "✨", line1: "Buena", line2: "vibra" },
+                        { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
+                      ].map(({ emoji, line1, line2 }) => (
+                        <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 bg-gray-800/50 text-gray-500">
+                          <span className="text-base leading-none">{emoji}</span>
+                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
+                  </div>
+                  <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
+                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
+                      <span className="font-black text-3xl leading-none">4-5</span>
+                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">APRIL</span>
+                    </div>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
+                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio at Beerfestcondido</h3>
+                    <p className="leading-relaxed text-sm text-gray-300">
+                      On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {[
+                        { emoji: "🍺", line1: "Craft", line2: "beer" },
+                        { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
+                        { emoji: "✨", line1: "Great", line2: "vibe" },
+                        { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
+                      ].map(({ emoji, line1, line2 }) => (
+                        <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 bg-gray-800/50 text-gray-500">
+                          <span className="text-base leading-none">{emoji}</span>
+                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
+                  </div>
+                </div>
+              )}
               {isEventInPast("football-night") && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                   {/* Football Night - Spanish */}
