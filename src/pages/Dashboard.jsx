@@ -1030,18 +1030,6 @@ export default function Dashboard() {
 
   const executiveKpis = [
     {
-      id: "gross-sales",
-      label: "Gross Sales",
-      value: formatCurrency(grossSales),
-      delta: primaryComparisonCard.deltaLabel,
-      trend: primaryComparisonCard.trend,
-      comparisonLabel: `${primaryComparisonCard.label}. ${loyverseOverview ? "Source: Loyverse gross before discounts" : "Fallback from app orders"}`,
-      sparkTone: "positive",
-      sparkline: revenue7Days.map((item) => item.revenue),
-      href: "/managementinsight?view=gross-sales",
-      dataSource: "live",
-    },
-    {
       id: "net-sales",
       label: "Net Sales",
       value: formatCurrency(netSales),
