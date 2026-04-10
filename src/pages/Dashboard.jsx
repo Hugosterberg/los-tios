@@ -31,7 +31,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { subDays, format } from "date-fns";
+import { subDays, format, isValid } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
@@ -59,7 +59,6 @@ import {
   filterOptions,
   inventoryInsights as mockInventoryInsights,
   laborEfficiencyTrend as mockLaborEfficiencyTrend,
-  productPerformance as mockProductPerformance,
 } from "@/features/dashboard/mockData";
 
 const formatCurrency = (value) =>
@@ -72,18 +71,50 @@ const formatCurrency = (value) =>
 
 const formatNumber = (value) => new Intl.NumberFormat("es-MX").format(value || 0);
 
+function formatDateSafe(value, pattern, fallback = "N/A") {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!isValid(date)) {
+    return fallback;
+  }
+
+  return format(date, pattern);
+}
+
 function SourceBadge({ source = "mock" }) {
-  const isLive = source === "live";
+  const sourceMeta = {
+    clip: {
+      label: "Clip",
+      tone: "border border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+    },
+    loyverse: {
+      label: "Loyverse",
+      tone: "border border-violet-500/25 bg-violet-500/10 text-violet-300",
+    },
+    both: {
+      label: "Clip + Loyverse",
+      tone: "border border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-300",
+    },
+    app: {
+      label: "App",
+      tone: "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    },
+    manual: {
+      label: "Manual",
+      tone: "border border-sky-500/20 bg-sky-500/10 text-sky-300",
+    },
+    mock: {
+      label: "Hardcoded",
+      tone: "border border-amber-400/20 bg-amber-400/10 text-amber-200",
+    },
+    live: {
+      label: "Live data",
+      tone: "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    },
+  };
+  const resolved = sourceMeta[source] || sourceMeta.mock;
+
   return (
-    <Badge
-      className={
-        isLive
-          ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-          : "border border-amber-400/20 bg-amber-400/10 text-amber-200"
-      }
-    >
-      {isLive ? "Live data" : "Hardcoded"}
-    </Badge>
+    <Badge className={resolved.tone}>{resolved.label}</Badge>
   );
 }
 
@@ -171,6 +202,19 @@ function getStartOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+function getEndOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+}
+
+const DEDUPE_WINDOW_OPTIONS = ["2 min", "5 min", "10 min", "15 min"];
+const DEDUPE_PRIORITY_OPTIONS = ["Prefer Loyverse", "Prefer Clip", "Prefer Manual", "Prefer earliest"];
+
+function parseDedupeWindowMinutes(option) {
+  const parsed = Number.parseInt(String(option || "").replace(/\D/g, ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+}
+
 function getDateRangeStart(range) {
   const today = getStartOfToday();
 
@@ -194,6 +238,29 @@ function filterByRange(records, range) {
   }
 
   return records.filter((record) => getRecordDate(record) >= start);
+}
+
+function getDateRangeWindow(range) {
+  const start = getDateRangeStart(range);
+  return {
+    start,
+    end: getEndOfToday(),
+  };
+}
+
+function getDashboardQueryStart(range) {
+  const today = getStartOfToday();
+
+  switch (range) {
+    case "1 day":
+    case "7 days":
+      return subDays(today, 34);
+    case "1 month":
+      return new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    case "All history":
+    default:
+      return subDays(today, 89);
+  }
 }
 
 function sumOrderRevenue(orders) {
@@ -284,11 +351,134 @@ function getClipPaymentRefundAmount(payment) {
   );
 }
 
+function formatSourceName(source) {
+  if (source === "loyverse") {
+    return "Loyverse";
+  }
+  if (source === "clip") {
+    return "Clip";
+  }
+  if (source === "manual") {
+    return "Manual";
+  }
+  return source;
+}
+
+function normalizePaymentMethod(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function matchesPaymentSourceFilter(event, selectedPaymentSource) {
+  if (selectedPaymentSource === "All sources") {
+    return true;
+  }
+
+  const method = normalizePaymentMethod(event.paymentMethod);
+
+  if (selectedPaymentSource === "Clip") {
+    return event.source === "clip";
+  }
+
+  if (selectedPaymentSource === "Cash") {
+    return method === "cash";
+  }
+
+  if (selectedPaymentSource === "Bank transfer") {
+    return method.includes("transfer") || method.includes("bank");
+  }
+
+  if (selectedPaymentSource === "Online") {
+    return method.includes("online") || method.includes("web") || method.includes("delivery") || method.includes("marketplace");
+  }
+
+  if (selectedPaymentSource === "Card") {
+    return event.source !== "clip" && (method.includes("card") || method.includes("credit") || method.includes("debit"));
+  }
+
+  return true;
+}
+
+function normalizeBranchName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeSalesChannel(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function deriveReceiptSalesChannel(receipt) {
+  const value = normalizeSalesChannel(
+    receipt?.source ||
+    receipt?.dining_option ||
+    receipt?.order_type ||
+    receipt?.receipt_type,
+  );
+
+  if (value.includes("dine")) {
+    return "Dine-in";
+  }
+  if (value.includes("pickup") || value.includes("takeout") || value.includes("carryout")) {
+    return "Pickup";
+  }
+  if (value.includes("delivery") || value.includes("marketplace")) {
+    return "Delivery app";
+  }
+  if (value.includes("web") || value.includes("online")) {
+    return "Direct web";
+  }
+
+  return "Unknown";
+}
+
+function deriveManualSalesChannel(transaction) {
+  const value = normalizeSalesChannel(transaction?.payment_method || transaction?.category || "manual");
+  if (value.includes("transfer") || value.includes("bank")) {
+    return "Direct web";
+  }
+  if (value.includes("cash")) {
+    return "Dine-in";
+  }
+  return "Unknown";
+}
+
+function matchesBranchFilter(event, selectedBranch) {
+  if (selectedBranch === "All branches") {
+    return true;
+  }
+
+  if (!event.branch) {
+    return selectedBranch === "Centro";
+  }
+
+  return normalizeBranchName(event.branch) === normalizeBranchName(selectedBranch);
+}
+
+function matchesSalesChannelFilter(event, selectedChannel) {
+  if (selectedChannel === "All channels") {
+    return true;
+  }
+
+  return event.channel === selectedChannel;
+}
+
+function getReceiptPaymentMethod(receipt) {
+  const payment = (receipt?.payments || [])[0];
+  return (
+    payment?.type ||
+    payment?.name ||
+    payment?.payment_type_id ||
+    receipt?.payment_type ||
+    receipt?.payment_method ||
+    "unknown"
+  );
+}
+
 function getClipSettlementFeeAmount(settlement) {
   return getMoneyValue(
+    settlement?.total_fee ??
     settlement?.fee_amount ??
-      settlement?.fees ??
-      settlement?.commission_amount ??
+    settlement?.fees ??
+    settlement?.commission_amount ??
       settlement?.total_fees,
   );
 }
@@ -299,6 +489,7 @@ function getClipSettlementStatus(settlement) {
 
 function getClipSettlementNetAmount(settlement) {
   return getMoneyValue(
+    settlement?.disbursed_net_amount ??
     settlement?.net_amount ??
       settlement?.net_total ??
       settlement?.amount_net ??
@@ -382,35 +573,34 @@ function getExpenseCategory(expense) {
   return String(expense?.category || "").toLowerCase();
 }
 
-function buildOrdersByHour(orders) {
+function buildOrdersByHourFromEvents(events) {
   return Array.from({ length: 12 }, (_, index) => {
     const hour = index + 10;
-    const count = orders.filter((order) => new Date(order.created_date).getHours() === hour).length;
+    const count = events.filter((event) => event.timestamp.getHours() === hour).length;
     return { hour: String(hour), orders: count };
   });
 }
 
-function buildSevenDayRevenue(orders) {
+function buildSevenDayRevenueFromEvents(events) {
   return Array.from({ length: 7 }, (_, index) => {
     const date = subDays(new Date(), 6 - index);
-    const dayOrders = orders.filter((order) => isSameDay(new Date(order.created_date), date));
+    const dayEvents = events.filter((event) => isSameDay(event.timestamp, date));
     return {
       day: format(date, "EEE"),
-      revenue: dayOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
-      orders: dayOrders.length,
+      revenue: dayEvents.reduce((sum, event) => sum + event.amount, 0),
+      orders: dayEvents.length,
     };
   });
 }
 
-function buildThirtyDayRevenue(orders) {
+function buildThirtyDayRevenueFromEvents(events) {
   return Array.from({ length: 4 }, (_, index) => {
     const end = subDays(new Date(), (3 - index) * 7);
     const start = subDays(end, 6);
-    const weekOrders = orders.filter((order) => {
-      const created = new Date(order.created_date);
-      return created >= start && created <= end;
+    const weekEvents = events.filter((event) => {
+      return event.timestamp >= start && event.timestamp <= end;
     });
-    const revenue = weekOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+    const revenue = weekEvents.reduce((sum, event) => sum + event.amount, 0);
     return {
       window: `Week ${index + 1}`,
       revenue,
@@ -419,62 +609,19 @@ function buildThirtyDayRevenue(orders) {
   });
 }
 
-function buildAovTrend(orders) {
+function buildAovTrendFromEvents(events) {
   return Array.from({ length: 4 }, (_, index) => {
     const end = subDays(new Date(), (3 - index) * 7);
     const start = subDays(end, 6);
-    const weekOrders = orders.filter((order) => {
-      const created = new Date(order.created_date);
-      return created >= start && created <= end;
+    const weekEvents = events.filter((event) => {
+      return event.timestamp >= start && event.timestamp <= end;
     });
-    const totalRevenue = weekOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+    const totalRevenue = weekEvents.reduce((sum, event) => sum + event.amount, 0);
     return {
       period: `Week ${index + 1}`,
-      aov: weekOrders.length ? Number((totalRevenue / weekOrders.length).toFixed(2)) : 0,
+      aov: weekEvents.length ? Number((totalRevenue / weekEvents.length).toFixed(2)) : 0,
     };
   });
-}
-
-function buildBestSellingProducts(orders) {
-  const itemsMap = new Map();
-
-  orders.forEach((order) => {
-    (order.items || []).forEach((item) => {
-      const key = item.item_name || item.name || "Unknown item";
-      const current = itemsMap.get(key) || { units: 0, revenue: 0 };
-      current.units += Number(item.quantity || 0);
-      current.revenue += Number(item.price || 0) * Number(item.quantity || 0);
-      itemsMap.set(key, current);
-    });
-  });
-
-  return [...itemsMap.entries()]
-    .sort((a, b) => b[1].units - a[1].units)
-    .slice(0, 3)
-    .map(([product, values], index) => ({
-      id: `live-product-${index}`,
-      product,
-      units: values.units,
-      revenue: formatCurrency(values.revenue),
-      margin: "Live qty/revenue",
-      href: "/managementinsight?view=products",
-    }));
-}
-
-function buildSalesByChannel(orders) {
-  const channels = [
-    { key: "dine-in", name: "Dine-in", fill: "#facc15" },
-    { key: "takeout", name: "Takeout", fill: "#a16207" },
-    { key: "delivery", name: "Delivery", fill: "#fef08a" },
-  ];
-
-  return channels.map((channel) => ({
-    name: channel.name,
-    value: orders
-      .filter((order) => order.order_type === channel.key)
-      .reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
-    fill: channel.fill,
-  }));
 }
 
 function buildInventoryRows(loyverseOverview) {
@@ -507,7 +654,7 @@ function buildRecentPurchases(expenses) {
       supplier: expense.supplier || "Expense ledger",
       item: expense.name || "Ingredient purchase",
       cost: formatCurrency(getExpenseAmount(expense)),
-      received: expense.date ? format(new Date(expense.date), "yyyy-MM-dd") : "No date",
+      received: expense.date ? formatDateSafe(expense.date, "yyyy-MM-dd", "No date") : "No date",
     }));
 }
 
@@ -571,31 +718,251 @@ function buildCostTrendVsBudget(orders, expenses) {
   });
 }
 
-function buildWorstPerformingProducts(orders) {
+function createSaleEvent({ id, source, amount, timestamp, paymentMethod, branch, channel, payload }) {
+  return {
+    id,
+    source,
+    amount: Number(amount || 0),
+    timestamp: timestamp ? new Date(timestamp) : new Date(0),
+    paymentMethod: paymentMethod || "unknown",
+    branch: branch || null,
+    channel: channel || "Unknown",
+    payload,
+  };
+}
+
+function findDuplicateEventIndex(canonicalEvents, candidate, toleranceMs = 10 * 60 * 1000) {
+  return canonicalEvents.findIndex((event) => {
+    if (Math.abs(event.amount - candidate.amount) > 0.009) {
+      return false;
+    }
+
+    const timeDifference = Math.abs(event.timestamp.getTime() - candidate.timestamp.getTime());
+    return timeDifference <= toleranceMs;
+  });
+}
+
+function getEventPriority(event, priorityMode) {
+  const sourcePriorityByMode = {
+    "Prefer Loyverse": { loyverse: 0, clip: 1, manual: 2 },
+    "Prefer Clip": { clip: 0, loyverse: 1, manual: 2 },
+    "Prefer Manual": { manual: 0, loyverse: 1, clip: 2 },
+    "Prefer earliest": { loyverse: 0, clip: 1, manual: 2 },
+  };
+
+  const sourcePriority = sourcePriorityByMode[priorityMode] || sourcePriorityByMode["Prefer Loyverse"];
+  return sourcePriority[event.source] ?? 99;
+}
+
+function dedupeSaleEvents(receiptEvents, clipEvents, manualEvents, options = {}) {
+  const toleranceMs = options.toleranceMs ?? 10 * 60 * 1000;
+  const priorityMode = options.priorityMode || "Prefer Loyverse";
+  const allEvents = [...receiptEvents, ...clipEvents, ...manualEvents].sort((left, right) => {
+    if (priorityMode === "Prefer earliest") {
+      const timeDiff = left.timestamp.getTime() - right.timestamp.getTime();
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+    }
+
+    const priorityDiff = getEventPriority(left, priorityMode) - getEventPriority(right, priorityMode);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return left.timestamp.getTime() - right.timestamp.getTime();
+  });
+  const canonicalEvents = [];
+  const duplicates = [];
+
+  allEvents.forEach((event) => {
+    const duplicateIndex = findDuplicateEventIndex(canonicalEvents, event, toleranceMs);
+    if (duplicateIndex >= 0) {
+      duplicates.push({
+        duplicate: event,
+        canonical: canonicalEvents[duplicateIndex],
+        matchedWithinMinutes: Math.round(Math.abs(canonicalEvents[duplicateIndex].timestamp.getTime() - event.timestamp.getTime()) / 60000),
+      });
+      return;
+    }
+
+    canonicalEvents.push(event);
+  });
+
+  return {
+    canonicalEvents,
+    duplicates,
+  };
+}
+
+function buildReceiptProductPerformance(receipts, direction = "top") {
   const itemsMap = new Map();
 
-  orders.forEach((order) => {
-    (order.items || []).forEach((item) => {
-      const key = item.item_name || item.name || "Unknown item";
-      const current = itemsMap.get(key) || { units: 0, revenue: 0 };
-      current.units += Number(item.quantity || 0);
-      current.revenue += Number(item.price || 0) * Number(item.quantity || 0);
-      itemsMap.set(key, current);
+  receipts.forEach((receipt) => {
+    getReceiptItems(receipt).forEach((item) => {
+      const product = item.item_name || item.name || item.variant_name || "Unknown item";
+      const current = itemsMap.get(product) || { units: 0, revenue: 0 };
+      const quantity = Number(item.quantity || item.qty || 0);
+      current.units += quantity;
+      current.revenue += getReceiptItemGross(item);
+      itemsMap.set(product, current);
     });
   });
 
-  return [...itemsMap.entries()]
+  const sorted = [...itemsMap.entries()]
     .filter(([, values]) => values.units > 0)
-    .sort((a, b) => a[1].units - b[1].units || a[1].revenue - b[1].revenue)
-    .slice(0, 3)
-    .map(([product, values], index) => ({
-      id: `low-product-${index}`,
-      product,
-      units: values.units,
-      revenue: formatCurrency(values.revenue),
-      margin: "Live low-volume proxy",
+    .sort((a, b) => {
+      if (direction === "bottom") {
+        return a[1].units - b[1].units || a[1].revenue - b[1].revenue;
+      }
+
+      return b[1].units - a[1].units || b[1].revenue - a[1].revenue;
+    })
+    .slice(0, 3);
+
+  return sorted.map(([product, values], index) => ({
+    id: `loyverse-product-${direction}-${index}`,
+    product,
+    units: values.units,
+    revenue: formatCurrency(values.revenue),
+    margin: direction === "bottom" ? "Live low-volume proxy" : "Live from Loyverse receipts",
+    href: "/managementinsight?view=products",
+  }));
+}
+
+function getLoyverseItemPrice(item) {
+  const directPrice = getMoneyValue(item?.price ?? item?.default_price ?? item?.price_money);
+  if (directPrice > 0) {
+    return directPrice;
+  }
+
+  if (Array.isArray(item?.variants) && item.variants.length > 0) {
+    const variantPrice = item.variants.reduce((max, variant) => {
+      const value = getMoneyValue(
+        variant?.default_price ??
+        variant?.price ??
+        variant?.price_money,
+      );
+      return Math.max(max, value);
+    }, 0);
+    if (variantPrice > 0) {
+      return variantPrice;
+    }
+  }
+
+  return 0;
+}
+
+function isLikelyRealName(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return false;
+  }
+  if (/^unknown/i.test(normalized)) {
+    return false;
+  }
+  return /[a-zA-Z\u00C0-\u017F]/.test(normalized);
+}
+
+function resolveLoyverseItemName(item, clipNameFallbacks = []) {
+  const variantName = Array.isArray(item?.variants)
+    ? item.variants.map((variant) => variant?.name).find(Boolean)
+    : "";
+  const fallbackFromFields = [
+    item?.name,
+    item?.item_name,
+    item?.display_name,
+    item?.title,
+    variantName,
+    item?.sku,
+    item?.id ? `Item ${item.id}` : "",
+  ].find((candidate) => isLikelyRealName(candidate));
+
+  if (fallbackFromFields) {
+    return String(fallbackFromFields).trim();
+  }
+
+  const clipName = clipNameFallbacks.find((candidate) => isLikelyRealName(candidate));
+  if (clipName) {
+    return String(clipName).trim();
+  }
+
+  if (item?.sku) {
+    return `SKU ${item.sku}`;
+  }
+  if (item?.id) {
+    return `Item ${item.id}`;
+  }
+
+  return "Menu item";
+}
+
+function buildCatalogProductCards(items, direction = "top", clipPayments = []) {
+  const clipNameFallbacks = (clipPayments || [])
+    .map((payment) =>
+      payment?.description ||
+      payment?.concept ||
+      payment?.reference ||
+      payment?.receipt_no ||
+      "",
+    )
+    .filter(Boolean);
+
+  const normalized = (items || [])
+    .map((item, index) => ({
+      id: item.id || `loyverse-catalog-${index}`,
+      product: resolveLoyverseItemName(item, clipNameFallbacks),
+      units: Number(item.variantsCount || item.variants?.length || 0),
+      revenue: formatCurrency(getLoyverseItemPrice(item)),
+      margin: "Catalog item",
       href: "/managementinsight?view=products",
-    }));
+      _sortPrice: getLoyverseItemPrice(item),
+    }))
+    .sort((left, right) => {
+      if (direction === "bottom") {
+        return left._sortPrice - right._sortPrice;
+      }
+      return right._sortPrice - left._sortPrice;
+    })
+    .slice(0, 3);
+
+  return normalized.map(({ _sortPrice, ...item }) => item);
+}
+
+function buildHighestMarginProductsFromReceipts(receipts) {
+  const byProduct = new Map();
+
+  receipts.forEach((receipt) => {
+    getReceiptItems(receipt).forEach((item) => {
+      const product = item.item_name || item.name || item.variant_name || "Unknown item";
+      const current = byProduct.get(product) || { units: 0, revenue: 0, cost: 0 };
+      const quantity = Number(item.quantity || item.qty || 0);
+      const lineRevenue = getReceiptItemGross(item);
+      const lineCost = getMoneyValue(item.cost_total ?? item.cost) || 0;
+      current.units += quantity;
+      current.revenue += lineRevenue;
+      current.cost += lineCost;
+      byProduct.set(product, current);
+    });
+  });
+
+  return [...byProduct.entries()]
+    .map(([product, values], index) => {
+      const marginAmount = values.revenue - values.cost;
+      const marginPct = values.revenue > 0 ? (marginAmount / values.revenue) * 100 : null;
+      return {
+        id: `loyverse-margin-${index}`,
+        product,
+        units: values.units,
+        revenue: formatCurrency(values.revenue),
+        margin: marginPct === null ? "No cost data" : `${marginPct.toFixed(1)}% margin`,
+        href: "/managementinsight?view=products",
+        _sortMargin: marginAmount,
+      };
+    })
+    .sort((left, right) => right._sortMargin - left._sortMargin)
+    .slice(0, 3)
+    .map(({ _sortMargin, ...row }) => row);
 }
 
 export default function Dashboard() {
@@ -605,9 +972,23 @@ export default function Dashboard() {
   const [selectedChannel, setSelectedChannel] = React.useState(filterOptions.salesChannels[0]);
   const [selectedPaymentSource, setSelectedPaymentSource] = React.useState(filterOptions.paymentSources[0]);
   const [selectedShift, setSelectedShift] = React.useState(filterOptions.shifts[0]);
+  const [selectedDedupeWindow, setSelectedDedupeWindow] = React.useState(DEDUPE_WINDOW_OPTIONS[2]);
+  const [selectedDedupePriority, setSelectedDedupePriority] = React.useState(DEDUPE_PRIORITY_OPTIONS[0]);
   const isLocalOnlyMode =
     import.meta.env.DEV &&
     (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
+  const queryWindowStart = React.useMemo(
+    () => getDashboardQueryStart(selectedDateRange),
+    [selectedDateRange],
+  );
+  const selectedRangeWindow = React.useMemo(
+    () => getDateRangeWindow(selectedDateRange),
+    [selectedDateRange],
+  );
+  const dedupeWindowMs = React.useMemo(
+    () => parseDedupeWindowMinutes(selectedDedupeWindow) * 60 * 1000,
+    [selectedDedupeWindow],
+  );
 
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
@@ -642,15 +1023,21 @@ export default function Dashboard() {
   });
 
   const loyverseQuery = useQuery({
-    queryKey: ["loyverseOverview", settings[0]?.id || "none"],
-    queryFn: () => getLoyverseOverview(appSettings),
+    queryKey: ["loyverseOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", selectedRangeWindow.end.toISOString()],
+    queryFn: () => getLoyverseOverview(appSettings, {
+      start: queryWindowStart,
+      end: selectedRangeWindow.end,
+    }),
     enabled: hasLoyverseApiConfig(appSettings),
     staleTime: 60_000,
   });
 
   const clipQuery = useQuery({
-    queryKey: ["clipOverview", settings[0]?.id || "none"],
-    queryFn: () => getClipOverview(appSettings),
+    queryKey: ["clipOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", selectedRangeWindow.end.toISOString()],
+    queryFn: () => getClipOverview(appSettings, {
+      start: queryWindowStart,
+      end: selectedRangeWindow.end,
+    }),
     enabled: hasClipApiConfig(appSettings),
     staleTime: 60_000,
   });
@@ -686,25 +1073,24 @@ export default function Dashboard() {
   const filteredReceipts = filterByRange(receipts, selectedDateRange);
   const filteredClipPayments = filterByRange(clipPayments, selectedDateRange);
   const filteredClipSettlements = filterByRange(clipSettlements, selectedDateRange);
+  const selectedRangeLabelLower = selectedDateRange.toLowerCase();
 
   const deliveredOrders = filteredOrders.filter((order) => order.status === "delivered");
-  const activeOrders = orders.filter((order) => ["pending", "preparing", "ready", "out_for_delivery"].includes(order.status)).length;
+  const activeOrders = filteredOrders.filter((order) => ["pending", "preparing", "ready", "out_for_delivery"].includes(order.status)).length;
   const todayStart = getStartOfToday();
   const weekStart = subDays(todayStart, 6);
   const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
-  const todayOrders = orders.filter((order) => new Date(order.created_date) >= todayStart);
-  const weekOrders = filteredOrders.filter((order) => getRecordDate(order) >= weekStart);
-  const todayReceipts = receipts.filter((receipt) => getRecordDate(receipt) >= todayStart);
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+  const todayOrders = filteredOrders;
+  const weekOrders = filteredOrders;
   const todayCancelledOrders = todayOrders.filter((order) => order.status === "cancelled").length;
-  const todayDelayedOrders = orders.filter((order) => Number(order.estimated_delivery_minutes || 0) > 35).length;
+  const todayDelayedOrders = filteredOrders.filter((order) => Number(order.estimated_delivery_minutes || 0) > 35).length;
   const todayRefundCount = filteredClipPayments.filter((payment) => getClipPaymentRefundAmount(payment) > 0).length;
   const prepTimeOrders = todayOrders.filter((order) => Number(order.preparation_minutes || order.estimated_delivery_minutes || 0) > 0);
   const avgPrepTime = prepTimeOrders.length
     ? Math.round(prepTimeOrders.reduce((sum, order) => sum + Number(order.preparation_minutes || order.estimated_delivery_minutes || 0), 0) / prepTimeOrders.length)
     : 0;
-  const ordersInKitchen = orders.filter((order) => order.status === "preparing").length;
-  const ordersOutForDelivery = orders.filter((order) => order.status === "out_for_delivery").length;
+  const ordersInKitchen = filteredOrders.filter((order) => order.status === "preparing").length;
+  const ordersOutForDelivery = filteredOrders.filter((order) => order.status === "out_for_delivery").length;
 
   const totalRevenue = sumOrderRevenue(deliveredOrders);
   const shiftExpenseIds = new Set(filteredShifts.map((shift) => shift.expense_id).filter(Boolean));
@@ -733,12 +1119,8 @@ export default function Dashboard() {
   const laborExpenses = shiftLaborExpenses || manualLaborExpenses;
   const recurringExpenses = recurringExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const otherOperatingExpenses = otherOperatingExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const ingredientExpensesToday = ingredientExpenseRows.filter((expense) => getRecordDate(expense) >= todayStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const ingredientExpensesWeek = ingredientExpenseRows.filter((expense) => getRecordDate(expense) >= weekStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const ingredientExpensesMonth = ingredientExpenseRows.filter((expense) => getRecordDate(expense) >= monthStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const laborExpensesToday = salaryExpenseRows.filter((expense) => getRecordDate(expense) >= todayStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const laborExpensesWeek = salaryExpenseRows.filter((expense) => getRecordDate(expense) >= weekStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const laborExpensesMonth = salaryExpenseRows.filter((expense) => getRecordDate(expense) >= monthStart).reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  const ingredientExpensesInRange = ingredientExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  const laborExpensesInRange = salaryExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const filteredRefundVolume = filteredClipPayments.reduce((sum, payment) => sum + getClipPaymentRefundAmount(payment), 0);
   const paymentFees = filteredClipSettlements.reduce((sum, settlement) => sum + getClipSettlementFeeAmount(settlement), 0);
   const grossSales = filteredReceipts.length ? filteredReceipts.reduce((sum, receipt) => sum + getReceiptGrossBeforeDiscount(receipt), 0) : totalRevenue;
@@ -752,8 +1134,14 @@ export default function Dashboard() {
     const status = getClipSettlementStatus(settlement);
     return status.includes("fail") || status.includes("declin") || status.includes("error");
   }).length;
-  const completedReceiptsCount = loyverseOverview?.metrics?.completedReceiptsCount || 0;
-  const cancelledReceiptsCount = loyverseOverview?.metrics?.cancelledReceiptsCount || 0;
+  const completedReceiptsCount = filteredReceipts.filter((receipt) => {
+    const status = String(receipt?.status || receipt?.receipt_status || (receipt?.canceled_at ? "cancelled" : "completed")).toLowerCase();
+    return !status.includes("cancel");
+  }).length;
+  const cancelledReceiptsCount = filteredReceipts.filter((receipt) => {
+    const status = String(receipt?.status || receipt?.receipt_status || (receipt?.canceled_at ? "cancelled" : "completed")).toLowerCase();
+    return status.includes("cancel");
+  }).length;
   const cancellationRate = completedReceiptsCount + cancelledReceiptsCount
     ? (cancelledReceiptsCount / (completedReceiptsCount + cancelledReceiptsCount)) * 100
     : 0;
@@ -766,90 +1154,176 @@ export default function Dashboard() {
   const firstFilteredReceipt = filteredReceipts[0] || receipts[0] || null;
   const clipApprovedTotal = approvedClipPayments.reduce((sum, payment) => sum + getClipPaymentAmount(payment), 0);
   const loyverseSalesTotal = filteredReceipts.reduce((sum, receipt) => sum + getReceiptTotal(receipt), 0);
-  const manualCashTotal = filteredTransactions
-    .filter((transaction) => transaction.type === "contribution" && transaction.payment_method === "cash")
-    .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
-  const salesTransactionCount = filteredReceipts.length + approvedClipPayments.length;
+  const manualContributionTransactions = filteredTransactions.filter((transaction) => transaction.type === "contribution");
+  const hasClipDataInRange = Boolean(filteredClipPayments.length || filteredClipSettlements.length);
+  const hasLoyverseDataInRange = Boolean(filteredReceipts.length);
+  const hasManualDataInRange = Boolean(manualContributionTransactions.length);
+  const hasAppDataInRange = Boolean(filteredOrders.length || filteredExpenses.length || filteredShifts.length);
+  const combinedClipLoyverseSource = hasClipDataInRange && hasLoyverseDataInRange
+    ? "both"
+    : hasClipDataInRange
+      ? "clip"
+      : hasLoyverseDataInRange
+        ? "loyverse"
+        : "mock";
+  const loyverseStoreMap = new Map((loyverseOverview?.stores || []).map((store) => [store.id, store.name || store.id]));
+  const receiptSaleEvents = filteredReceipts.map((receipt, index) =>
+    createSaleEvent({
+      id: receipt.id || receipt.receipt_number || `receipt-${index}`,
+      source: "loyverse",
+      amount: getReceiptTotal(receipt),
+      timestamp: getRecordDate(receipt),
+      paymentMethod: getReceiptPaymentMethod(receipt),
+      branch: loyverseStoreMap.get(receipt.store_id) || receipt.store_id || "Centro",
+      channel: deriveReceiptSalesChannel(receipt),
+      payload: receipt,
+    }),
+  );
+  const clipSaleEvents = approvedClipPayments.map((payment, index) =>
+    createSaleEvent({
+      id: payment.id || payment.receipt_no || `clip-${index}`,
+      source: "clip",
+      amount: getClipPaymentAmount(payment),
+      timestamp: getRecordDate(payment),
+      paymentMethod: payment?.payment_method?.id || payment?.payment_method?.type || "card",
+      branch: "Centro",
+      channel: "Unknown",
+      payload: payment,
+    }),
+  );
+  const manualSaleEvents = manualContributionTransactions.map((transaction, index) =>
+    createSaleEvent({
+      id: transaction.id || `manual-${index}`,
+      source: "manual",
+      amount: Number(transaction.amount || 0),
+      timestamp: getRecordDate(transaction),
+      paymentMethod: transaction.payment_method || "manual",
+      branch: "Centro",
+      channel: deriveManualSalesChannel(transaction),
+      payload: transaction,
+    }),
+  );
+  const dedupedSales = dedupeSaleEvents(receiptSaleEvents, clipSaleEvents, manualSaleEvents, {
+    toleranceMs: dedupeWindowMs,
+    priorityMode: selectedDedupePriority,
+  });
+  const filteredCanonicalSalesEvents = dedupedSales.canonicalEvents.filter((event) =>
+    matchesPaymentSourceFilter(event, selectedPaymentSource)
+    && matchesBranchFilter(event, selectedBranch)
+    && matchesSalesChannelFilter(event, selectedChannel),
+  );
+  const currentDaySalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= todayStart);
+  const currentWeekSalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= weekStart);
+  const currentMonthSalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= monthStart);
+  const previousDaySalesEvents = filteredCanonicalSalesEvents.filter((event) => {
+    return event.timestamp >= subDays(todayStart, 7) && event.timestamp < subDays(todayStart, 6);
+  });
+  const previousWeekSalesEvents = filteredCanonicalSalesEvents.filter((event) => {
+    return event.timestamp >= subDays(todayStart, 13) && event.timestamp < subDays(todayStart, 6);
+  });
+  const previousMonthStart = new Date(todayStart.getFullYear(), todayStart.getMonth() - 1, 1);
+  const previousMonthEnd = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  const previousMonthSalesEvents = filteredCanonicalSalesEvents.filter((event) => {
+    return event.timestamp >= previousMonthStart && event.timestamp < previousMonthEnd;
+  });
+  const selectedRangeStart = getDateRangeStart(selectedDateRange);
+  const previousSelectedSalesEvents = selectedRangeStart
+    ? filteredCanonicalSalesEvents.filter((event) => {
+        const diff = todayStart.getTime() - selectedRangeStart.getTime();
+        const previousStart = new Date(selectedRangeStart.getTime() - diff - 86400000);
+        const previousEnd = new Date(todayStart.getTime() - diff - 86400000);
+        return event.timestamp >= previousStart && event.timestamp < previousEnd;
+      })
+    : [];
+  const filteredDuplicateRowsRaw = dedupedSales.duplicates.filter(({ duplicate, canonical }) =>
+    (
+      matchesPaymentSourceFilter(duplicate, selectedPaymentSource)
+      && matchesBranchFilter(duplicate, selectedBranch)
+      && matchesSalesChannelFilter(duplicate, selectedChannel)
+    ) || (
+      matchesPaymentSourceFilter(canonical, selectedPaymentSource)
+      && matchesBranchFilter(canonical, selectedBranch)
+      && matchesSalesChannelFilter(canonical, selectedChannel)
+    ),
+  );
+  const filteredDeduplicationRows = filteredDuplicateRowsRaw.slice(0, 20).map(({ duplicate, canonical, matchedWithinMinutes }, index) => ({
+    id: `dedupe-filtered-${index}`,
+    removed_source: formatSourceName(duplicate.source),
+    kept_source: formatSourceName(canonical.source),
+    amount: formatCurrency(duplicate.amount),
+    removed_time: formatDateSafe(duplicate.timestamp, "yyyy-MM-dd HH:mm"),
+    kept_time: formatDateSafe(canonical.timestamp, "yyyy-MM-dd HH:mm"),
+    payment_method: duplicate.paymentMethod || "unknown",
+    branch: canonical.branch || duplicate.branch || "Unknown",
+    channel: canonical.channel || duplicate.channel || "Unknown",
+    matched_window: `${matchedWithinMinutes} min`,
+  }));
+  const deduplicatedSalesCount = dedupedSales.duplicates.length;
+  const filteredClipSalesTotal = filteredCanonicalSalesEvents
+    .filter((event) => event.source === "clip")
+    .reduce((sum, event) => sum + event.amount, 0);
+  const filteredManualContributionTotal = filteredCanonicalSalesEvents
+    .filter((event) => event.source === "manual")
+    .reduce((sum, event) => sum + event.amount, 0);
+  const filteredLoyverseSalesTotal = filteredCanonicalSalesEvents
+    .filter((event) => event.source === "loyverse")
+    .reduce((sum, event) => sum + event.amount, 0);
+  const filteredLoyverseReceipts = filteredCanonicalSalesEvents
+    .filter((event) => event.source === "loyverse")
+    .map((event) => event.payload)
+    .filter(Boolean);
+  const filteredDeduplicatedSalesCount = filteredDuplicateRowsRaw.length;
+  const filteredSalesTotal = filteredCanonicalSalesEvents.reduce((sum, event) => sum + event.amount, 0);
+  const salesTransactionCount = filteredCanonicalSalesEvents.length;
   const averageTransactionValue = salesTransactionCount
-    ? (loyverseSalesTotal + clipApprovedTotal) / salesTransactionCount
+    ? filteredCanonicalSalesEvents.reduce((sum, event) => sum + event.amount, 0) / salesTransactionCount
     : 0;
   const appCardTotal = filteredOrders
     .filter((order) => order.payment_method === "card")
     .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
-  const todayCardOrdersCount = todayOrders.filter((order) => order.payment_method === "card").length;
+  const todayCardOrdersCount = filteredOrders.filter((order) => order.payment_method === "card").length;
   const depositTotal = filteredClipSettlements.reduce((sum, settlement) => sum + getClipSettlementNetAmount(settlement), 0);
-  const netSales = loyverseSalesTotal + clipApprovedTotal + manualCashTotal;
+  const netSales = filteredLoyverseSalesTotal + filteredClipSalesTotal + filteredManualContributionTotal;
   const aov = averageTransactionValue;
-  const pendingSettlements = Math.max(clipApprovedTotal - depositTotal, 0);
+  const unsettledClipPayments = approvedClipPayments.filter((payment) => {
+    const paidAt = getRecordDate(payment);
+    const ageMs = Date.now() - paidAt.getTime();
+    return ageMs > 24 * 60 * 60 * 1000;
+  });
+  const eligibleSettlementsTotal = unsettledClipPayments.reduce((sum, payment) => sum + getClipPaymentAmount(payment), 0);
+  const pendingSettlements = Math.max(eligibleSettlementsTotal - depositTotal, 0);
   const mismatch = clipApprovedTotal - appCardTotal;
-  const todayGrossReceived = todayReceipts.length
-    ? todayReceipts.reduce((sum, receipt) => sum + getReceiptGrossBeforeDiscount(receipt), 0)
-    : todayRevenue;
   const bankTransferTotal = filteredTransactions
-    .filter((transaction) => transaction.payment_method === "transfer")
+    .filter((transaction) => normalizePaymentMethod(transaction.payment_method) === "transfer")
     .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
 
-  // Clip transactions without a matching app order (same amount) count as additional orders
-  const _appOrderAmounts = filteredOrders.map((o) => Number(o.total_amount || 0));
-  const unmatchedClipPayments = approvedClipPayments.filter((payment) => {
-    const amount = getClipPaymentAmount(payment);
-    const matchIndex = _appOrderAmounts.indexOf(amount);
-    if (matchIndex !== -1) {
-      _appOrderAmounts.splice(matchIndex, 1);
-      return false;
-    }
-    return true;
-  });
-  const ordersCount = filteredReceipts.length || (filteredOrders.length + unmatchedClipPayments.length);
+  const ordersCount = salesTransactionCount;
+  const clipFilterActive = selectedPaymentSource === "All sources" || selectedPaymentSource === "Clip";
   const costPerOrder = ordersCount ? totalExpenses / ordersCount : 0;
-  const previousDayOrders = orders.filter((order) => {
-    const date = getRecordDate(order);
-    return date >= subDays(todayStart, 7) && date < subDays(todayStart, 6);
-  });
-  const previousWeekOrders = orders.filter((order) => {
-    const date = getRecordDate(order);
-    return date >= subDays(todayStart, 13) && date < subDays(todayStart, 6);
-  });
-  const previousMonthStart = new Date(todayStart.getFullYear(), todayStart.getMonth() - 1, 1);
-  const previousMonthEnd = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
-  const previousMonthOrders = orders.filter((order) => {
-    const date = getRecordDate(order);
-    return date >= previousMonthStart && date < previousMonthEnd;
-  });
-  const selectedRangeStart = getDateRangeStart(selectedDateRange);
-  const previousSelectedOrders = selectedRangeStart
-    ? orders.filter((order) => {
-        const date = getRecordDate(order);
-        const diff = todayStart.getTime() - selectedRangeStart.getTime();
-        const previousStart = new Date(selectedRangeStart.getTime() - diff - 86400000);
-        const previousEnd = new Date(todayStart.getTime() - diff - 86400000);
-        return date >= previousStart && date < previousEnd;
-      })
-    : [];
   const comparisonCards = [
     {
       id: "day-compare",
       label: "This day vs same day last week",
-      current: sumOrderRevenue(todayOrders),
-      previous: sumOrderRevenue(previousDayOrders),
+      current: currentDaySalesEvents.reduce((sum, event) => sum + event.amount, 0),
+      previous: previousDaySalesEvents.reduce((sum, event) => sum + event.amount, 0),
     },
     {
       id: "week-compare",
       label: "This week vs last week",
-      current: sumOrderRevenue(orders.filter((order) => getRecordDate(order) >= weekStart)),
-      previous: sumOrderRevenue(previousWeekOrders),
+      current: currentWeekSalesEvents.reduce((sum, event) => sum + event.amount, 0),
+      previous: previousWeekSalesEvents.reduce((sum, event) => sum + event.amount, 0),
     },
     {
       id: "month-compare",
       label: "This month vs last month",
-      current: sumOrderRevenue(orders.filter((order) => getRecordDate(order) >= monthStart)),
-      previous: sumOrderRevenue(previousMonthOrders),
+      current: currentMonthSalesEvents.reduce((sum, event) => sum + event.amount, 0),
+      previous: previousMonthSalesEvents.reduce((sum, event) => sum + event.amount, 0),
     },
     {
       id: "selected-compare",
       label: "Selected period vs previous period",
-      current: totalRevenue,
-      previous: sumOrderRevenue(previousSelectedOrders),
+      current: filteredSalesTotal,
+      previous: previousSelectedSalesEvents.reduce((sum, event) => sum + event.amount, 0),
     },
   ].map((item) => {
     const difference = calculateDifference(item.current, item.previous);
@@ -861,29 +1335,57 @@ export default function Dashboard() {
       trend: getTrendFromDifference(difference),
     };
   });
-  const primaryComparisonCard = comparisonCards[0];
+  const primaryComparisonCard = comparisonCards.find((item) => item.id === "selected-compare") || comparisonCards[0];
 
-  const revenue7Days = buildSevenDayRevenue(filteredOrders);
-  const revenue30Days = buildThirtyDayRevenue(filteredOrders);
-  const ordersByHourToday = buildOrdersByHour(todayOrders);
-  const salesByChannel = buildSalesByChannel(deliveredOrders);
-  const aovTrend = buildAovTrend(deliveredOrders);
-  const bestSellingProducts = buildBestSellingProducts(filteredOrders);
-  const worstPerformingProducts = buildWorstPerformingProducts(filteredOrders);
+  const revenue7Days = buildSevenDayRevenueFromEvents(filteredCanonicalSalesEvents);
+  const revenue30Days = buildThirtyDayRevenueFromEvents(filteredCanonicalSalesEvents);
+  const ordersByHourToday = buildOrdersByHourFromEvents(filteredCanonicalSalesEvents);
+  const salesByChannel = filteredCanonicalSalesEvents.reduce((channels, event) => {
+    const fillByChannel = {
+      "Direct web": "#fbbf24",
+      "Dine-in": "#fb7185",
+      "Pickup": "#38bdf8",
+      "Delivery app": "#4ade80",
+      Unknown: "#737373",
+    };
+    const existing = channels.find((channel) => channel.name === event.channel);
+    if (existing) {
+      existing.value += event.amount;
+      return channels;
+    }
+
+    channels.push({
+      name: event.channel,
+      value: event.amount,
+      fill: fillByChannel[event.channel] || "#737373",
+    });
+    return channels;
+  }, []);
+  const aovTrend = buildAovTrendFromEvents(filteredCanonicalSalesEvents);
+  const bestSellingProducts = filteredLoyverseReceipts.length
+    ? buildReceiptProductPerformance(filteredLoyverseReceipts, "top")
+    : buildCatalogProductCards(loyverseOverview?.items || [], "top", filteredClipPayments);
+  const highestMarginProducts = filteredLoyverseReceipts.length
+    ? buildHighestMarginProductsFromReceipts(filteredLoyverseReceipts)
+    : buildCatalogProductCards(loyverseOverview?.items || [], "top", filteredClipPayments);
+  const worstPerformingProducts = filteredLoyverseReceipts.length
+    ? buildReceiptProductPerformance(filteredLoyverseReceipts, "bottom")
+    : buildCatalogProductCards(loyverseOverview?.items || [], "bottom", filteredClipPayments);
   const inventoryRows = buildInventoryRows(loyverseOverview);
   const recentPurchases = buildRecentPurchases(filteredExpenses);
   const inventoryForecast = buildInventoryForecast(inventoryRows);
   const laborEfficiencyTrend = buildLaborEfficiencyTrend(filteredShifts, filteredOrders);
   const costTrendData = buildCostTrendVsBudget(filteredOrders, filteredExpenses);
-  const todayShifts = filteredShifts.filter((shift) => getRecordDate(shift) >= todayStart);
-  const weekShifts = filteredShifts.filter((shift) => getRecordDate(shift) >= weekStart);
+  const todayShifts = filteredShifts;
+  const weekShifts = filteredShifts;
   const totalWorkedHours = weekShifts.reduce((sum, shift) => sum + Number(shift.hours_worked || 0), 0);
   const totalShiftCost = weekShifts.reduce((sum, shift) => sum + Number(shift.amount || 0), 0);
   const salesPerLaborHour = totalWorkedHours ? weekOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0) / totalWorkedHours : 0;
   const laborCostPerShift = weekShifts.length ? totalShiftCost / weekShifts.length : 0;
-  const overtimeAlertsCount = shifts.filter((shift) => Number(shift.hours_worked || 0) > 8).length;
+  const overtimeAlertsCount = filteredShifts.filter((shift) => Number(shift.hours_worked || 0) > 8).length;
   const currentShiftStaffing = todayShifts.length;
   const activeEmployeesCount = employees.filter((employee) => employee.is_active).length;
+  const leanOpsMode = activeEmployeesCount <= 1 && ordersCount <= 20;
 
   const liveAlerts = [];
   if (!hasLoyverseApiConfig(appSettings)) {
@@ -896,7 +1398,7 @@ export default function Dashboard() {
       status: "new",
       owner: "Admin",
       href: "/integrations",
-      dataSource: "live",
+      dataSource: "loyverse",
     });
   }
   if (!hasClipApiConfig(appSettings)) {
@@ -909,34 +1411,33 @@ export default function Dashboard() {
       status: "new",
       owner: "Admin",
       href: "/integrations",
-      dataSource: "live",
+      dataSource: "clip",
     });
   }
   if (
     hasClipApiConfig(appSettings) &&
     !clipQuery.isLoading &&
     !clipQuery.isError &&
-    selectedDateRange === "1 day" &&
     todayCardOrdersCount > 0 &&
     filteredClipPayments.length === 0
   ) {
     liveAlerts.push({
       id: "clip-sync-warning",
       severity: "high",
-      summary: "Clip is connected but no payments were mapped into today's dashboard window.",
+      summary: `Clip is connected but no payments were mapped into the selected ${selectedRangeLabelLower} window.`,
       suggestedAction: "Check Clip credentials, payment status mapping, and timezone/date-field alignment between Clip and the dashboard.",
       timestamp: "Live",
       status: "new",
       owner: "Finance manager",
       href: "/Clip",
-      dataSource: "live",
+      dataSource: "clip",
     });
   }
   if (
     hasClipApiConfig(appSettings) &&
     !clipQuery.isLoading &&
     !clipQuery.isError &&
-    clipPayments.length === 0
+    filteredClipPayments.length === 0
   ) {
     liveAlerts.push({
       id: "clip-empty-feed",
@@ -947,7 +1448,7 @@ export default function Dashboard() {
       status: "new",
       owner: "Admin",
       href: "/Clip",
-      dataSource: "live",
+      dataSource: "clip",
     });
   }
   if (Math.abs(mismatch) > 1) {
@@ -960,20 +1461,20 @@ export default function Dashboard() {
       status: "new",
       owner: "Finance manager",
       href: "/managementinsight?view=payments-reconciliation",
-      dataSource: "live",
+      dataSource: hasClipDataInRange ? "both" : "app",
     });
   }
   if (todayRefundCount > 0) {
     liveAlerts.push({
       id: "refunds-live",
       severity: "medium",
-      summary: `${todayRefundCount} Clip refunds detected in the current sync window.`,
+      summary: `${todayRefundCount} Clip refunds detected in the selected ${selectedRangeLabelLower} window.`,
       suggestedAction: "Check refund reasons and confirm they match cancellations or duplicate charges.",
       timestamp: "Live",
       status: "acknowledged",
       owner: "Operations",
       href: "/managementinsight?view=alerts-exceptions",
-      dataSource: "live",
+      dataSource: "clip",
     });
   }
   if (foodCostPct > 30) {
@@ -986,7 +1487,7 @@ export default function Dashboard() {
       status: "new",
       owner: "Operations",
       href: "/managementinsight?view=costs",
-      dataSource: "live",
+      dataSource: "app",
     });
   }
   if (laborCostPct > 20) {
@@ -999,7 +1500,7 @@ export default function Dashboard() {
       status: "acknowledged",
       owner: "Management",
       href: "/managementinsight?view=staff",
-      dataSource: "live",
+      dataSource: "app",
     });
   }
   if (inventoryRows.some((row) => row.status === "Critical")) {
@@ -1012,7 +1513,7 @@ export default function Dashboard() {
       status: "new",
       owner: "Supply chain",
       href: "/managementinsight?view=inventory",
-      dataSource: "live",
+      dataSource: "loyverse",
     });
   }
   if (failedSettlementsCount > 0) {
@@ -1025,26 +1526,38 @@ export default function Dashboard() {
       status: "new",
       owner: "Finance manager",
       href: "/managementinsight?view=payments-reconciliation",
-      dataSource: "live",
+      dataSource: "clip",
     });
   }
   if (cancellationRate > 10 || todayCancelledOrders >= 3) {
     liveAlerts.push({
       id: "cancellations-live",
       severity: "medium",
-      summary: `Cancellation rate is ${cancellationRate.toFixed(1)}% with ${todayCancelledOrders} app cancellations today.`,
+      summary: `Cancellation rate is ${cancellationRate.toFixed(1)}% with ${todayCancelledOrders} app cancellations in the selected ${selectedRangeLabelLower}.`,
       suggestedAction: "Review refund reasons, service delays, and channel-specific cancellation patterns.",
       timestamp: "Live",
       status: "new",
       owner: "Operations",
       href: "/managementinsight?view=alerts-exceptions",
-      dataSource: "live",
+      dataSource: hasLoyverseDataInRange ? "both" : "app",
     });
   }
 
   const alerts = liveAlerts.length
     ? liveAlerts
     : mockAlerts.map((alert) => ({ ...alert, dataSource: "mock" }));
+  const alertHasClip = alerts.some((alert) => alert.dataSource === "clip" || alert.dataSource === "both");
+  const alertHasLoyverse = alerts.some((alert) => alert.dataSource === "loyverse" || alert.dataSource === "both");
+  const alertHasApp = alerts.some((alert) => alert.dataSource === "app");
+  const alertsSource = alertHasClip && alertHasLoyverse
+    ? "both"
+    : alertHasClip
+      ? "clip"
+      : alertHasLoyverse
+        ? "loyverse"
+        : alertHasApp
+          ? "app"
+          : "mock";
 
   const executiveKpis = [
     {
@@ -1053,11 +1566,11 @@ export default function Dashboard() {
       value: formatCurrency(netSales),
       delta: primaryComparisonCard.deltaLabel,
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Combined for ${selectedDateRange.toLowerCase()}: Loyverse receipts + Clip approved payments + manual cash entries.`,
+      comparisonLabel: `Combined for ${selectedDateRange.toLowerCase()} and ${selectedPaymentSource.toLowerCase()}: Loyverse receipts + unmatched Clip payments + unmatched manual entries.${filteredDeduplicatedSalesCount ? ` ${filteredDeduplicatedSalesCount} duplicate matches removed.` : ""}`,
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue, 0)),
       href: "/managementinsight?view=net-sales",
-      dataSource: "live",
+      dataSource: hasClipDataInRange && hasLoyverseDataInRange ? "both" : hasClipDataInRange ? "clip" : hasLoyverseDataInRange ? "loyverse" : hasManualDataInRange ? "manual" : "mock",
     },
     {
       id: "orders-count",
@@ -1069,7 +1582,7 @@ export default function Dashboard() {
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => item.orders),
       href: "/managementinsight?view=orders-count",
-      dataSource: receipts.length || orders.length ? "live" : "mock",
+      dataSource: filteredOrders.length ? "app" : "mock",
     },
     {
       id: "average-order-value",
@@ -1077,11 +1590,11 @@ export default function Dashboard() {
       value: formatCurrency(aov),
       delta: aov ? primaryComparisonCard.deltaLabel : "Waiting for source data",
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Average transaction amount from Loyverse receipts and Clip approved payments for ${selectedDateRange.toLowerCase()}`,
+      comparisonLabel: `Average transaction amount from deduplicated Loyverse, Clip, and manual sales for ${selectedDateRange.toLowerCase()}`,
       sparkTone: "positive",
       sparkline: aovTrend.map((item) => item.aov),
       href: "/managementinsight?view=average-order-value",
-      dataSource: salesTransactionCount ? "live" : "mock",
+      dataSource: hasClipDataInRange && hasLoyverseDataInRange ? "both" : hasClipDataInRange ? "clip" : hasLoyverseDataInRange ? "loyverse" : hasManualDataInRange ? "manual" : "mock",
     },
     {
       id: "gross-profit",
@@ -1095,7 +1608,7 @@ export default function Dashboard() {
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=gross-profit",
-      dataSource: rawIngredientExpenses ? "live" : "mock",
+      dataSource: rawIngredientExpenses ? "app" : "mock",
     },
     {
       id: "net-profit",
@@ -1109,7 +1622,7 @@ export default function Dashboard() {
       sparkTone: "negative",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
       href: "/managementinsight?view=net-profit",
-      dataSource: laborExpenses && rawIngredientExpenses ? "live" : "mock",
+      dataSource: laborExpenses && rawIngredientExpenses && paymentFees ? "both" : laborExpenses && rawIngredientExpenses ? "app" : "mock",
     },
     {
       id: "food-cost",
@@ -1121,7 +1634,7 @@ export default function Dashboard() {
       sparkTone: "negative",
       sparkline: mockCostTrendVsBudget.map((item) => item.actual),
       href: "/managementinsight?view=food-cost",
-      dataSource: rawIngredientExpenses ? "live" : "mock",
+      dataSource: rawIngredientExpenses ? "app" : "mock",
     },
     {
       id: "labor-cost",
@@ -1133,7 +1646,7 @@ export default function Dashboard() {
       sparkTone: "negative",
       sparkline: laborExpenses ? mockLaborEfficiencyTrend.map((item) => item.efficiency / 20) : [16.8, 17.0, 17.3, 17.8, 18.0, 18.4, 18.7],
       href: "/managementinsight?view=labor-cost",
-      dataSource: laborExpenses ? "live" : "mock",
+      dataSource: laborExpenses ? "app" : "mock",
     },
     {
       id: "open-anomalies",
@@ -1145,34 +1658,40 @@ export default function Dashboard() {
       sparkTone: liveAlerts.length ? "positive" : "negative",
       sparkline: liveAlerts.length ? [1, 1, 2, 2, 3, 3, alerts.length] : [4, 5, 6, 7, 8, 9, 12],
       href: "/managementinsight?view=alerts-exceptions",
-      dataSource: liveAlerts.length ? "live" : "mock",
+      dataSource: liveAlerts.length && hasClipDataInRange && hasLoyverseDataInRange ? "both" : liveAlerts.length && hasClipDataInRange ? "clip" : liveAlerts.length && hasLoyverseDataInRange ? "loyverse" : liveAlerts.length ? "app" : "mock",
     },
   ];
 
   const liveOperations = [
-    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Live from app order statuses", href: "/managementinsight?view=live-operations", dataSource: "live" },
-    { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: "Approximation until SLA timestamps are wired", href: "/managementinsight?view=live-operations", dataSource: orders.length ? "live" : "mock" },
-    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? "Current estimate based on open order flow" : "Needs preparation_minutes or estimated_delivery_minutes set on order records.", href: "/managementinsight?view=live-operations", dataSource: todayOrders.length ? "live" : "mock" },
-    { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Orders with status preparing", href: "/managementinsight?view=live-operations", dataSource: "live" },
-    { id: "out-for-delivery", label: "Out For Delivery", value: formatNumber(ordersOutForDelivery), tone: "text-yellow-400", subtext: "Orders with delivery handoff status", href: "/managementinsight?view=live-operations", dataSource: "live" },
-    { id: "reservations", label: "Reservations Today", value: "—", tone: "text-white", subtext: "Needs a Reservation entity with a date field. Once reservations are logged, today's count auto-populates.", href: "/managementinsight?view=live-operations", dataSource: "mock" },
-    { id: "refunds", label: "Refund Count Today", value: formatNumber(todayRefundCount), tone: "text-red-300", subtext: "Live from Clip refund fields", href: "/managementinsight?view=payments-reconciliation", dataSource: clipOverview ? "live" : "mock" },
-    { id: "cancelled", label: "Cancelled Orders Today", value: formatNumber(todayCancelledOrders), tone: "text-yellow-400", subtext: "Live from app order statuses", href: "/managementinsight?view=alerts-exceptions", dataSource: "live" },
-  ];
+    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Live from app order statuses", href: "/managementinsight?view=live-operations", dataSource: "app" },
+    { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: `Approximation for selected ${selectedRangeLabelLower} until SLA timestamps are wired`, href: "/managementinsight?view=live-operations", dataSource: filteredOrders.length ? "app" : "mock" },
+    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? `Estimate for selected ${selectedRangeLabelLower}` : "Needs preparation_minutes or estimated_delivery_minutes set on order records.", href: "/managementinsight?view=live-operations", dataSource: filteredOrders.length ? "app" : "mock" },
+    { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Orders with status preparing", href: "/managementinsight?view=live-operations", dataSource: "app" },
+    { id: "out-for-delivery", label: "Out For Delivery", value: formatNumber(ordersOutForDelivery), tone: "text-yellow-400", subtext: "Orders with delivery handoff status", href: "/managementinsight?view=live-operations", dataSource: "app" },
+    { id: "reservations", label: `Reservations (${selectedDateRange})`, value: "—", tone: "text-white", subtext: "Needs a Reservation entity with a date field. Once reservations are logged, the selected range count auto-populates.", href: "/managementinsight?view=live-operations", dataSource: "mock" },
+    { id: "refunds", label: `Refund Count (${selectedDateRange})`, value: formatNumber(todayRefundCount), tone: "text-red-300", subtext: `Live from Clip refund fields in selected ${selectedRangeLabelLower}`, href: "/managementinsight?view=payments-reconciliation", dataSource: clipOverview ? "clip" : "mock" },
+    { id: "cancelled", label: `Cancelled Orders (${selectedDateRange})`, value: formatNumber(todayCancelledOrders), tone: "text-yellow-400", subtext: "Live from app order statuses", href: "/managementinsight?view=alerts-exceptions", dataSource: "app" },
+  ].filter((item) => {
+    if (!leanOpsMode) {
+      return true;
+    }
+
+    return ["active-orders", "avg-prep-time", "refunds", "cancelled"].includes(item.id);
+  });
 
   const paymentSummary = [
-    { label: `Total Received (${selectedDateRange})`, value: formatCurrency(selectedDateRange === "1 day" ? todayGrossReceived : grossSales), subtext: filteredReceipts.length ? `Live from Loyverse receipts before discounts for ${selectedDateRange.toLowerCase()}` : `Fallback from app orders for ${selectedDateRange.toLowerCase()}`, dataSource: filteredReceipts.length || filteredOrders.length ? "live" : "mock" },
-    { label: `Net Sales Inflow (${selectedDateRange})`, value: formatCurrency(netSales), subtext: "Loyverse receipts + Clip approved payments + manual cash contributions for the selected period", dataSource: clipOverview || loyverseOverview || filteredTransactions.length ? "live" : "mock" },
-    { label: `Pending Settlements (${selectedDateRange})`, value: formatCurrency(pendingSettlements), subtext: clipOverview ? "Filtered Clip approved payments vs filtered net deposits" : "Needs Clip to calculate", dataSource: clipOverview ? "live" : "mock" },
-    { label: `Settled Amounts (${selectedDateRange})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: clipOverview ? "live" : "mock" },
-    { label: `Refunds (${selectedDateRange})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: clipOverview ? "live" : "mock" },
-    { label: "Payment Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", subtext: paymentFees ? "Live from Clip settlement fee fields" : "Clip must return fee_amount, fees, or commission_amount in its settlement records for this to auto-fill.", dataSource: paymentFees ? "live" : "mock" },
+    { label: `Total Received (${selectedDateRange})`, value: formatCurrency(filteredSalesTotal), subtext: `Deduplicated received amount filtered to ${selectedPaymentSource.toLowerCase()} for ${selectedDateRange.toLowerCase()}`, dataSource: hasClipDataInRange && hasLoyverseDataInRange ? "both" : hasClipDataInRange ? "clip" : hasLoyverseDataInRange ? "loyverse" : hasManualDataInRange ? "manual" : "mock" },
+    { label: `Net Sales Inflow (${selectedDateRange})`, value: formatCurrency(netSales), subtext: filteredDeduplicatedSalesCount ? `Duplicate same-amount same-time sales removed across Loyverse, Clip, and manual entries (${filteredDeduplicatedSalesCount} matches for current payment-source filter).` : `Filtered to ${selectedPaymentSource.toLowerCase()} across Loyverse, Clip, and manual contributions for the selected period`, dataSource: hasClipDataInRange && hasLoyverseDataInRange ? "both" : hasClipDataInRange ? "clip" : hasLoyverseDataInRange ? "loyverse" : hasManualDataInRange ? "manual" : "mock" },
+    { label: `Pending Settlements (${selectedDateRange})`, value: clipFilterActive ? formatCurrency(pendingSettlements) : "—", subtext: clipOverview ? (clipFilterActive ? "Clip payments older than 24h compared against filtered net deposits" : "Only applicable for All sources or Clip view") : "Needs Clip to calculate", dataSource: clipOverview ? "clip" : "mock" },
+    { label: `Settled Amounts (${selectedDateRange})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: clipOverview ? "clip" : "mock" },
+    { label: `Refunds (${selectedDateRange})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: clipOverview ? "clip" : "mock" },
+    { label: "Payment Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", subtext: paymentFees ? "Live from Clip settlement fee fields" : "Clip must return total_fee, fee_amount, fees, or commission_amount in its settlement records for this to auto-fill.", dataSource: paymentFees ? "clip" : "mock" },
   ];
 
   const cashVsCard = [
-    { source: "Cash", amount: orders.filter((order) => order.payment_method === "cash").reduce((sum, order) => sum + Number(order.total_amount || 0), 0) },
-    { source: "Card", amount: appCardTotal },
-    { source: "Clip", amount: clipApprovedTotal },
+    { source: "Cash", amount: filteredCanonicalSalesEvents.filter((event) => event.paymentMethod === "cash").reduce((sum, event) => sum + event.amount, 0) },
+    { source: "Card", amount: filteredCanonicalSalesEvents.filter((event) => ["card", "credit_card", "debit_card"].includes(String(event.paymentMethod).toLowerCase())).reduce((sum, event) => sum + event.amount, 0) },
+    { source: "Clip", amount: filteredClipSalesTotal },
     { source: "Deposited", amount: depositTotal },
   ];
 
@@ -1184,16 +1703,16 @@ export default function Dashboard() {
       actual_amount: formatCurrency(clipApprovedTotal),
       difference: formatCurrency(mismatch),
       status: Math.abs(mismatch) <= 1 ? "Matched" : "Mismatch",
-      last_sync_time: clipOverview?.metrics?.latestSyncAt ? format(new Date(clipOverview.metrics.latestSyncAt), "HH:mm") : "N/A",
+      last_sync_time: clipOverview?.metrics?.latestSyncAt ? formatDateSafe(clipOverview.metrics.latestSyncAt, "HH:mm") : "N/A",
     },
     {
       id: "recon-clip-vs-bank",
-      source_system: "Clip payments vs settlements",
-      expected_amount: formatCurrency(clipApprovedTotal),
+      source_system: "Unmatched Clip payments vs settlements",
+      expected_amount: clipFilterActive ? formatCurrency(filteredClipSalesTotal) : "—",
       actual_amount: formatCurrency(depositTotal),
-      difference: formatCurrency(depositTotal - clipApprovedTotal),
-      status: depositTotal >= clipApprovedTotal ? "Matched" : "Pending",
-      last_sync_time: clipOverview?.metrics?.latestSyncAt ? format(new Date(clipOverview.metrics.latestSyncAt), "HH:mm") : "N/A",
+      difference: clipFilterActive ? formatCurrency(depositTotal - filteredClipSalesTotal) : "—",
+      status: clipFilterActive ? (depositTotal >= filteredClipSalesTotal ? "Matched" : "Pending") : "Review",
+      last_sync_time: clipOverview?.metrics?.latestSyncAt ? formatDateSafe(clipOverview.metrics.latestSyncAt, "HH:mm") : "N/A",
     },
     {
       id: "recon-loyverse-vs-orders",
@@ -1202,7 +1721,7 @@ export default function Dashboard() {
       actual_amount: formatCurrency(totalRevenue),
       difference: formatCurrency(totalRevenue - grossSales),
       status: loyverseOverview ? "Review" : "Pending",
-      last_sync_time: loyverseOverview?.metrics?.latestSyncAt ? format(new Date(loyverseOverview.metrics.latestSyncAt), "HH:mm") : "N/A",
+      last_sync_time: loyverseOverview?.metrics?.latestSyncAt ? formatDateSafe(loyverseOverview.metrics.latestSyncAt, "HH:mm") : "N/A",
     },
     ...(bankTransferTotal
       ? [{
@@ -1212,24 +1731,20 @@ export default function Dashboard() {
           actual_amount: formatCurrency(bankTransferTotal),
           difference: formatCurrency(bankTransferTotal - depositTotal),
           status: Math.abs(bankTransferTotal - depositTotal) <= 1 ? "Matched" : "Review",
-          last_sync_time: transactions[0]?.date ? format(new Date(transactions[0].date), "HH:mm") : "N/A",
+          last_sync_time: filteredTransactions[0]?.date ? formatDateSafe(filteredTransactions[0].date, "HH:mm") : "N/A",
         }]
       : []),
   ];
 
   const costsSummary = [
-    { label: "Ingredient Cost Today", value: ingredientExpensesToday ? formatCurrency(ingredientExpensesToday) : formatCurrency(todayOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesToday ? "Purchase-based from ingredient expenses logged today" : `Estimated: ${todayOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesToday ? "live" : "mock" },
-    { label: "Ingredient Cost This Week", value: ingredientExpensesWeek ? formatCurrency(ingredientExpensesWeek) : formatCurrency(weekOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesWeek ? "Purchase-based from ingredient expenses this week" : `Estimated: ${weekOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesWeek ? "live" : "mock" },
-    { label: "Ingredient Cost This Month", value: ingredientExpensesMonth ? formatCurrency(ingredientExpensesMonth) : formatCurrency(filteredOrders.filter(o => getRecordDate(o) >= monthStart).length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesMonth ? "Purchase-based from ingredient expenses this month" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order`, dataSource: ingredientExpensesMonth ? "live" : "mock" },
-    { label: "Food Cost %", value: `${foodCostPct.toFixed(1)}%`, delta: rawIngredientExpenses ? "Calculated live from purchase-based ingredient cost" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order avg. Add expenses to replace.`, dataSource: rawIngredientExpenses ? "live" : "mock" },
-    { label: "Labor Cost Today", value: laborExpensesToday ? formatCurrency(laborExpensesToday) : "—", delta: laborExpensesToday ? "Shift-linked and salary expenses posted today" : "Log today's shifts in Employee Calendar or add a salary expense in Finance.", dataSource: laborExpensesToday ? "live" : "mock" },
-    { label: "Labor Cost This Week", value: laborExpensesWeek ? formatCurrency(laborExpensesWeek) : "—", delta: laborExpensesWeek ? "Shift-linked and salary expenses this week" : "No salary expenses this week. Mark shifts as paid in Employee Calendar to populate this.", dataSource: laborExpensesWeek ? "live" : "mock" },
-    { label: "Labor Cost This Month", value: laborExpensesMonth ? formatCurrency(laborExpensesMonth) : "—", delta: laborExpensesMonth ? "Shift-linked and salary expenses this month" : "No salary expenses this month. Add salary expenses in Finance or complete shifts in Employee Calendar.", dataSource: laborExpensesMonth ? "live" : "mock" },
-    { label: "Labor Cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—", delta: laborExpenses ? "Calculated live from tracked labor expenses" : "Needs salary expenses. Log shifts with pay in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpenses ? "live" : "mock" },
-    { label: "Payment Processing Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", delta: paymentFees ? "Live from Clip settlement reports" : "Requires Clip to return fee fields (fee_amount / fees / commission_amount) in settlement records.", dataSource: paymentFees ? "live" : "mock" },
-    { label: "Fixed Costs", value: recurringExpenses ? formatCurrency(recurringExpenses) : "—", delta: recurringExpenses ? "Live from recurring expenses" : "Add recurring expenses in Finance (e.g. rent, utilities) and check the 'recurring' checkbox.", dataSource: recurringExpenses ? "live" : "mock" },
-    { label: "Other Operating Expenses", value: otherOperatingExpenses ? formatCurrency(otherOperatingExpenses) : "—", delta: otherOperatingExpenses ? "Live from non-ingredient, non-salary expenses" : "Add non-ingredient, non-salary expenses in Finance to track operational overhead.", dataSource: otherOperatingExpenses ? "live" : "mock" },
-    { label: "Cost Per Order", value: costPerOrder ? formatCurrency(costPerOrder) : "—", delta: costPerOrder ? "Ingredient + labor + operating costs + Clip fees divided by orders" : "Needs expenses in Finance. Once any cost is logged, this auto-calculates as total expenses ÷ order count.", dataSource: costPerOrder ? "live" : "mock" },
+    { label: `Ingredient Cost (${selectedDateRange})`, value: ingredientExpensesInRange ? formatCurrency(ingredientExpensesInRange) : formatCurrency(filteredOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesInRange ? `Purchase-based from ingredient expenses in selected ${selectedRangeLabelLower}` : `Estimated: ${filteredOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesInRange ? "app" : "mock" },
+    { label: "Food Cost %", value: `${foodCostPct.toFixed(1)}%`, delta: rawIngredientExpenses ? "Calculated live from purchase-based ingredient cost" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order avg. Add expenses to replace.`, dataSource: rawIngredientExpenses ? "app" : "mock" },
+    { label: `Labor Cost (${selectedDateRange})`, value: laborExpensesInRange ? formatCurrency(laborExpensesInRange) : "—", delta: laborExpensesInRange ? `Shift-linked and salary expenses in selected ${selectedRangeLabelLower}` : "Log shifts in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpensesInRange ? "app" : "mock" },
+    { label: "Labor Cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—", delta: laborExpenses ? "Calculated live from tracked labor expenses" : "Needs salary expenses. Log shifts with pay in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpenses ? "app" : "mock" },
+    { label: "Payment Processing Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", delta: paymentFees ? "Live from Clip settlement reports" : "Requires Clip to return fee fields (total_fee / fee_amount / fees / commission_amount) in settlement records.", dataSource: paymentFees ? "clip" : "mock" },
+    { label: "Fixed Costs", value: recurringExpenses ? formatCurrency(recurringExpenses) : "—", delta: recurringExpenses ? "Live from recurring expenses" : "Add recurring expenses in Finance (e.g. rent, utilities) and check the 'recurring' checkbox.", dataSource: recurringExpenses ? "app" : "mock" },
+    { label: "Other Operating Expenses", value: otherOperatingExpenses ? formatCurrency(otherOperatingExpenses) : "—", delta: otherOperatingExpenses ? "Live from non-ingredient, non-salary expenses" : "Add non-ingredient, non-salary expenses in Finance to track operational overhead.", dataSource: otherOperatingExpenses ? "app" : "mock" },
+    { label: "Cost Per Order", value: costPerOrder ? formatCurrency(costPerOrder) : "—", delta: costPerOrder ? "Ingredient + labor + operating costs + Clip fees divided by orders" : "Needs expenses in Finance. Once any cost is logged, this auto-calculates as total expenses ÷ order count.", dataSource: costPerOrder && paymentFees ? "both" : costPerOrder ? "app" : "mock" },
   ];
 
   const inventoryInsights = {
@@ -1238,20 +1753,27 @@ export default function Dashboard() {
     forecast: inventoryForecast.length ? inventoryForecast : mockInventoryInsights.forecast,
   };
 
-  const inventoryDataSource = inventoryRows.length ? "live" : "mock";
-  const inventoryPurchasesSource = recentPurchases.length ? "live" : "mock";
-  const inventoryForecastSource = inventoryForecast.length ? "live" : "mock";
-  const bestSellingSource = bestSellingProducts.length ? "live" : "mock";
-  const worstPerformingSource = worstPerformingProducts.length ? "live" : "mock";
+  const hasLoyverseCatalog = Boolean(loyverseOverview?.items?.length);
+  const inventoryDataSource = inventoryRows.length ? "loyverse" : "mock";
+  const inventoryPurchasesSource = recentPurchases.length ? "app" : "mock";
+  const inventoryForecastSource = inventoryForecast.length ? "loyverse" : "mock";
+  const bestSellingSource = (filteredLoyverseReceipts.length || hasLoyverseCatalog) ? "loyverse" : "mock";
+  const worstPerformingSource = (filteredLoyverseReceipts.length || hasLoyverseCatalog) ? "loyverse" : "mock";
   const staffMetrics = [
-    { label: "Total Worked Hours", value: totalWorkedHours ? `${formatNumber(totalWorkedHours)} h` : "—", detail: totalWorkedHours ? "Live from Shift records in the last 7 days" : "Log shifts with hours_worked in Employee Calendar to populate this.", dataSource: totalWorkedHours ? "live" : "mock" },
-    { label: "Sales Per Labor Hour", value: salesPerLaborHour ? formatCurrency(salesPerLaborHour) : "—", detail: salesPerLaborHour ? "Weekly sales divided by tracked shift hours" : "Needs completed shifts with hours_worked. Auto-calculates as weekly revenue ÷ total shift hours.", dataSource: salesPerLaborHour ? "live" : "mock" },
-    { label: "Labor Cost Per Shift", value: laborCostPerShift ? formatCurrency(laborCostPerShift) : "—", detail: laborCostPerShift ? "Average from tracked shift payouts" : "Set an amount (payout) on each shift in Employee Calendar. Average auto-calculates.", dataSource: laborCostPerShift ? "live" : "mock" },
-    { label: "Current Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "—", detail: currentShiftStaffing ? `Today's scheduled shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : "Schedule today's shifts in Employee Calendar to see current staffing count.", dataSource: currentShiftStaffing ? "live" : "mock" },
-    { label: "Overtime Alerts", value: overtimeAlertsCount ? formatNumber(overtimeAlertsCount) : "—", detail: overtimeAlertsCount ? "Triggered by shifts above 8 tracked hours" : "Auto-triggers when any shift has more than 8 hours logged. No overtime in current data.", dataSource: overtimeAlertsCount ? "live" : "mock" },
+    { label: "Total Worked Hours", value: totalWorkedHours ? `${formatNumber(totalWorkedHours)} h` : "—", detail: totalWorkedHours ? `Live from Shift records in selected ${selectedRangeLabelLower}` : "Log shifts with hours_worked in Employee Calendar to populate this.", dataSource: totalWorkedHours ? "app" : "mock" },
+    { label: "Sales Per Labor Hour", value: salesPerLaborHour ? formatCurrency(salesPerLaborHour) : "—", detail: salesPerLaborHour ? `Selected ${selectedRangeLabelLower} sales divided by tracked shift hours` : "Needs completed shifts with hours_worked. Auto-calculates as selected-range revenue ÷ total shift hours.", dataSource: salesPerLaborHour ? "app" : "mock" },
+    { label: "Labor Cost Per Shift", value: laborCostPerShift ? formatCurrency(laborCostPerShift) : "—", detail: laborCostPerShift ? "Average from tracked shift payouts" : "Set an amount (payout) on each shift in Employee Calendar. Average auto-calculates.", dataSource: laborCostPerShift ? "app" : "mock" },
+    { label: "Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "—", detail: currentShiftStaffing ? `${selectedDateRange} shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : `Schedule shifts in Employee Calendar to see staffing for selected ${selectedRangeLabelLower}.`, dataSource: currentShiftStaffing ? "app" : "mock" },
+    { label: "Overtime Alerts", value: overtimeAlertsCount ? formatNumber(overtimeAlertsCount) : "—", detail: overtimeAlertsCount ? "Triggered by shifts above 8 tracked hours" : "Auto-triggers when any shift has more than 8 hours logged. No overtime in current data.", dataSource: overtimeAlertsCount ? "app" : "mock" },
   ];
-  const staffDataSource = staffMetrics.some((metric) => metric.dataSource === "live") ? "live" : "mock";
-  const laborEfficiencySource = laborEfficiencyTrend.some((item) => item.efficiency > 0) ? "live" : "mock";
+  const staffDataSource = staffMetrics.some((metric) => metric.dataSource === "app") ? "app" : "mock";
+  const laborEfficiencySource = laborEfficiencyTrend.some((item) => item.efficiency > 0) ? "app" : "mock";
+  const liveSourceStates = [
+    { id: "loyverse", label: "Loyverse", connected: hasLoyverseApiConfig(appSettings) },
+    { id: "clip", label: "Clip", connected: hasClipApiConfig(appSettings) },
+    { id: "app-orders", label: "App orders", connected: filteredOrders.length > 0 },
+  ];
+  const connectedLiveSourcesCount = liveSourceStates.filter((source) => source.connected).length;
 
   const refreshAll = () => {
     ordersQuery.refetch();
@@ -1287,15 +1809,24 @@ export default function Dashboard() {
               <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Live sources connected</p>
                 <p className="mt-2 text-2xl font-bold text-yellow-400">
-                  {[hasLoyverseApiConfig(appSettings), hasClipApiConfig(appSettings), orders.length > 0].filter(Boolean).length}/3
+                  {connectedLiveSourcesCount}/3
                 </p>
-                <p className="text-xs text-gray-400">Loyverse, Clip, app orders</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  {liveSourceStates.map((source) => (
+                    <span
+                      key={source.id}
+                      className={source.connected ? "text-yellow-300" : "text-gray-500"}
+                    >
+                      {source.label}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Last synced</p>
                 <p className="mt-2 text-lg font-bold text-yellow-400">
                   {clipOverview?.metrics?.latestSyncAt || loyverseOverview?.metrics?.latestSyncAt
-                    ? format(new Date(clipOverview?.metrics?.latestSyncAt || loyverseOverview?.metrics?.latestSyncAt), "yyyy-MM-dd HH:mm")
+                    ? formatDateSafe(clipOverview?.metrics?.latestSyncAt || loyverseOverview?.metrics?.latestSyncAt, "yyyy-MM-dd HH:mm")
                     : "No live sync yet"}
                 </p>
                 <p className="text-xs text-gray-400">Based on current dashboard queries</p>
@@ -1318,14 +1849,25 @@ export default function Dashboard() {
               </div>
               <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4 sm:col-span-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <SourceBadge source="live" />
-                  <span className="text-sm text-gray-300">Live data already wired</span>
+                  <SourceBadge source="clip" />
+                  <span className="text-sm text-gray-300">Clip data</span>
+                  <SourceBadge source="loyverse" />
+                  <span className="text-sm text-gray-300">Loyverse data</span>
+                  <SourceBadge source="both" />
+                  <span className="text-sm text-gray-300">Combined Clip + Loyverse</span>
+                  <SourceBadge source="app" />
+                  <span className="text-sm text-gray-300">App/internal data</span>
                   <SourceBadge source="mock" />
                   <span className="text-sm text-gray-300">Needs replacement / mapping</span>
                 </div>
                 <p className="mt-3 text-xs text-gray-500">
-                  Filters below are still mostly UI-only until branch/channel/date filtering is wired directly into the provider queries. Revolut is not integrated yet in this repo, so bank views still come from local finance records instead of the Revolut API.
+                  Date, payment source, branch, and sales channel now affect the combined sales and reconciliation views on this page. Revolut is not integrated yet in this repo, so bank views still come from local finance records instead of the Revolut API.
                 </p>
+                {leanOpsMode ? (
+                  <p className="mt-2 text-xs text-yellow-300">
+                    Lean mode is active for a low-volume setup: staffing and advanced operations views are reduced so sales, payments, products, and basic costs stay primary.
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1372,7 +1914,7 @@ export default function Dashboard() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Live Operations</p>
-              <h2 className="mt-1 text-2xl font-bold text-yellow-400">Current service flow</h2>
+              <h2 className="mt-1 text-2xl font-bold text-yellow-400">{leanOpsMode ? `${selectedDateRange} at a glance` : `Current service flow (${selectedDateRange})`}</h2>
             </div>
             <Button asChild variant="outline" className="border-yellow-500/20 bg-[#242424] text-gray-200 hover:bg-[#2b2b2b]">
               <Link to="/managementinsight?view=live-operations">
@@ -1403,12 +1945,12 @@ export default function Dashboard() {
           <DashboardPanel
             title="Sales & Trends"
             description="Revenue cadence, order timing, and sales mix."
-            sourceBadge={<SourceBadge source="live" />}
-            action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><BarChart3 className="mr-1 h-3 w-3" />Live from orders</Badge>}
+            sourceBadge={<SourceBadge source={combinedClipLoyverseSource} />}
+            action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><BarChart3 className="mr-1 h-3 w-3" />Source-tagged sales events</Badge>}
           >
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
-                <p className="text-sm font-semibold text-yellow-400">Revenue last 7 days</p>
+                <p className="text-sm font-semibold text-yellow-400">Revenue trend (latest 7 days within selection)</p>
                 <div className="mt-4 h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={revenue7Days}>
@@ -1445,7 +1987,7 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
-                <p className="text-sm font-semibold text-yellow-400">Orders by hour today</p>
+                <p className="text-sm font-semibold text-yellow-400">Sales events by hour ({selectedDateRange})</p>
                 <div className="mt-4 h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ordersByHourToday}>
@@ -1478,7 +2020,7 @@ export default function Dashboard() {
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4 xl:col-span-2">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Average order value trend</p>
-                  <SourceBadge source="live" />
+                  <SourceBadge source={combinedClipLoyverseSource} />
                 </div>
                 <div className="mt-4 h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1498,7 +2040,7 @@ export default function Dashboard() {
           <DashboardPanel
             title="Alerts & Exceptions"
             description="Current action queue for management."
-            sourceBadge={<SourceBadge source={liveAlerts.length ? "live" : "mock"} />}
+            sourceBadge={<SourceBadge source={alertsSource} />}
             action={<Badge className="border border-red-500/20 bg-red-500/10 text-red-300"><AlertTriangle className="mr-1 h-3 w-3" />{alerts.length} active</Badge>}
           >
             <AlertFeed alerts={alerts} />
@@ -1506,9 +2048,13 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-3">
-          <ProductList title="Best selling products" items={bestSellingProducts.length ? bestSellingProducts : mockProductPerformance.bestSelling} source={bestSellingSource} />
-          <ProductList title="Highest margin products" items={mockProductPerformance.highestMargin} source="mock" />
-          <ProductList title="Worst performing products" items={worstPerformingProducts.length ? worstPerformingProducts : mockProductPerformance.worstPerforming} source={worstPerformingSource} />
+          <ProductList title="Best selling products" items={bestSellingProducts} source={bestSellingSource} />
+          {leanOpsMode ? (
+            <ProductList title="Focus products" items={bestSellingProducts} source={bestSellingSource} />
+          ) : (
+            <ProductList title="Highest margin products" items={highestMarginProducts} source="loyverse" />
+          )}
+          <ProductList title="Worst performing products" items={worstPerformingProducts} source={worstPerformingSource} />
         </div>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
@@ -1516,9 +2062,34 @@ export default function Dashboard() {
             id="payments-reconciliation"
             title="Payments & Reconciliation"
             description="Cross-check between app orders, Clip transactions, and deposits."
-            sourceBadge={<SourceBadge source={clipOverview ? "live" : "mock"} />}
+            sourceBadge={<SourceBadge source={hasClipDataInRange && (hasLoyverseDataInRange || filteredOrders.length) ? "both" : hasClipDataInRange ? "clip" : "mock"} />}
             action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><CreditCard className="mr-1 h-3 w-3" />Clip + app</Badge>}
           >
+            <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Duplicate matches removed</p>
+                <p className="mt-2 text-2xl font-bold text-white">{formatNumber(deduplicatedSalesCount)}</p>
+                <p className="mt-2 text-xs text-gray-400">Current reconciliation uses {selectedDedupeWindow.toLowerCase()} and {selectedDedupePriority.toLowerCase()}.</p>
+              </div>
+              <SelectField
+                label="Dedupe window"
+                options={DEDUPE_WINDOW_OPTIONS}
+                value={selectedDedupeWindow}
+                onChange={setSelectedDedupeWindow}
+              />
+              <SelectField
+                label="Dedupe priority"
+                options={DEDUPE_PRIORITY_OPTIONS}
+                value={selectedDedupePriority}
+                onChange={setSelectedDedupePriority}
+              />
+              <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Match rule</p>
+                <p className="mt-2 text-sm font-medium text-white">Same amount + near timestamp</p>
+                <p className="mt-2 text-xs text-gray-400">If two sources report the same amount within the chosen time window, the preferred source wins and the other is removed from combined sales.</p>
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               {paymentSummary.map((item) => (
                 <div key={item.label} className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
@@ -1536,7 +2107,7 @@ export default function Dashboard() {
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Cash vs card vs Clip</p>
-                  <SourceBadge source="live" />
+                  <SourceBadge source={hasClipDataInRange && filteredOrders.length ? "both" : hasClipDataInRange ? "clip" : filteredOrders.length ? "app" : "mock"} />
                 </div>
                 <div className="mt-4 h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1554,7 +2125,7 @@ export default function Dashboard() {
               <InsightTable
                 title="Reconciliation table"
                 subtitle="Expected vs actual amounts from current connected sources."
-                sourceBadge={<SourceBadge source={clipOverview || loyverseOverview ? "live" : "mock"} />}
+                sourceBadge={<SourceBadge source={hasClipDataInRange && hasLoyverseDataInRange ? "both" : hasClipDataInRange ? "clip" : hasLoyverseDataInRange ? "loyverse" : "mock"} />}
                 columns={[
                   { key: "source_system", label: "Source system" },
                   { key: "expected_amount", label: "Expected amount" },
@@ -1568,11 +2139,34 @@ export default function Dashboard() {
               />
             </div>
 
+            <div className="mt-6">
+              <InsightTable
+                title="Deduplicated sales matches"
+                subtitle={filteredDeduplicatedSalesCount
+                  ? `Recent matches removed from combined sales for the current payment-source filter. Showing ${Math.min(filteredDeduplicationRows.length, filteredDeduplicatedSalesCount)} of ${filteredDeduplicatedSalesCount}.`
+                  : "No same-amount same-time duplicate sales were detected for the current payment-source filter."}
+                sourceBadge={<SourceBadge source={filteredDeduplicatedSalesCount ? combinedClipLoyverseSource : "mock"} />}
+                columns={[
+                  { key: "removed_source", label: "Removed source" },
+                  { key: "kept_source", label: "Kept source" },
+                  { key: "amount", label: "Amount" },
+                  { key: "branch", label: "Branch" },
+                  { key: "channel", label: "Channel" },
+                  { key: "removed_time", label: "Removed time" },
+                  { key: "kept_time", label: "Kept time" },
+                  { key: "matched_window", label: "Matched within" },
+                  { key: "payment_method", label: "Method" },
+                ]}
+                rows={filteredDeduplicationRows}
+                defaultSortKey="removed_time"
+              />
+            </div>
+
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Clip API response</p>
-                  <SourceBadge source={clipOverview ? "live" : "mock"} />
+                  <SourceBadge source={clipOverview ? "clip" : "mock"} />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-yellow-500/10 bg-black/20 p-3">
@@ -1580,8 +2174,8 @@ export default function Dashboard() {
                     <p className="mt-1 text-xl font-bold text-white">{formatNumber(clipPayments.length)}</p>
                   </div>
                   <div className="rounded-lg border border-yellow-500/10 bg-black/20 p-3">
-                    <p className="text-xs text-gray-500">Approved volume</p>
-                    <p className="mt-1 text-xl font-bold text-white">{formatCurrency(clipApprovedTotal)}</p>
+                    <p className="text-xs text-gray-500">Unmatched Clip volume</p>
+                    <p className="mt-1 text-xl font-bold text-white">{formatCurrency(filteredClipSalesTotal)}</p>
                   </div>
                 </div>
                 <p className="mt-4 text-xs text-gray-400">
@@ -1600,7 +2194,7 @@ export default function Dashboard() {
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Loyverse API response</p>
-                  <SourceBadge source={loyverseOverview ? "live" : "mock"} />
+                  <SourceBadge source={loyverseOverview ? "loyverse" : "mock"} />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-yellow-500/10 bg-black/20 p-3">
@@ -1636,7 +2230,7 @@ export default function Dashboard() {
             id="costs"
             title="Costs"
             description="Uses live Expense and Clip settlement rows where available, otherwise stays marked as placeholder."
-            sourceBadge={<SourceBadge source={totalExpenses ? "live" : "mock"} />}
+            sourceBadge={<SourceBadge source={totalExpenseLedger > 0 && paymentFees > 0 ? "both" : paymentFees > 0 ? "clip" : totalExpenseLedger > 0 ? "app" : "mock"} />}
             action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><BriefcaseBusiness className="mr-1 h-3 w-3" />Expenses</Badge>}
           >
             <div className="mb-4 rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4 text-sm text-gray-300">
@@ -1666,7 +2260,7 @@ export default function Dashboard() {
             <div className="mt-6 rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-yellow-400">Cost trend vs budget</p>
-                <SourceBadge source={costTrendData.some((item) => item.actual > 0) ? "live" : "mock"} />
+                <SourceBadge source={costTrendData.some((item) => item.actual > 0) ? "app" : "mock"} />
               </div>
               <div className="mt-4 h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">

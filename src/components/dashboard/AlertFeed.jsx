@@ -30,6 +30,37 @@ export default function AlertFeed({ alerts }) {
     <div className="space-y-3">
       {alerts.map((alert) => {
         const StatusIcon = statusIcons[alert.status] || ShieldAlert;
+        const sourceMeta = {
+          clip: {
+            label: "Clip",
+            tone: "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+          },
+          loyverse: {
+            label: "Loyverse",
+            tone: "border-violet-500/25 bg-violet-500/10 text-violet-300",
+          },
+          both: {
+            label: "Clip + Loyverse",
+            tone: "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-300",
+          },
+          app: {
+            label: "App",
+            tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+          },
+          manual: {
+            label: "Manual",
+            tone: "border-sky-500/20 bg-sky-500/10 text-sky-300",
+          },
+          mock: {
+            label: "Hardcoded",
+            tone: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+          },
+          live: {
+            label: "Live data",
+            tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+          },
+        };
+        const source = sourceMeta[alert.dataSource] || sourceMeta.mock;
 
         return (
           <Link
@@ -50,12 +81,10 @@ export default function AlertFeed({ alerts }) {
                   <Badge
                     className={cn(
                       "border text-[10px] uppercase tracking-[0.18em]",
-                      alert.dataSource === "live"
-                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                        : "border-amber-400/20 bg-amber-400/10 text-amber-200"
+                      source.tone
                     )}
                   >
-                    {alert.dataSource === "live" ? "Live data" : "Hardcoded"}
+                    {source.label}
                   </Badge>
                 </div>
                 <div>

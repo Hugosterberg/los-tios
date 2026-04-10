@@ -4,8 +4,10 @@ import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
-const isLocalDevBypass = import.meta.env.DEV && import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === 'true';
+const isLocalDevBypass =
+  import.meta.env.DEV && import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH !== 'false';
 const hasBase44Config = Boolean(appParams.appId && appParams.serverUrl);
+const isLocalDevWithoutBase44Config = import.meta.env.DEV && !hasBase44Config;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -24,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      if (isLocalDevBypass) {
+      if (isLocalDevBypass || isLocalDevWithoutBase44Config) {
         setAppPublicSettings({ local_dev_bypass: true });
         setUser({
           id: 'local-dev-admin',

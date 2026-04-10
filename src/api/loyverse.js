@@ -97,6 +97,23 @@ async function loyverseFetch(path, searchParams = {}, settings = {}) {
     throw new LoyverseApiError("Missing Loyverse API token");
   }
 
+  if (import.meta.env.DEV) {
+    const url = buildLoyverseUrl(getLoyverseRequestBaseUrl(config), path, searchParams);
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new LoyverseApiError(`Loyverse API error ${response.status}: ${text || response.statusText}`, response.status);
+    }
+
+    return text ? JSON.parse(text) : null;
+  }
+
   const response = await base44.functions.invoke("loyverseProxy", {
     path,
     searchParams,
@@ -193,7 +210,90 @@ function getReceiptStatus(receipt) {
   );
 }
 
-export async function getLoyverseOverview(settings = {}) {
+function getReceiptLineItems(receipt) {
+  if (!receipt || typeof receipt !== "object") {
+    return [];
+  }
+
+  return (
+    receipt.line_items ||
+    receipt.receipt_items ||
+    receipt.items ||
+    receipt.positions ||
+    []
+  );
+}
+
+function getReceiptPayments(receipt) {
+  if (!receipt || typeof receipt !== "object") {
+    return [];
+  }
+
+  return Array.isArray(receipt.payments) ? receipt.payments : [];
+}
+
+function normalizeDay(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function filterRecordsByDateRange(records, options = {}) {
+  if (!options.start && !options.end) {
+    return records;
+  }
+
+  const start = options.start ? new Date(options.start) : null;
+  const end = options.end ? new Date(options.end) : null;
+
+  return records.filter((record) => {
+    const date = new Date(
+      record?.receipt_date ||
+      record?.created_at ||
+      record?.updated_at ||
+      record?.date ||
+      0,
+    );
+
+    if (start && date < start) {
+      return false;
+    }
+
+    if (end && date > end) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function getLineItemTotalMoney(lineItem, preferredKeys = []) {
+  for (const key of preferredKeys) {
+    const value = getMoneyAmount(lineItem?.[key]);
+    if (value > 0) {
+      return value;
+    }
+  }
+
+  const quantity = Number(lineItem?.quantity ?? lineItem?.qty ?? 1) || 1;
+  const unitPrice = getMoneyAmount(
+    lineItem?.price_money ??
+    lineItem?.price ??
+    lineItem?.base_price_money ??
+    lineItem?.amount_money,
+  );
+
+  return unitPrice * quantity;
+}
+
+export async function getLoyverseOverview(settings = {}, options = {}) {
   const [
     stores,
     items,
@@ -209,20 +309,21 @@ export async function getLoyverseOverview(settings = {}) {
     inventoryLevels,
   ] = await Promise.all([
     fetchOptionalCollection("stores", "stores", { maxPages: 5, settings }),
-    fetchOptionalCollection("items", "items", { maxPages: 20, settings }),
-    fetchOptionalCollection("customers", "customers", { maxPages: 20, settings }),
-    fetchCollection("receipts", "receipts", { maxPages: 20, settings }),
+    fetchOptionalCollection("items", "items", { maxPages: 50, settings }),
+    fetchOptionalCollection("customers", "customers", { maxPages: 50, settings }),
+    fetchCollection("receipts", "receipts", { maxPages: 100, settings }),
     fetchOptionalCollection("categories", "categories", { maxPages: 10, settings }),
-    fetchOptionalCollection("modifiers", "modifiers", { maxPages: 20, settings }),
+    fetchOptionalCollection("modifiers", "modifiers", { maxPages: 50, settings }),
     fetchOptionalCollection("discounts", "discounts", { maxPages: 10, settings }),
     fetchOptionalCollection("taxes", "taxes", { maxPages: 10, settings }),
     fetchOptionalCollection("employees", "employees", { maxPages: 10, settings }),
     fetchOptionalCollection("pos_devices", "pos_devices", { maxPages: 10, settings }),
-    fetchOptionalCollection("shifts", "shifts", { maxPages: 20, settings }),
-    fetchOptionalCollection("inventory", "inventory_levels", { maxPages: 20, settings }),
+    fetchOptionalCollection("shifts", "shifts", { maxPages: 50, settings }),
+    fetchOptionalCollection("inventory", "inventory_levels", { maxPages: 50, settings }),
   ]);
 
-  const receiptsSorted = [...receipts].sort((a, b) => {
+  const receiptsInRange = filterRecordsByDateRange(receipts, options);
+  const receiptsSorted = [...receiptsInRange].sort((a, b) => {
     const left = new Date(a.created_at || a.updated_at || 0).getTime();
     const right = new Date(b.created_at || b.updated_at || 0).getTime();
     return right - left;
@@ -248,6 +349,19 @@ export async function getLoyverseOverview(settings = {}) {
       )
     );
   }, 0);
+  const totalDiscountAmount = completedReceipts.reduce(
+    (sum, receipt) => sum + getMoneyAmount(receipt.total_discount),
+    0,
+  );
+  const totalTaxAmount = completedReceipts.reduce(
+    (sum, receipt) => sum + getMoneyAmount(receipt.total_tax),
+    0,
+  );
+  const totalTipsAmount = completedReceipts.reduce(
+    (sum, receipt) => sum + getMoneyAmount(receipt.tip),
+    0,
+  );
+  const averageReceiptValue = completedReceipts.length ? grossSales / completedReceipts.length : 0;
 
   const itemsSorted = [...items].sort((a, b) => {
     const left = new Date(a.updated_at || a.created_at || 0).getTime();
@@ -367,6 +481,112 @@ export async function getLoyverseOverview(settings = {}) {
       : [],
   }));
 
+  const productSales = [...completedReceipts.reduce((map, receipt) => {
+    getReceiptLineItems(receipt).forEach((lineItem) => {
+      const key = lineItem.item_id || lineItem.variant_id || lineItem.item_name || "unknown";
+      const current = map.get(key) || {
+        id: key,
+        itemId: lineItem.item_id || null,
+        variantId: lineItem.variant_id || null,
+        itemName: lineItem.item_name || lineItem.name || "Unknown item",
+        sku: lineItem.sku || null,
+        quantity: 0,
+        grossRevenue: 0,
+        netRevenue: 0,
+        discounts: 0,
+        costTotal: 0,
+      };
+
+      current.quantity += Number(lineItem.quantity || 0);
+      current.grossRevenue += getLineItemTotalMoney(lineItem, ["gross_total_money", "subtotal_money"]);
+      current.netRevenue += getLineItemTotalMoney(lineItem, ["total_money", "gross_total_money", "subtotal_money"]);
+      current.discounts += getMoneyAmount(lineItem.total_discount);
+      current.costTotal += getMoneyAmount(lineItem.cost_total ?? lineItem.cost);
+      map.set(key, current);
+    });
+
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.quantity - a.quantity || b.netRevenue - a.netRevenue);
+
+  const paymentMethodSummary = [...completedReceipts.reduce((map, receipt) => {
+    getReceiptPayments(receipt).forEach((payment) => {
+      const key = payment.type || payment.name || payment.payment_type_id || "unknown";
+      const current = map.get(key) || {
+        id: key,
+        type: payment.type || "unknown",
+        name: payment.name || payment.type || "Unknown",
+        count: 0,
+        amount: 0,
+      };
+
+      current.count += 1;
+      current.amount += getMoneyAmount(payment.money_amount);
+      map.set(key, current);
+    });
+
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.amount - a.amount || b.count - a.count);
+
+  const salesByStore = [...completedReceipts.reduce((map, receipt) => {
+    const key = receipt.store_id || "unknown";
+    const current = map.get(key) || {
+      id: key,
+      storeId: key,
+      storeName: storeMap.get(key)?.name || key || "Unknown store",
+      receiptsCount: 0,
+      salesAmount: 0,
+      discountsAmount: 0,
+    };
+
+    current.receiptsCount += 1;
+    current.salesAmount += getMoneyAmount(receipt.total_money ?? receipt.total_payment_money ?? receipt.total);
+    current.discountsAmount += getMoneyAmount(receipt.total_discount);
+    map.set(key, current);
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.salesAmount - a.salesAmount);
+
+  const employeeMap = new Map(enrichedEmployees.map((employee) => [employee.id, employee]));
+  const salesByEmployee = [...completedReceipts.reduce((map, receipt) => {
+    const key = receipt.employee_id || "unknown";
+    const current = map.get(key) || {
+      id: key,
+      employeeId: key,
+      employeeName: employeeMap.get(key)?.name || key || "Unknown employee",
+      receiptsCount: 0,
+      salesAmount: 0,
+    };
+
+    current.receiptsCount += 1;
+    current.salesAmount += getMoneyAmount(receipt.total_money ?? receipt.total_payment_money ?? receipt.total);
+    map.set(key, current);
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.salesAmount - a.salesAmount);
+
+  const dailySales = [...completedReceipts.reduce((map, receipt) => {
+    const day = normalizeDay(receipt.receipt_date || receipt.created_at || receipt.updated_at);
+    if (!day) {
+      return map;
+    }
+
+    const current = map.get(day) || {
+      day,
+      receiptsCount: 0,
+      salesAmount: 0,
+      discountsAmount: 0,
+    };
+
+    current.receiptsCount += 1;
+    current.salesAmount += getMoneyAmount(receipt.total_money ?? receipt.total_payment_money ?? receipt.total);
+    current.discountsAmount += getMoneyAmount(receipt.total_discount);
+    map.set(day, current);
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => a.day.localeCompare(b.day));
+
   return {
     stores,
     items: enrichedItems,
@@ -380,6 +600,17 @@ export async function getLoyverseOverview(settings = {}) {
     posDevices: enrichedPosDevices,
     shifts,
     inventoryLevels,
+    analytics: {
+      productSales,
+      paymentMethodSummary,
+      salesByStore,
+      salesByEmployee,
+      dailySales,
+      averageReceiptValue,
+      totalDiscountAmount,
+      totalTaxAmount,
+      totalTipsAmount,
+    },
     config: {
       baseUrl: getLoyverseResolvedConfig(settings).baseUrl,
     },
@@ -402,6 +633,10 @@ export async function getLoyverseOverview(settings = {}) {
       completedReceiptsCount: completedReceipts.length,
       cancelledReceiptsCount: cancelledReceipts.length,
       grossSales,
+      averageReceiptValue,
+      totalDiscountAmount,
+      totalTaxAmount,
+      totalTipsAmount,
       variantsCount,
       itemsWithVariantsCount,
       trackedStockItemsCount,

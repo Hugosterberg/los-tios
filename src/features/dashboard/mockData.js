@@ -4,7 +4,7 @@ const detailHref = (view) => `${createPageUrl("ManagementInsight")}?view=${view}
 
 export const filterOptions = {
   dateRanges: ["1 day", "7 days", "1 month", "All history"],
-  branches: ["Centro"],
+  branches: ["All branches", "Centro"],
   salesChannels: ["All channels", "Dine-in", "Pickup", "Delivery app", "Direct web"],
   paymentSources: ["All sources", "Cash", "Card", "Clip", "Online", "Bank transfer"],
   shifts: ["All shifts", "Lunch", "Dinner", "Closing"],

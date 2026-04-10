@@ -2,6 +2,8 @@ import { buildClipResolvedConfig } from "@/lib/integrationSettings";
 import { base44 } from "@/api/base44Client";
 export const CLIP_PAYMENTS_API_BASE_URL = "https://api.payclip.com";
 export const CLIP_SETTLEMENTS_API_BASE_URL = "https://api-gw.payclip.com";
+const DEFAULT_CLIP_PAYMENTS_PROXY_PATH = "/api/clip/payments";
+const DEFAULT_CLIP_SETTLEMENTS_PROXY_PATH = "/api/clip/settlements";
 
 function buildClipAuthToken(config = {}) {
   if (config.authToken) {
@@ -130,9 +132,52 @@ class ClipApiError extends Error {
   }
 }
 
+function getClipRequestBaseUrl(apiType, config) {
+  if (import.meta.env.DEV) {
+    return apiType === "settlements"
+      ? (import.meta.env.VITE_CLIP_SETTLEMENTS_PROXY_PATH || DEFAULT_CLIP_SETTLEMENTS_PROXY_PATH)
+      : (import.meta.env.VITE_CLIP_PAYMENTS_PROXY_PATH || DEFAULT_CLIP_PAYMENTS_PROXY_PATH);
+  }
+
+  return apiType === "settlements" ? config.settlementsBaseUrl : config.paymentsBaseUrl;
+}
+
+function buildClipUrl(baseUrl, path, searchParams = {}) {
+  const normalizedBaseUrl = String(baseUrl || "").replace(/\/$/, "");
+  const resolvedBaseUrl = /^https?:/i.test(normalizedBaseUrl)
+    ? `${normalizedBaseUrl}/`
+    : `${window.location.origin}${normalizedBaseUrl}/`;
+  const url = new URL(path, resolvedBaseUrl);
+
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
 async function clipFetch(path, { searchParams, apiType = "payments", authToken } = {}) {
   if (!authToken) {
     throw new ClipApiError("Missing Clip auth token");
+  }
+
+  if (import.meta.env.DEV) {
+    const config = getClipResolvedConfig();
+    const url = buildClipUrl(getClipRequestBaseUrl(apiType, config), path, searchParams);
+    const response = await fetch(url, {
+      headers: apiType === "settlements"
+        ? { Accept: "application/json", "x-api-key": authToken }
+        : { Accept: "application/json", Authorization: authToken },
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new ClipApiError(`Clip API error ${response.status}: ${text || response.statusText}`, response.status);
+    }
+
+    return text ? JSON.parse(text) : null;
   }
 
   const response = await base44.functions.invoke("clipProxy", {
@@ -143,6 +188,14 @@ async function clipFetch(path, { searchParams, apiType = "payments", authToken }
   });
 
   return response.data;
+}
+
+async function clipFetchOptional(path, options = {}) {
+  try {
+    return await clipFetch(path, options);
+  } catch {
+    return null;
+  }
 }
 
 function normalizeClipItem(payload) {
@@ -199,6 +252,72 @@ function getAmount(value) {
   return 0;
 }
 
+function normalizeDay(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeClipDateTime(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function normalizeClipDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getSettlementDetailId(settlement) {
+  const href = settlement?.links?.self?.href;
+  if (typeof href === "string") {
+    const parts = href.split("/").filter(Boolean);
+    return parts[parts.length - 1] || null;
+  }
+
+  return settlement?.settlement_report_id || null;
+}
+
+function extractSettlementPaymentRows(detailPayload) {
+  const settlement = detailPayload?.settlement;
+  if (!settlement || !Array.isArray(settlement.details)) {
+    return [];
+  }
+
+  return settlement.details.flatMap((detail) =>
+    (detail.payments || []).map((payment) => ({
+      ...payment,
+      settlementDate: detail.date,
+      settlementReportId: settlement.settlement_report_id,
+      merchantName: settlement.merchant_name,
+      disbursementDate: settlement.disbursement_date,
+    })),
+  );
+}
+
 function getDefaultPaymentsRange() {
   const now = new Date();
   const to = new Date(now);
@@ -211,6 +330,17 @@ function getDefaultPaymentsRange() {
     from: from.toISOString().replace(/\.\d{3}Z$/, "Z"),
     to: to.toISOString().replace(/\.\d{3}Z$/, "Z"),
   };
+}
+
+function getPaymentsRange(options = {}) {
+  if (options.start || options.end) {
+    return {
+      from: normalizeClipDateTime(options.start || new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)),
+      to: normalizeClipDateTime(options.end || new Date()),
+    };
+  }
+
+  return getDefaultPaymentsRange();
 }
 
 function getDefaultSettlementsRange() {
@@ -229,22 +359,114 @@ function getDefaultSettlementsRange() {
   };
 }
 
-export async function getClipOverview(settings = {}) {
-  const config = getClipResolvedConfig(settings);
-  const paymentsRange = getDefaultPaymentsRange();
-  const settlementsRange = getDefaultSettlementsRange();
+function getSettlementsRange(options = {}) {
+  if (options.start || options.end) {
+    const end = options.end ? new Date(options.end) : new Date();
+    const start = options.start ? new Date(options.start) : new Date(end.getTime() - 89 * 24 * 60 * 60 * 1000);
+    const boundedStart = new Date(Math.max(start.getTime(), end.getTime() - 89 * 24 * 60 * 60 * 1000));
 
-  const [paymentsPayload, settlementsPayload] = await Promise.all([
-    clipFetch("payments", {
+    return {
+      from: normalizeClipDate(boundedStart),
+      to: normalizeClipDate(end),
+    };
+  }
+
+  return getDefaultSettlementsRange();
+}
+
+function getClipPageCursor(payload) {
+  return (
+    payload?.cursor ||
+    payload?.next_cursor ||
+    payload?.pagination?.cursor ||
+    payload?.pagination?.next_cursor ||
+    null
+  );
+}
+
+function getClipNextPage(payload, currentPage, pageSize, itemCount) {
+  const explicitNextPage =
+    payload?.next_page ??
+    payload?.pagination?.next_page ??
+    payload?.paging?.next_page ??
+    null;
+
+  if (explicitNextPage) {
+    return explicitNextPage;
+  }
+
+  if (itemCount === pageSize) {
+    return currentPage + 1;
+  }
+
+  return null;
+}
+
+async function fetchClipCollection(path, { searchParams, apiType, authToken, pageSize = 100, maxPages = 20 } = {}) {
+  const allItems = [];
+  let cursor = null;
+  let page = 1;
+  let pagesFetched = 0;
+  let previousSignature = null;
+
+  while (pagesFetched < maxPages) {
+    const payload = await clipFetch(path, {
+      searchParams: {
+        ...searchParams,
+        size: pageSize,
+        ...(cursor ? { cursor } : { page }),
+      },
+      apiType,
+      authToken,
+    });
+
+    const items = extractArray(payload);
+    const signature = JSON.stringify(items.slice(0, 5).map((item) => item?.id || item?.receipt_no || item?.settlement_report_id || item));
+
+    if (signature && signature === previousSignature) {
+      break;
+    }
+
+    previousSignature = signature;
+    allItems.push(...items);
+    pagesFetched += 1;
+
+    const nextCursor = getClipPageCursor(payload);
+    if (nextCursor) {
+      cursor = nextCursor;
+      continue;
+    }
+
+    const nextPage = getClipNextPage(payload, page, pageSize, items.length);
+    if (!nextPage) {
+      break;
+    }
+
+    page = nextPage;
+  }
+
+  return allItems;
+}
+
+export async function getClipOverview(settings = {}, options = {}) {
+  const config = getClipResolvedConfig(settings);
+  const paymentsRange = getPaymentsRange(options);
+  const settlementsRange = getSettlementsRange(options);
+
+  const [paymentMethodsPayload, paymentsPayload, settlementsPayload] = await Promise.all([
+    clipFetchOptional("payment_methods", {
+      apiType: "payments",
+      authToken: config.authToken,
+    }),
+    fetchClipCollection("payments", {
       searchParams: {
         from: paymentsRange.from,
         to: paymentsRange.to,
-        size: 100,
       },
       apiType: "payments",
       authToken: config.authToken,
     }),
-    clipFetch("settlements", {
+    fetchClipCollection("settlements", {
       searchParams: {
         from: settlementsRange.from,
         to: settlementsRange.to,
@@ -265,6 +487,21 @@ export async function getClipOverview(settings = {}) {
     const right = new Date(b.created_at || b.deposit_date || b.date || 0).getTime();
     return right - left;
   });
+  const paymentMethods = extractArray(paymentMethodsPayload);
+  const settlementDetailPayloads = await Promise.all(
+    settlements.map((settlement) => {
+      const settlementId = getSettlementDetailId(settlement);
+      if (!settlementId) {
+        return Promise.resolve(null);
+      }
+
+      return clipFetchOptional(`settlements/${settlementId}`, {
+        apiType: "settlements",
+        authToken: config.authToken,
+      });
+    }),
+  );
+  const settlementPayments = settlementDetailPayloads.flatMap(extractSettlementPaymentRows);
 
   const approvedPayments = payments.filter((payment) => {
     const status = String(payment.status || "").toLowerCase();
@@ -275,18 +512,105 @@ export async function getClipOverview(settings = {}) {
   const refundedVolume = payments.reduce((sum, payment) => sum + getAmount(payment.amount_refunded), 0);
   const tipsVolume = payments.reduce((sum, payment) => sum + getAmount(payment.tip_amount ?? payment.tip), 0);
   const netDeposits = settlements.reduce(
-    (sum, settlement) => sum + getAmount(settlement.net_amount ?? settlement.net_total ?? settlement.amount_net),
+    (sum, settlement) =>
+      sum + getAmount(settlement.disbursed_net_amount ?? settlement.net_amount ?? settlement.net_total ?? settlement.amount_net),
     0,
   );
   const grossDeposits = settlements.reduce(
     (sum, settlement) => sum + getAmount(settlement.gross_amount ?? settlement.gross_total ?? settlement.amount_gross),
     0,
   );
+  const totalSettlementFees = settlements.reduce(
+    (sum, settlement) => sum + getAmount(settlement.total_fee ?? settlement.fee_amount ?? settlement.total_fees),
+    0,
+  );
+  const totalSettlementTax = settlements.reduce(
+    (sum, settlement) => sum + getAmount(settlement.total_tax),
+    0,
+  );
+  const totalSettlementRetention = settlements.reduce(
+    (sum, settlement) => sum + getAmount(settlement.total_retention),
+    0,
+  );
+  const averageTicket = approvedPayments.length ? grossVolume / approvedPayments.length : 0;
+  const installmentPaymentsCount = approvedPayments.filter((payment) => Number(payment.installments || 0) > 1).length;
+  const paymentStatusSummary = [...payments.reduce((map, payment) => {
+    const key = String(payment.status || "unknown").toLowerCase();
+    const current = map.get(key) || { status: key, count: 0, amount: 0 };
+    current.count += 1;
+    current.amount += getAmount(payment.amount);
+    map.set(key, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.count - a.count || b.amount - a.amount);
+  const paymentTypeSummary = [...approvedPayments.reduce((map, payment) => {
+    const method = payment.payment_method || {};
+    const key = method.id || method.type || "unknown";
+    const current = map.get(key) || {
+      id: key,
+      type: method.type || "unknown",
+      name: method.id || method.type || "Unknown",
+      count: 0,
+      amount: 0,
+    };
+    current.count += 1;
+    current.amount += getAmount(payment.amount);
+    map.set(key, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.amount - a.amount || b.count - a.count);
+  const issuerSummary = [...approvedPayments.reduce((map, payment) => {
+    const issuer = payment?.payment_method?.card?.issuer || "Unknown issuer";
+    const current = map.get(issuer) || { issuer, count: 0, amount: 0 };
+    current.count += 1;
+    current.amount += getAmount(payment.amount);
+    map.set(issuer, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.amount - a.amount || b.count - a.count);
+  const dailyPayments = [...approvedPayments.reduce((map, payment) => {
+    const day = normalizeDay(payment.approved_at || payment.created_at);
+    if (!day) {
+      return map;
+    }
+
+    const current = map.get(day) || { day, count: 0, grossAmount: 0, refundedAmount: 0, tipsAmount: 0 };
+    current.count += 1;
+    current.grossAmount += getAmount(payment.amount);
+    current.refundedAmount += getAmount(payment.amount_refunded);
+    current.tipsAmount += getAmount(payment.tip_amount ?? payment.tip);
+    map.set(day, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => a.day.localeCompare(b.day));
+  const settlementDaily = [...settlements.reduce((map, settlement) => {
+    const day = settlement.disbursement_date || normalizeDay(settlement.created_at || settlement.date);
+    if (!day) {
+      return map;
+    }
+
+    const current = map.get(day) || { day, settlementsCount: 0, grossAmount: 0, netAmount: 0, feeAmount: 0 };
+    current.settlementsCount += 1;
+    current.grossAmount += getAmount(settlement.gross_amount ?? settlement.gross_total ?? settlement.amount_gross);
+    current.netAmount += getAmount(settlement.disbursed_net_amount ?? settlement.net_amount ?? settlement.net_total ?? settlement.amount_net);
+    current.feeAmount += getAmount(settlement.total_fee ?? settlement.fee_amount ?? settlement.total_fees);
+    map.set(day, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => a.day.localeCompare(b.day));
+  const settlementCardBrands = [...settlementPayments.reduce((map, payment) => {
+    const brand = payment?.card?.brand || payment.payment_method || "UNKNOWN";
+    const current = map.get(brand) || { brand, count: 0, amount: 0, feeAmount: 0 };
+    current.count += 1;
+    current.amount += getAmount(payment.amount);
+    current.feeAmount += getAmount(payment?.charges?.charge?.fee);
+    map.set(brand, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.amount - a.amount || b.count - a.count);
 
   return {
+    paymentMethods,
     payments,
     settlements,
+    settlementDetails: settlementDetailPayloads.filter(Boolean),
+    settlementPayments,
     raw: {
+      paymentMethodsPayload,
       paymentsPayload,
       settlementsPayload,
     },
@@ -298,7 +622,21 @@ export async function getClipOverview(settings = {}) {
       paymentsBaseUrl: config.paymentsBaseUrl,
       settlementsBaseUrl: config.settlementsBaseUrl,
     },
+    analytics: {
+      paymentStatusSummary,
+      paymentTypeSummary,
+      issuerSummary,
+      dailyPayments,
+      settlementDaily,
+      settlementCardBrands,
+      averageTicket,
+      installmentPaymentsCount,
+      totalSettlementFees,
+      totalSettlementTax,
+      totalSettlementRetention,
+    },
     metrics: {
+      paymentMethodsCount: paymentMethods.length,
       paymentsCount: payments.length,
       approvedPaymentsCount: approvedPayments.length,
       refundedPaymentsCount: refundedPayments.length,
@@ -308,6 +646,12 @@ export async function getClipOverview(settings = {}) {
       tipsVolume,
       grossDeposits,
       netDeposits,
+      totalSettlementFees,
+      totalSettlementTax,
+      totalSettlementRetention,
+      averageTicket,
+      installmentPaymentsCount,
+      settlementPaymentsCount: settlementPayments.length,
       latestSyncAt: new Date().toISOString(),
     },
   };

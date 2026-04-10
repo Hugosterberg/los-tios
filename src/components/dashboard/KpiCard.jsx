@@ -46,10 +46,37 @@ export default function KpiCard({ item }) {
   const deltaTone = trendPositive ? "positive" : "negative";
   const TrendIcon = trendIcon;
   const href = item.href || "#";
-  const sourceTone =
-    item.dataSource === "live"
-      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-      : "border-amber-400/20 bg-amber-400/10 text-amber-200";
+  const sourceMeta = {
+    clip: {
+      label: "Clip",
+      tone: "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+    },
+    loyverse: {
+      label: "Loyverse",
+      tone: "border-violet-500/25 bg-violet-500/10 text-violet-300",
+    },
+    both: {
+      label: "Clip + Loyverse",
+      tone: "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-300",
+    },
+    app: {
+      label: "App",
+      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    },
+    manual: {
+      label: "Manual",
+      tone: "border-sky-500/20 bg-sky-500/10 text-sky-300",
+    },
+    mock: {
+      label: "Hardcoded",
+      tone: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+    },
+    live: {
+      label: "Live data",
+      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    },
+  };
+  const source = sourceMeta[item.dataSource] || sourceMeta.mock;
 
   return (
     <Link
@@ -60,8 +87,8 @@ export default function KpiCard({ item }) {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs uppercase tracking-[0.22em] text-gray-500">{item.label}</p>
-            <Badge className={cn("border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em]", sourceTone)}>
-              {item.dataSource === "live" ? "Live data" : "Hardcoded"}
+            <Badge className={cn("border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em]", source.tone)}>
+              {source.label}
             </Badge>
           </div>
           <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{item.value}</p>

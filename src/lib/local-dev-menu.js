@@ -1,3 +1,7 @@
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
+import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
+import { getClipOverview, hasClipApiConfig } from "@/api/clip";
+
 const isBrowser = typeof window !== "undefined";
 
 export const isLocalDevMenuMode =
@@ -5,27 +9,253 @@ export const isLocalDevMenuMode =
 
 const STORAGE_KEY = "los_tios_local_dev_menu_items_v1";
 
-const sampleMenuItems = [
-  {
-    id: "local-dev-margherita",
-    name: "Pizza Margherita",
-    name_en: "Margherita Pizza",
-    description: "Tomate, mozzarella, albahaca fresca y aceite de oliva.",
-    description_en: "Tomato, mozzarella, fresh basil and olive oil.",
-    category: "pizzas",
-    price: 160,
-    image_url:
-      "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=1200&q=80",
-    ingredients: ["Tomate", "Mozzarella", "Albahaca", "Aceite de oliva"],
-    is_vegetarian: true,
-    is_available: true,
-    preparation_time: 12,
-    created_date: "2026-03-29T00:00:00.000Z",
-    updated_date: "2026-03-29T00:00:00.000Z",
-  },
-];
+const sampleMenuItems = [];
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+function getMoneyValue(value) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (value && typeof value === "object") {
+    return getMoneyValue(value.amount ?? value.value ?? value.total ?? value.money_amount);
+  }
+
+  return 0;
+}
+
+function normalizeMenuCategory(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (key.includes("pizza")) return "pizzas";
+  if (key.includes("dessert") || key.includes("postre")) return "desserts";
+  if (key.includes("drink") || key.includes("bebida")) return "beverages";
+  if (key.includes("panini")) return "paninis";
+  if (key.includes("appetizer") || key.includes("entrada")) return "appetizers";
+  if (key.includes("salsa") || key.includes("sauce")) return "salsas";
+  return key || "uncategorized";
+}
+
+function getLoyverseItemPrice(item) {
+  const directPrice = getMoneyValue(item?.price ?? item?.default_price ?? item?.price_money);
+  if (directPrice > 0) {
+    return directPrice;
+  }
+
+  if (Array.isArray(item?.variants) && item.variants.length > 0) {
+    const variantPrice = item.variants.reduce((max, variant) => {
+      const value = getMoneyValue(
+        variant?.default_price ??
+        variant?.price ??
+        variant?.price_money,
+      );
+      return Math.max(max, value);
+    }, 0);
+    return variantPrice > 0 ? variantPrice : 0;
+  }
+
+  return 0;
+}
+
+function isLikelyRealName(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return false;
+  }
+  if (/^unknown/i.test(normalized)) {
+    return false;
+  }
+  return /[a-zA-Z\u00C0-\u017F]/.test(normalized);
+}
+
+function resolveLoyverseItemName(item) {
+  const variantName = Array.isArray(item?.variants)
+    ? item.variants.map((variant) => variant?.name).find(Boolean)
+    : "";
+  const bestCandidate = [
+    item?.name,
+    item?.item_name,
+    item?.display_name,
+    item?.title,
+    variantName,
+    item?.sku,
+  ].find((candidate) => isLikelyRealName(candidate));
+
+  if (bestCandidate) {
+    return String(bestCandidate).trim();
+  }
+
+  if (item?.sku) {
+    return `SKU ${item.sku}`;
+  }
+  if (item?.id) {
+    return `Item ${item.id}`;
+  }
+  return "Menu item";
+}
+
+function mapLoyverseItemsToMenuItems(items = []) {
+  return items
+    .filter((item) => !item?.is_deleted)
+    .map((item, index) => ({
+      id: item.id || `loyverse-item-${index}`,
+      source: "loyverse",
+      name: resolveLoyverseItemName(item),
+      name_en: resolveLoyverseItemName(item),
+      description: item.description || "",
+      description_en: item.description || "",
+      category: normalizeMenuCategory(item?.category?.name || item?.category_name || item?.category_id),
+      price: getLoyverseItemPrice(item),
+      image_url: item.image_url || item.image || "",
+      ingredients: [],
+      is_vegetarian: false,
+      is_available: item.available !== false && item.is_archived !== true,
+      preparation_time: null,
+      created_date: item.created_at || null,
+      updated_date: item.updated_at || null,
+    }))
+    .filter((item) => item.price > 0 || item.name);
+}
+
+function normalizeSearchKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u00C0-\u017F]+/g, " ")
+    .trim();
+}
+
+function isImageUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return false;
+  }
+  if (raw.startsWith("data:image/")) {
+    return true;
+  }
+  return /^(https?:)?\/\//i.test(raw) && /\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(raw);
+}
+
+function getFirstImageField(payload) {
+  const candidates = [
+    payload?.image_url,
+    payload?.image,
+    payload?.photo_url,
+    payload?.thumbnail_url,
+    payload?.product_image_url,
+    payload?.avatar_url,
+  ];
+  return candidates.find(isImageUrl) || "";
+}
+
+function getClipImageMapFromPayments(payments = []) {
+  const imageMap = new Map();
+
+  payments.forEach((payment) => {
+    const paymentImage = getFirstImageField(payment);
+    const paymentName = normalizeSearchKey(
+      payment?.description ||
+      payment?.concept ||
+      payment?.title ||
+      payment?.reference ||
+      payment?.receipt_no,
+    );
+
+    if (paymentImage && paymentName && !imageMap.has(paymentName)) {
+      imageMap.set(paymentName, paymentImage);
+    }
+
+    const lineCollections = [
+      ...(Array.isArray(payment?.items) ? payment.items : []),
+      ...(Array.isArray(payment?.line_items) ? payment.line_items : []),
+      ...(Array.isArray(payment?.products) ? payment.products : []),
+      ...(Array.isArray(payment?.details) ? payment.details : []),
+    ];
+
+    lineCollections.forEach((line) => {
+      const image = getFirstImageField(line);
+      const name = normalizeSearchKey(
+        line?.name ||
+        line?.item_name ||
+        line?.description ||
+        line?.title ||
+        line?.sku,
+      );
+      if (image && name && !imageMap.has(name)) {
+        imageMap.set(name, image);
+      }
+    });
+  });
+
+  return imageMap;
+}
+
+function matchClipImageForName(name, clipImageMap) {
+  const target = normalizeSearchKey(name);
+  if (!target || !clipImageMap.size) {
+    return "";
+  }
+
+  if (clipImageMap.has(target)) {
+    return clipImageMap.get(target);
+  }
+
+  for (const [key, image] of clipImageMap.entries()) {
+    if (key.includes(target) || target.includes(key)) {
+      return image;
+    }
+  }
+
+  return "";
+}
+
+function enrichMenuItemsWithClipImages(menuItems, clipImageMap) {
+  return (menuItems || []).map((item) => {
+    if (isImageUrl(item.image_url)) {
+      return item;
+    }
+
+    const clipImage = matchClipImageForName(item.name, clipImageMap);
+    if (!clipImage) {
+      return item;
+    }
+
+    return {
+      ...item,
+      image_url: clipImage,
+    };
+  });
+}
+
+async function getLiveMenuItemsFromLoyverse(settings) {
+  if (!hasLoyverseApiConfig(settings)) {
+    return [];
+  }
+
+  try {
+    const overview = await getLoyverseOverview(settings);
+    return mapLoyverseItemsToMenuItems(overview?.items || []);
+  } catch {
+    return [];
+  }
+}
+
+async function getClipImageMap(settings) {
+  if (!hasClipApiConfig(settings)) {
+    return new Map();
+  }
+
+  try {
+    const clipOverview = await getClipOverview(settings);
+    return getClipImageMapFromPayments(clipOverview?.payments || []);
+  } catch {
+    return new Map();
+  }
+}
 
 const readStoredItems = () => {
   if (!isBrowser) return clone(sampleMenuItems);
@@ -64,6 +294,17 @@ const createLocalId = () => {
 };
 
 export const listMenuItems = async (remoteListFn) => {
+  const settings = getResolvedIntegrationSettings();
+  const [liveMenuItems, clipImageMap] = await Promise.all([
+    getLiveMenuItemsFromLoyverse(settings),
+    getClipImageMap(settings),
+  ]);
+  const enrichedLiveMenuItems = enrichMenuItemsWithClipImages(liveMenuItems, clipImageMap);
+
+  if (enrichedLiveMenuItems.length > 0) {
+    return enrichedLiveMenuItems;
+  }
+
   if (isLocalDevMenuMode) {
     return readStoredItems();
   }
@@ -106,6 +347,6 @@ export const deleteMenuItem = async (id, remoteDeleteFn) => {
   }
 
   const items = readStoredItems().filter((item) => item.id !== id);
-  writeStoredItems(items.length > 0 ? items : clone(sampleMenuItems));
+  writeStoredItems(items);
   return { id };
 };

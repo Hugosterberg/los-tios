@@ -15,6 +15,7 @@ Wallet,
 Users,
 KeyRound,
 BookOpen,
+Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -28,7 +29,6 @@ export default function Layout({ children, currentPageName }) {
   const navItems = [
     { name: "Dashboard", shortName: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
     { name: "Orders", shortName: "Orders", url: createPageUrl("Orders"), icon: ShoppingBag },
-    { name: "Integrations", shortName: "Integrations", url: createPageUrl("IntegrationsHub"), icon: KeyRound },
     { name: "Notion", shortName: "Notion", url: createPageUrl("Notion"), icon: BookOpen },
     { name: "Statistics", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
     { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
@@ -87,13 +87,27 @@ export default function Layout({ children, currentPageName }) {
       <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-[#1a1a1a]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-10 items-center justify-between gap-2.5" lang="en">
-            <Link to={createPageUrl("Dashboard")} className="shrink-0">
-              <img
-                src={losTiosLogo}
-                alt="Los Tios"
-                className="h-9 w-9 rounded-full bg-[#f5c400] p-[1px] border-2 border-yellow-300/90 object-contain shadow-sm"
-              />
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link to={createPageUrl("Dashboard")} className="shrink-0">
+                <img
+                  src={losTiosLogo}
+                  alt="Los Tios"
+                  className="h-9 w-9 rounded-full bg-[#f5c400] p-[1px] border-2 border-yellow-300/90 object-contain shadow-sm"
+                />
+              </Link>
+              <Link
+                to={createPageUrl("IntegrationsHub")}
+                title="Settings & Integrations"
+                className={`hidden xl:inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-all ${
+                  location.pathname === createPageUrl("IntegrationsHub")
+                    ? "bg-yellow-400/10 text-yellow-300 border border-yellow-400/30"
+                    : "text-gray-400 border border-yellow-500/20 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <Settings2 className="h-3 w-3" />
+                Settings
+              </Link>
+            </div>
 
             <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex">
               {navItems.map((item) => (
@@ -139,6 +153,21 @@ export default function Layout({ children, currentPageName }) {
         {mobileMenuOpen && (
           <div className="border-t border-yellow-500/30 bg-[#1a1a1a] xl:hidden">
             <nav className="space-y-2 px-4 py-4">
+              <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
+                <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Settings</p>
+                <Link
+                  to={createPageUrl("IntegrationsHub")}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
+                    location.pathname === createPageUrl("IntegrationsHub")
+                      ? "bg-yellow-400/10 text-yellow-400"
+                      : "text-gray-300 hover:bg-white/10"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Settings2 className="h-5 w-5" />
+                  <span className="font-medium">Integrations</span>
+                </Link>
+              </div>
               {navItems.map((item) => (
                 <Link
                   key={item.name}
