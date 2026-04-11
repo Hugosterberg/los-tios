@@ -1,187 +1,461 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, TrendingUp, Package, Calendar, TrendingDown, Printer, ShoppingCart, Percent, ChefHat, Users, CreditCard } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, startOfDay, endOfDay } from "date-fns";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import {
+  BarChart3,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Package,
+  Printer,
+  FileSpreadsheet,
+  ShoppingCart,
+  ChefHat,
+  Users,
+  Info,
+} from "lucide-react";
+import { format, endOfMonth, eachDayOfInterval, subMonths, startOfMonth, startOfDay, endOfDay, parseISO } from "date-fns";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { es } from "date-fns/locale";
+import { enUS, es } from "date-fns/locale";
 import { listOrders } from "@/lib/local-dev-orders";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
+import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
+import { cn } from "@/lib/utils";
+import {
+  buildMergedCanonicalEvents,
+  filterCanonicalEventsByDateRange,
+  sumEventAmounts,
+  aggregateTopReceiptLineItems,
+  countByChannel,
+  getRecordDate,
+} from "@/lib/mergedSales";
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    currencyDisplay: "code",
+    maximumFractionDigits: 0,
+  }).format(value || 0);
+
+const formatCurrencyDetailed = (value) =>
+  new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    currencyDisplay: "code",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value || 0);
+
+const formatNumber = (value) => new Intl.NumberFormat("es-MX").format(value || 0);
+
+function escapeCsvField(value) {
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+const RADIAN = Math.PI / 180;
+
+function pieSectorLabel({ cx, cy, midAngle, innerRadius, outerRadius, name, value }) {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.62;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#fde68a" textAnchor="middle" dominantBaseline="central" fontSize={11}>
+      {`${name}: ${value}`}
+    </text>
+  );
+}
+
+function scrollToStatsSection(elementId) {
+  document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+const statsShortcutLinkClass =
+  "rounded px-0.5 text-[11px] text-yellow-300/90 transition-colors hover:text-yellow-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-yellow-400/60";
+
+function StatsDetailShortcuts({ channelId, topItemsId }) {
+  return (
+    <nav aria-label="Section shortcuts" className="mb-4 flex flex-wrap items-center gap-x-0.5 gap-y-1">
+      <span className="mr-2 text-[10px] font-medium uppercase tracking-wider text-yellow-500/55">Jump to</span>
+      <button type="button" className={statsShortcutLinkClass} onClick={() => scrollToStatsSection(channelId)}>
+        Channel mix
+      </button>
+      <span className="select-none px-1 text-[10px] text-yellow-600/35" aria-hidden>
+        ·
+      </span>
+      <button type="button" className={statsShortcutLinkClass} onClick={() => scrollToStatsSection(topItemsId)}>
+        Top items
+      </button>
+    </nav>
+  );
+}
+
+function pctChangeLabel(current, previous) {
+  if (previous == null || previous === 0) {
+    return null;
+  }
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% vs previous month`;
+}
 
 export default function Statistics() {
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [selectedDay, setSelectedDay] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [printMode, setPrintMode] = useState(null); // 'daily' or 'monthly'
-
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [selectedDay, setSelectedDay] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [printMode, setPrintMode] = useState(null);
+  const [statsView, setStatsView] = useState("monthly");
   const { data: orders = [] } = useQuery({
-    queryKey: ['orders'],
-    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), '-created_date'),
+    queryKey: ["orders"],
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ['expenses'],
-    queryFn: () => base44.entities.Expense.list('-date'),
+    queryKey: ["expenses"],
+    queryFn: () => base44.entities.Expense.list("-date"),
   });
 
   const { data: settings = [] } = useQuery({
-    queryKey: ['appSettings'],
+    queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
   });
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
+  const statisticsMonth = statsView === "daily" ? format(parseISO(`${selectedDay}T12:00:00`), "yyyy-MM") : selectedMonth;
+
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["companyTransactions"],
+    queryFn: () => base44.entities.CompanyTransaction.list("-date"),
+  });
+
+  const monthAnchor = useMemo(() => parseISO(`${statisticsMonth}-01`), [statisticsMonth]);
+  const fetchStart = useMemo(() => startOfMonth(subMonths(monthAnchor, 1)), [monthAnchor]);
+  const rangeStart = useMemo(() => startOfMonth(monthAnchor), [monthAnchor]);
+  const rangeEnd = useMemo(() => {
+    const end = endOfMonth(monthAnchor);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [monthAnchor]);
+  const prevRangeStart = useMemo(() => startOfMonth(subMonths(monthAnchor, 1)), [monthAnchor]);
+  const prevRangeEnd = useMemo(() => {
+    const end = endOfMonth(subMonths(monthAnchor, 1));
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [monthAnchor]);
+
+  const { data: loyverseOverview } = useQuery({
+    queryKey: ["statisticsLoyverse", settings[0]?.id || "none", statisticsMonth],
+    queryFn: () =>
+      getLoyverseOverview(appSettings, {
+        start: fetchStart,
+        end: rangeEnd,
+      }),
+    enabled: hasLoyverseApiConfig(appSettings),
+    staleTime: 60_000,
+  });
+
   const { data: clipOverview } = useQuery({
-    queryKey: ['clipOverview', settings[0]?.id || 'none'],
-    queryFn: () => getClipOverview(appSettings),
+    queryKey: ["statisticsClip", settings[0]?.id || "none", statisticsMonth],
+    queryFn: () =>
+      getClipOverview(appSettings, {
+        start: fetchStart,
+        end: rangeEnd,
+      }),
     enabled: hasClipApiConfig(appSettings),
     staleTime: 60_000,
   });
 
-  // Generate month options (last 12 months)
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const date = subMonths(new Date(), i);
     return {
-      value: format(date, 'yyyy-MM'),
-      label: format(date, 'MMMM yyyy', { locale: es })
+      value: format(date, "yyyy-MM"),
+      label: format(date, "MMMM yyyy", { locale: es }),
     };
   });
 
-  // Filter orders by selected month
-  const monthOrders = orders.filter(o => {
-    const orderDate = new Date(o.created_date);
-    return format(orderDate, 'yyyy-MM') === selectedMonth;
-  });
+  const monthOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM") === statisticsMonth);
+  const monthExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM") === statisticsMonth);
 
-  // Filter expenses by selected month
-  const monthExpenses = expenses.filter(e => {
-    const expenseDate = new Date(e.date);
-    return format(expenseDate, 'yyyy-MM') === selectedMonth;
-  });
+  const dayOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM-dd") === selectedDay);
+  const dayExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === selectedDay);
 
-  // Filter orders by selected day
-  const dayOrders = orders.filter(o => {
-    const orderDate = new Date(o.created_date);
-    return format(orderDate, 'yyyy-MM-dd') === selectedDay;
-  });
+  const contributionInWindow = useMemo(
+    () =>
+      transactions.filter(
+        (t) =>
+          t.type === "contribution" &&
+          getRecordDate(t) >= fetchStart &&
+          getRecordDate(t) <= rangeEnd,
+      ),
+    [transactions, fetchStart, rangeEnd],
+  );
 
-  // Filter expenses by selected day
-  const dayExpenses = expenses.filter(e => {
-    const expenseDate = new Date(e.date);
-    return format(expenseDate, 'yyyy-MM-dd') === selectedDay;
-  });
+  const { canonicalEvents: canonicalFull } = useMemo(
+    () =>
+      buildMergedCanonicalEvents({
+        receipts: loyverseOverview?.receipts || [],
+        clipPayments: clipOverview?.payments || [],
+        contributionTransactions: contributionInWindow,
+        stores: loyverseOverview?.stores || [],
+        dedupeWindowMs: 10 * 60 * 1000,
+        priorityMode: "Prefer Loyverse",
+        paymentSource: "All sources",
+        branch: "All branches",
+        channel: "All channels",
+      }),
+    [loyverseOverview, clipOverview, contributionInWindow],
+  );
 
-  // Calculate statistics
-  const calculateStats = (orderList, expenseList) => {
-    const totalRevenue = orderList.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-    const totalExpenses = expenseList.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const totalProfit = totalRevenue - totalExpenses;
-    const totalOrders = orderList.length;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const completedOrders = orderList.filter(o => o.status === 'delivered').length;
-    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-    
-    return { totalRevenue, totalExpenses, totalProfit, totalOrders, avgOrderValue, completedOrders, profitMargin };
+  const canonicalCurrent = useMemo(
+    () => filterCanonicalEventsByDateRange(canonicalFull, rangeStart, rangeEnd),
+    [canonicalFull, rangeStart, rangeEnd],
+  );
+  const canonicalPrev = useMemo(
+    () => filterCanonicalEventsByDateRange(canonicalFull, prevRangeStart, prevRangeEnd),
+    [canonicalFull, prevRangeStart, prevRangeEnd],
+  );
+
+  const mergedRevenue = sumEventAmounts(canonicalCurrent);
+  const mergedTransactionCount = canonicalCurrent.length;
+  const mergedAov = mergedTransactionCount ? mergedRevenue / mergedTransactionCount : 0;
+  const monthExpensesTotal = monthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const mergedNet = mergedRevenue - monthExpensesTotal;
+
+  const orderModuleRevenue = monthOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+  const orderModuleCount = monthOrders.length;
+
+  const sourceTotals = canonicalCurrent.reduce(
+    (acc, e) => {
+      acc[e.source] = (acc[e.source] || 0) + e.amount;
+      return acc;
+    },
+    { loyverse: 0, clip: 0, manual: 0 },
+  );
+
+  const PIZZA_COST_ESTIMATE = 80;
+  const ingredientExpenses = monthExpenses.filter((e) => e.category === "ingredients").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const laborExpenses = monthExpenses.filter((e) => e.category === "salaries").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const estimatedIngredientCost = ingredientExpenses || orderModuleCount * PIZZA_COST_ESTIMATE;
+  const grossProfit = mergedRevenue - estimatedIngredientCost;
+  const foodCostPct = mergedRevenue > 0 ? (estimatedIngredientCost / mergedRevenue) * 100 : 0;
+  const laborCostPct = mergedRevenue > 0 ? (laborExpenses / mergedRevenue) * 100 : 0;
+
+  const prevMonthStr = format(subMonths(monthAnchor, 1), "yyyy-MM");
+  const prevMonthExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM") === prevMonthStr);
+  const prevMonthExpenseTotal = prevMonthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const prevMergedRevenue = sumEventAmounts(canonicalPrev);
+  const prevMergedNet = prevMergedRevenue - prevMonthExpenseTotal;
+
+  const revenueChangeLabel = pctChangeLabel(mergedRevenue, prevMergedRevenue);
+  const ordersChangeLabel = pctChangeLabel(mergedTransactionCount, canonicalPrev.length);
+  const expensesChangeLabel = pctChangeLabel(monthExpensesTotal, prevMonthExpenseTotal);
+  const profitChangeLabel = pctChangeLabel(mergedNet, prevMergedNet);
+
+  const PIE_COLORS = ["#facc15", "#a16207", "#fef08a", "#84cc16", "#22d3ee", "#a78bfa", "#fb7185"];
+
+  const selectedDayDate = useMemo(() => parseISO(`${selectedDay}T12:00:00`), [selectedDay]);
+  const dayStart = startOfDay(selectedDayDate);
+  const dayEnd = endOfDay(selectedDayDate);
+  const dayCanonical = filterCanonicalEventsByDateRange(canonicalFull, dayStart, dayEnd);
+  const dayMergedRevenue = sumEventAmounts(dayCanonical);
+  const dayMergedCount = dayCanonical.length;
+  const dayExpensesTotal = dayExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const dayNet = dayMergedRevenue - dayExpensesTotal;
+  const dayStats = {
+    totalRevenue: dayMergedRevenue,
+    totalExpenses: dayExpensesTotal,
+    totalProfit: dayNet,
+    totalOrders: dayMergedCount,
+    avgOrderValue: dayMergedCount ? dayMergedRevenue / dayMergedCount : 0,
+    profitMargin: dayMergedRevenue > 0 ? (dayNet / dayMergedRevenue) * 100 : 0,
   };
 
-  const monthStats = calculateStats(monthOrders, monthExpenses);
-  const dayStats = calculateStats(dayOrders, dayExpenses);
+  const dayExpenseByCategory = useMemo(() => {
+    const map = new Map();
+    dayExpenses.forEach((e) => {
+      const c = e.category || "other";
+      map.set(c, (map.get(c) || 0) + Number(e.amount || 0));
+    });
+    return Array.from(map.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [dayExpenses]);
 
-  // Dashboard-style KPIs for selected month
-  const PIZZA_COST_ESTIMATE = 80;
-  const ingredientExpenses = monthExpenses.filter(e => e.category === 'ingredients').reduce((sum, e) => sum + (e.amount || 0), 0);
-  const laborExpenses = monthExpenses.filter(e => e.category === 'salaries').reduce((sum, e) => sum + (e.amount || 0), 0);
-  const estimatedIngredientCost = ingredientExpenses || (monthOrders.length * PIZZA_COST_ESTIMATE);
-  const grossProfit = monthStats.totalRevenue - estimatedIngredientCost;
-  const netProfit = monthStats.totalRevenue - monthStats.totalExpenses;
-  const foodCostPct = monthStats.totalRevenue > 0 ? (estimatedIngredientCost / monthStats.totalRevenue) * 100 : 0;
-  const laborCostPct = monthStats.totalRevenue > 0 ? (laborExpenses / monthStats.totalRevenue) * 100 : 0;
-
-  // Clip payments filtered by selected month
-  const allClipPayments = clipOverview?.payments || [];
-  const monthClipPayments = allClipPayments.filter(p => {
-    const date = new Date(p.created_at || p.approved_at || 0);
-    return format(date, 'yyyy-MM') === selectedMonth;
-  });
-  const clipApprovedMonth = monthClipPayments.filter(p => {
-    const status = String(p.status || '').toLowerCase();
-    return status.includes('approved') || status.includes('paid');
-  });
-  const clipTotalMonth = clipApprovedMonth.reduce((sum, p) => {
-    const amt = p.amount ?? p.total_amount ?? p.approved_amount ?? 0;
-    return sum + (typeof amt === 'number' ? amt : Number(amt) || 0);
-  }, 0);
-
-  // Comparison with previous month
-  const prevMonthStr = format(subMonths(new Date(selectedMonth + '-01'), 1), 'yyyy-MM');
-  const prevMonthOrders = orders.filter(o => format(new Date(o.created_date), 'yyyy-MM') === prevMonthStr);
-  const prevMonthRevenue = prevMonthOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-  const revenueChange = prevMonthRevenue ? ((monthStats.totalRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : null;
-  const ordersChange = prevMonthOrders.length ? ((monthOrders.length - prevMonthOrders.length) / prevMonthOrders.length) * 100 : null;
-
-  // Revenue, Expenses, and Profit by day for selected month
-  const monthStart = new Date(selectedMonth + '-01');
-  const monthEnd = endOfMonth(monthStart);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  const dailyRevenue = daysInMonth.map(day => {
-    const dayStr = format(day, 'yyyy-MM-dd');
-    const dayOrders = orders.filter(o => format(new Date(o.created_date), 'yyyy-MM-dd') === dayStr);
-    const dayExpenses = expenses.filter(e => format(new Date(e.date), 'yyyy-MM-dd') === dayStr);
-    const revenue = dayOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-    const expense = dayExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const profit = revenue - expense;
-
-    return {
-      date: format(day, 'MMM dd'),
-      revenue,
-      expenses: expense,
-      profit,
-      orders: dayOrders.length
-    };
-  });
-
-  // Orders by type for selected month
-  const ordersByType = [
-    { 
-      name: 'Dine-in', 
-      value: monthOrders.filter(o => o.order_type === 'dine-in').length,
-      revenue: monthOrders.filter(o => o.order_type === 'dine-in').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#facc15' 
+  const daySourceTotals = dayCanonical.reduce(
+    (acc, e) => {
+      acc[e.source] = (acc[e.source] || 0) + e.amount;
+      return acc;
     },
-    { 
-      name: 'Takeout', 
-      value: monthOrders.filter(o => o.order_type === 'takeout').length,
-      revenue: monthOrders.filter(o => o.order_type === 'takeout').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#a16207' 
-    },
-    { 
-      name: 'Delivery', 
-      value: monthOrders.filter(o => o.order_type === 'delivery').length,
-      revenue: monthOrders.filter(o => o.order_type === 'delivery').reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      color: '#fef08a' 
-    },
+    { loyverse: 0, clip: 0, manual: 0 },
+  );
+
+  const dayIngredientExpenses = dayExpenses
+    .filter((e) => e.category === "ingredients")
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const dayLaborExpenses = dayExpenses
+    .filter((e) => e.category === "salaries")
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const dayEstimatedIngredient = dayIngredientExpenses || dayOrders.length * PIZZA_COST_ESTIMATE;
+  const dayGrossProfit = dayMergedRevenue - dayEstimatedIngredient;
+  const dayFoodCostPct = dayMergedRevenue > 0 ? (dayEstimatedIngredient / dayMergedRevenue) * 100 : 0;
+  const dayLaborCostPct = dayMergedRevenue > 0 ? (dayLaborExpenses / dayMergedRevenue) * 100 : 0;
+
+  const dayChannelPieData = countByChannel(dayCanonical).map((row, index) => ({
+    ...row,
+    color: PIE_COLORS[index % PIE_COLORS.length],
+  }));
+
+  const dayItemCounts = {};
+  const dayItemRevenue = {};
+  dayOrders.forEach((order) => {
+    order.items?.forEach((item) => {
+      dayItemCounts[item.item_name] = (dayItemCounts[item.item_name] || 0) + item.quantity;
+      dayItemRevenue[item.item_name] = (dayItemRevenue[item.item_name] || 0) + item.price * item.quantity;
+    });
+  });
+  const dayTopFromReceipts = aggregateTopReceiptLineItems(dayCanonical, 10);
+  const dayTopItems =
+    dayTopFromReceipts.length > 0
+      ? dayTopFromReceipts
+      : Object.entries(dayItemCounts)
+          .map(([name, count]) => ({ name, count, revenue: dayItemRevenue[name] }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+
+  const daySnapshotBars = [
+    { name: "Merged POS", value: dayMergedRevenue },
+    { name: "Expenses", value: dayExpensesTotal },
+    { name: "Net", value: dayNet },
   ];
 
-  // Top selling items
+  const dailyLedgerRows = useMemo(() => {
+    const days = eachDayOfInterval({ start: rangeStart, end: endOfMonth(monthAnchor) });
+    return days.map((day) => {
+      const ds = startOfDay(day);
+      const de = endOfDay(day);
+      const ev = filterCanonicalEventsByDateRange(canonicalFull, ds, de);
+      const mergedPosNet = sumEventAmounts(ev);
+      const dayStr = format(day, "yyyy-MM-dd");
+      const dExp = expenses.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === dayStr);
+      const expensesSpent = dExp.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      const sourceTotals = ev.reduce(
+        (acc, e) => {
+          acc[e.source] = (acc[e.source] || 0) + e.amount;
+          return acc;
+        },
+        { loyverse: 0, clip: 0, manual: 0 },
+      );
+      const dOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM-dd") === dayStr);
+      const orderModuleRevenue = dOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      return {
+        dateIso: dayStr,
+        dayEnglish: format(day, "EEEE", { locale: enUS }),
+        mergedPosNet,
+        expensesSpent,
+        net: mergedPosNet - expensesSpent,
+        mergedEvents: ev.length,
+        loyverse: sourceTotals.loyverse,
+        clip: sourceTotals.clip,
+        manual: sourceTotals.manual,
+        orderModuleRevenue,
+      };
+    });
+  }, [rangeStart, monthAnchor, canonicalFull, expenses, orders]);
+
+  const dailyLedgerTotals = useMemo(
+    () =>
+      dailyLedgerRows.reduce(
+        (acc, r) => ({
+          mergedPosNet: acc.mergedPosNet + r.mergedPosNet,
+          expensesSpent: acc.expensesSpent + r.expensesSpent,
+          net: acc.net + r.net,
+          mergedEvents: acc.mergedEvents + r.mergedEvents,
+          loyverse: acc.loyverse + r.loyverse,
+          clip: acc.clip + r.clip,
+          manual: acc.manual + r.manual,
+          orderModuleRevenue: acc.orderModuleRevenue + r.orderModuleRevenue,
+        }),
+        {
+          mergedPosNet: 0,
+          expensesSpent: 0,
+          net: 0,
+          mergedEvents: 0,
+          loyverse: 0,
+          clip: 0,
+          manual: 0,
+          orderModuleRevenue: 0,
+        },
+      ),
+    [dailyLedgerRows],
+  );
+
+  const dailyRevenue = useMemo(
+    () =>
+      dailyLedgerRows.map((r) => ({
+        date: format(parseISO(`${r.dateIso}T12:00:00`), "MMM dd"),
+        revenue: r.mergedPosNet,
+        expenses: r.expensesSpent,
+        profit: r.net,
+        orders: r.mergedEvents,
+      })),
+    [dailyLedgerRows],
+  );
+
+  const channelPieData = countByChannel(canonicalCurrent).map((row, index) => ({
+    ...row,
+    color: PIE_COLORS[index % PIE_COLORS.length],
+  }));
+
+  const expenseByCategory = useMemo(() => {
+    const map = new Map();
+    monthExpenses.forEach((e) => {
+      const c = e.category || "other";
+      map.set(c, (map.get(c) || 0) + Number(e.amount || 0));
+    });
+    return Array.from(map.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [monthExpenses]);
+
   const itemCounts = {};
   const itemRevenue = {};
-  monthOrders.forEach(order => {
-    order.items?.forEach(item => {
+  monthOrders.forEach((order) => {
+    order.items?.forEach((item) => {
       itemCounts[item.item_name] = (itemCounts[item.item_name] || 0) + item.quantity;
-      itemRevenue[item.item_name] = (itemRevenue[item.item_name] || 0) + (item.price * item.quantity);
+      itemRevenue[item.item_name] = (itemRevenue[item.item_name] || 0) + item.price * item.quantity;
     });
   });
 
-  const topItems = Object.entries(itemCounts)
-    .map(([name, count]) => ({ name, count, revenue: itemRevenue[name] }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const topFromReceipts = aggregateTopReceiptLineItems(canonicalCurrent, 10);
+  const topItems =
+    topFromReceipts.length > 0
+      ? topFromReceipts
+      : Object.entries(itemCounts)
+          .map(([name, count]) => ({ name, count, revenue: itemRevenue[name] }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
 
   const handlePrintDaily = () => {
-    setPrintMode('daily');
+    setPrintMode("daily");
     setTimeout(() => {
       window.print();
       setPrintMode(null);
@@ -189,532 +463,548 @@ export default function Statistics() {
   };
 
   const handlePrintMonthly = () => {
-    setPrintMode('monthly');
+    setPrintMode("monthly");
     setTimeout(() => {
       window.print();
       setPrintMode(null);
     }, 100);
   };
 
+  const handleOpenInExcel = () => {
+    const headers = [
+      "Date (ISO)",
+      "Weekday",
+      "Daily cash — merged POS net sales (MXN)",
+      "Spent — finance expenses (MXN)",
+      "Net (MXN)",
+      "Merged sales events",
+      "Loyverse (MXN)",
+      "Clip (MXN)",
+      "Manual (MXN)",
+      "Order module revenue (MXN)",
+    ];
+    const dataLines = dailyLedgerRows.map((r) =>
+      [
+        r.dateIso,
+        r.dayEnglish,
+        r.mergedPosNet.toFixed(2),
+        r.expensesSpent.toFixed(2),
+        r.net.toFixed(2),
+        String(r.mergedEvents),
+        r.loyverse.toFixed(2),
+        r.clip.toFixed(2),
+        r.manual.toFixed(2),
+        r.orderModuleRevenue.toFixed(2),
+      ]
+        .map(escapeCsvField)
+        .join(","),
+    );
+    const totalLine = [
+      "",
+      "TOTAL",
+      dailyLedgerTotals.mergedPosNet.toFixed(2),
+      dailyLedgerTotals.expensesSpent.toFixed(2),
+      dailyLedgerTotals.net.toFixed(2),
+      String(dailyLedgerTotals.mergedEvents),
+      dailyLedgerTotals.loyverse.toFixed(2),
+      dailyLedgerTotals.clip.toFixed(2),
+      dailyLedgerTotals.manual.toFixed(2),
+      dailyLedgerTotals.orderModuleRevenue.toFixed(2),
+    ]
+      .map(escapeCsvField)
+      .join(",");
+    const csv = `\uFEFF${[headers.map(escapeCsvField).join(","), ...dataLines, totalLine].join("\r\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `daily-ledger-${selectedMonth}.csv`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const showDailyOnScreen = !printMode && statsView === "daily";
+  const showMonthlyOnScreen = !printMode && statsView === "monthly";
+  const showDailyPrint = printMode === "daily";
+  const showMonthlyPrint = printMode === "monthly";
+
+  const chartAxisTick = { fill: "#e7e5e4", fontSize: 11 };
+  const chartTooltipStyle = {
+    background: "#242424",
+    border: "1px solid rgba(250,204,21,0.25)",
+    borderRadius: "8px",
+    color: "#fafaf9",
+  };
+
+  const sourceMixSub = `After dedupe: Loyverse ${formatCurrency(sourceTotals.loyverse)} · Clip ${formatCurrency(sourceTotals.clip)} · Manual ${formatCurrency(sourceTotals.manual)}`;
+
+  const summaryKpis = [
+    {
+      label: "Sales events (merged)",
+      value: formatNumber(mergedTransactionCount),
+      sub: `${ordersChangeLabel || "No comparison"} — Loyverse + Clip + manual ledger, same rules as Dashboard`,
+      subTone: "neutral",
+      icon: ShoppingCart,
+    },
+    {
+      label: "Net sales (POS merge)",
+      value: formatCurrency(mergedRevenue),
+      sub: revenueChangeLabel ? `${revenueChangeLabel} · ${sourceMixSub}` : sourceMixSub,
+      subTone: "neutral",
+      icon: DollarSign,
+    },
+    {
+      label: "Avg sale (merged)",
+      value: formatCurrency(mergedAov),
+      sub: mergedTransactionCount ? "Mean transaction amount after deduplication" : "No merged sales in month",
+      subTone: "neutral",
+      icon: TrendingUp,
+    },
+    {
+      label: "Expenses (Finance ledger)",
+      value: formatCurrency(monthExpensesTotal),
+      sub: expensesChangeLabel || "No comparison — Expense entity rows in this month",
+      subTone: "neutral",
+      icon: TrendingDown,
+    },
+    {
+      label: "Net (merged sales − expenses)",
+      value: formatCurrency(mergedNet),
+      sub: profitChangeLabel || "No comparison",
+      subTone: mergedNet >= 0 ? "good" : "bad",
+      icon: mergedNet >= 0 ? TrendingUp : TrendingDown,
+    },
+    {
+      label: "Order module (separate)",
+      value: formatCurrency(orderModuleRevenue),
+      sub:
+        orderModuleCount > 0
+          ? `${formatNumber(orderModuleCount)} Base44 Order rows — not added to POS merge unless also in Loyverse/Clip/manual`
+          : "No orders in Order module this month",
+      subTone: "neutral",
+      icon: Package,
+    },
+  ];
+
+  const dayOrderModuleRevenue = dayOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+  const daySourceMixSub = `After dedupe: Loyverse ${formatCurrency(daySourceTotals.loyverse)} · Clip ${formatCurrency(daySourceTotals.clip)} · Manual ${formatCurrency(daySourceTotals.manual)}`;
+
+  const dailySummaryKpis = [
+    {
+      label: "Sales events (merged)",
+      value: formatNumber(dayMergedCount),
+      sub: `${daySourceMixSub} — same rules as Dashboard`,
+      subTone: "neutral",
+      icon: ShoppingCart,
+    },
+    {
+      label: "Net sales (POS merge)",
+      value: formatCurrency(dayMergedRevenue),
+      sub: daySourceMixSub,
+      subTone: "neutral",
+      icon: DollarSign,
+    },
+    {
+      label: "Avg sale (merged)",
+      value: formatCurrency(dayStats.avgOrderValue),
+      sub: dayMergedCount ? "Mean transaction amount after deduplication" : "No merged sales this day",
+      subTone: "neutral",
+      icon: TrendingUp,
+    },
+    {
+      label: "Expenses (Finance ledger)",
+      value: formatCurrency(dayExpensesTotal),
+      sub: "Expense rows dated this calendar day",
+      subTone: "neutral",
+      icon: TrendingDown,
+    },
+    {
+      label: "Net (merged sales − expenses)",
+      value: formatCurrency(dayNet),
+      sub: "POS merge revenue minus same-day expenses",
+      subTone: dayNet >= 0 ? "good" : "bad",
+      icon: dayNet >= 0 ? TrendingUp : TrendingDown,
+    },
+    {
+      label: "Order module (separate)",
+      value: formatCurrency(dayOrderModuleRevenue),
+      sub:
+        dayOrders.length > 0
+          ? `${formatNumber(dayOrders.length)} Base44 Order rows — not added to POS merge unless also in Loyverse/Clip/manual`
+          : "No orders in Order module this day",
+      subTone: "neutral",
+      icon: Package,
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="statistics-page min-h-screen bg-[#1a1a1a] text-white">
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-area, .print-area * {
-            visibility: visible;
-          }
-          .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white;
-            padding: 20px;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .print-break {
-            page-break-after: always;
-          }
-          @page {
-            margin: 1cm;
-          }
+          body * { visibility: hidden; }
+          .print-area, .print-area * { visibility: visible; }
+          .print-area { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
+          .no-print { display: none !important; }
+          .print-break { page-break-after: always; }
+          @page { margin: 1cm; }
         }
+        .statistics-page .recharts-cartesian-axis-tick text { fill: #e7e5e4; }
+        .statistics-page .recharts-cartesian-axis-line { stroke: #737373; }
+        .statistics-page .recharts-cartesian-grid line { stroke: #404040; }
+        .statistics-page .recharts-default-tooltip { color: #fafaf9 !important; }
       `}</style>
 
-      <div className="bg-[#1a1a1a] border-b border-yellow-500/20 py-5 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-yellow-500/20 bg-[#1a1a1a] py-5 no-print">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <BarChart3 className="w-6 h-6 text-yellow-400" />
+            <BarChart3 className="h-6 w-6 text-yellow-400" />
             <div>
               <h1 className="text-xl font-bold text-yellow-400">Statistics</h1>
-              <p className="text-xs text-gray-500">Sales and profitability</p>
+              <p className="text-xs text-gray-400">Same merged POS math as Dashboard (Loyverse + Clip + manual), plus Finance ledger expenses</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 lg:py-7 lg:space-y-7">
-        {/* Date Filters */}
-        <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-3 sm:p-4 no-print">
-          <h3 className="text-sm font-bold text-yellow-400 mb-3">Select Period</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-400">View by Month:</label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="bg-[#1a1a1a] border-yellow-500/20 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:space-y-7 lg:px-8 lg:py-7">
+        <div className="no-print flex flex-wrap gap-2 rounded-xl border border-yellow-500/20 bg-[#242424] p-1">
+          {[
+            { id: "monthly", label: "Monthly overview" },
+            { id: "daily", label: "Single day" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatsView(tab.id)}
+              className={cn(
+                "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                statsView === tab.id ? "bg-yellow-400/20 text-yellow-200" : "text-gray-400 hover:text-white",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">View Specific Day:</label>
-                <input
-                  type="date"
-                  value={selectedDay}
-                  onChange={(e) => setSelectedDay(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#1a1a1a] border border-yellow-500/20 rounded-md text-white [color-scheme:dark]"
-                />
-              </div>
+        <div className="no-print rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] p-4">
+          <div className="flex gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400/90" />
+            <div className="text-sm text-gray-300">
+              <p className="font-medium text-yellow-200">Where each number comes from</p>
+              <p className="mt-1 text-xs text-gray-400">
+                <strong className="text-gray-300">Net sales &amp; sales events</strong> use the same pipeline as Dashboard: Loyverse receipts + approved Clip payments + manual contribution transactions, then duplicate removal (10 min window, prefer Loyverse).
+                <strong className="text-gray-300"> Expenses</strong> are summed from Finance <strong>Expense</strong> rows
+                {statsView === "daily" ? " dated the selected calendar day." : " in the calendar month."}
+                <strong className="text-gray-300"> Order module</strong> shows Base44 <strong>Order</strong> totals separately — those are not double-counted into net sales unless the same sale also appears in Loyverse/Clip/manual.
+              </p>
             </div>
           </div>
+        </div>
 
-        {/* Print Buttons */}
-        <div className="flex gap-4 no-print">
-          <Button onClick={handlePrintDaily} className="h-8 text-xs bg-yellow-400 hover:bg-yellow-300 text-black gap-2">
-            <Printer className="w-4 h-4" />
-            Print Daily Report
+        <div className="no-print rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+          <h3 className="mb-3 text-sm font-bold text-yellow-400">Period</h3>
+          {statsView === "monthly" ? (
+            <div className="max-w-md space-y-2">
+              <label className="text-xs font-medium text-gray-400">Month</label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="max-w-md space-y-2">
+              <label className="text-xs font-medium text-gray-400">Date</label>
+              <input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="w-full rounded-md border border-yellow-500/20 bg-[#1a1a1a] px-3 py-2 text-white [color-scheme:dark]"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="no-print flex flex-wrap gap-3">
+          <Button
+            onClick={handlePrintDaily}
+            className="h-8 gap-2 bg-yellow-400 text-xs text-black hover:bg-yellow-300"
+            variant="default"
+          >
+            <Printer className="h-4 w-4" />
+            Print daily report
           </Button>
-          <Button onClick={handlePrintMonthly} className="h-8 text-xs bg-[#242424] border border-yellow-500/20 text-gray-300 hover:text-white gap-2">
-            <Printer className="w-4 h-4" />
-            Print Monthly Report
+          <Button
+            onClick={handlePrintMonthly}
+            className="h-8 gap-2 border border-yellow-500/20 bg-[#242424] text-xs text-gray-300 hover:text-white"
+            variant="outline"
+          >
+            <Printer className="h-4 w-4" />
+            Print monthly report
           </Button>
         </div>
 
-        {/* Print Area */}
-        <div className={printMode ? 'print-area' : ''}>
-          {/* Header for Print */}
+        <div className={printMode ? "print-area" : ""}>
           {printMode && (
-            <div className="mb-8 pb-6 border-b-2">
+            <div className="mb-8 border-b-2 pb-6">
               <div className="text-center">
-                <h1 className="text-3xl font-bold mb-2">Los Tios Pizzeria</h1>
+                <h1 className="mb-2 text-3xl font-bold">Los Tios Pizzeria</h1>
                 <h2 className="text-xl text-gray-700">
-                  {printMode === 'daily' 
-                    ? `Daily Report - ${format(new Date(selectedDay), 'dd MMMM yyyy', { locale: es })}`
-                    : `Monthly Report - ${monthOptions.find(m => m.value === selectedMonth)?.label}`
-                  }
+                  {printMode === "daily"
+                    ? `Daily report — ${format(selectedDayDate, "dd MMMM yyyy", { locale: es })}`
+                    : `Monthly report — ${monthOptions.find((m) => m.value === selectedMonth)?.label}`}
                 </h2>
-                <p className="text-sm text-gray-500 mt-2">
-                  Generated on: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}
-                </p>
+                <p className="mt-2 text-sm text-gray-600">Generated {format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}</p>
               </div>
             </div>
           )}
 
-          {/* Daily Statistics */}
-          {(!printMode || printMode === 'daily') && (
+          {(showDailyOnScreen || showDailyPrint) && (
             <div className="mb-8">
-              <h2 className="text-xl sm:text-2xl font-bold mb-4">
-                Daily Statistics - {format(new Date(selectedDay), 'MMMM d, yyyy', { locale: es })}
+              <h2 className="mb-4 text-xl font-bold sm:text-2xl">
+                Daily — {format(selectedDayDate, "MMMM d, yyyy", { locale: es })}
               </h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4" />
-                      Daily Revenue
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">${dayStats.totalRevenue.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
 
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4" />
-                      Daily Expenses
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400/70">${dayStats.totalExpenses.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Daily Profit
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">
-                      ${dayStats.totalProfit.toFixed(2)}
+              <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {dailySummaryKpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <kpi.icon className="h-3.5 w-3.5 shrink-0 text-yellow-400" />
+                      <p className="truncate text-xs uppercase tracking-widest text-yellow-200/70">{kpi.label}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Margin: {dayStats.profitMargin.toFixed(1)}%
+                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                    <p
+                      className={cn(
+                        "mt-1 text-xs",
+                        kpi.subTone === "good" && "text-emerald-400",
+                        kpi.subTone === "bad" && "text-red-400",
+                        kpi.subTone === "neutral" && "text-gray-400",
+                      )}
+                    >
+                      {kpi.sub}
                     </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Orders
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{dayStats.totalOrders}</div>
-                  </CardContent>
-                </Card>
+                  </div>
+                ))}
               </div>
 
-              {/* Daily Orders Details */}
-              {printMode === 'daily' && dayOrders.length > 0 && (
-                <Card className="mt-6 border-0 shadow-lg">
+              <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
+                    Gross profit (rough)
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{formatCurrency(dayGrossProfit)}</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {dayIngredientExpenses ? "After ingredient expenses" : `Estimate ${PIZZA_COST_ESTIMATE} / order`}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
+                    Food cost %
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{dayFoodCostPct.toFixed(1)}%</p>
+                  <p className="mt-1 text-xs text-gray-400">vs merged POS net sales</p>
+                </div>
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <Users className="h-3.5 w-3.5 text-yellow-400" />
+                    Labor cost %
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{dayLaborExpenses ? `${dayLaborCostPct.toFixed(1)}%` : "—"}</p>
+                  <p className="mt-1 text-xs text-gray-400">{dayLaborExpenses ? "Salary expenses" : "No salary expenses"}</p>
+                </div>
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
                   <CardHeader>
-                    <CardTitle>Order Details</CardTitle>
+                    <CardTitle className="text-base text-yellow-100">Costs by category</CardTitle>
+                    <p className="text-xs text-gray-400">All expense rows on the selected day</p>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {dayOrders.map((order, idx) => (
-                        <div key={order.id} className="p-4 border rounded-lg">
-                          <div className="flex justify-between mb-2">
-                            <div>
-                              <p className="font-semibold">{order.customer_name}</p>
-                              <p className="text-sm text-gray-600">{order.customer_phone}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold text-lg text-green-600">${order.total_amount?.toFixed(2)} MXN</p>
-                              <p className="text-xs text-gray-500">{format(new Date(order.created_date), 'HH:mm')}</p>
-                            </div>
+                    {dayExpenseByCategory.length ? (
+                      <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                        {dayExpenseByCategory.map(({ category, total }) => (
+                          <div key={category} className="flex items-center justify-between rounded-lg bg-[#1a1a1a] px-3 py-2 text-sm">
+                            <span className="capitalize text-gray-300">{category}</span>
+                            <span className="font-semibold text-yellow-200">{formatCurrency(total)}</span>
                           </div>
-                          <div className="text-sm space-y-1">
-                            {order.items?.map((item, i) => (
-                              <div key={i} className="flex justify-between">
-                                <span>{item.quantity}x {item.item_name}</span>
-                                <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        ))}
+                        <div className="flex items-center justify-between border-t border-yellow-500/10 pt-2 text-sm font-bold text-yellow-100">
+                          <span>Total</span>
+                          <span>{formatCurrency(dayExpensesTotal)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-300">No expenses this day.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {!printMode && (
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base text-yellow-100">Day snapshot</CardTitle>
+                      <p className="text-xs text-gray-400">Merged POS, expenses, and net for the selected date</p>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={daySnapshotBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+                          <XAxis dataKey="name" tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} />
+                          <YAxis tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} width={48} />
+                          <Tooltip
+                            contentStyle={chartTooltipStyle}
+                            labelStyle={{ color: "#fafaf9" }}
+                            itemStyle={{ color: "#fafaf9" }}
+                            formatter={(value) => formatCurrencyDetailed(value)}
+                          />
+                          <Bar dataKey="value" fill="#facc15" radius={[4, 4, 0, 0]} name="Amount" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {!printMode && (
+                <div className="mb-6 rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+                  <h3 className="mb-1 text-sm font-medium text-yellow-200">Breakdown</h3>
+                  <p className="mb-3 text-xs text-gray-400">Sales channel mix and top items for the selected day.</p>
+                  <StatsDetailShortcuts channelId="stats-daily-channel" topItemsId="stats-daily-top-items" />
+                  <div className="space-y-4">
+                    <Card id="stats-daily-channel" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                      <CardHeader>
+                        <CardTitle className="text-base text-yellow-100">Merged sales by channel</CardTitle>
+                        <p className="text-xs text-gray-400">From Loyverse receipt routing (same as Dashboard)</p>
+                      </CardHeader>
+                      <CardContent>
+                        {dayChannelPieData.length ? (
+                          <ResponsiveContainer width="100%" height={260}>
+                            <PieChart>
+                              <Pie
+                                data={dayChannelPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={pieSectorLabel}
+                                outerRadius={88}
+                                dataKey="value"
+                              >
+                                {dayChannelPieData.map((entry, index) => (
+                                  <Cell key={`day-cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={chartTooltipStyle}
+                                labelStyle={{ color: "#fafaf9" }}
+                                itemStyle={{ color: "#fafaf9" }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="py-12 text-center text-sm text-gray-300">No merged sales with channel labels this day.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card id="stats-daily-top-items" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                      <CardHeader>
+                        <CardTitle className="text-base text-yellow-100">Top items (Loyverse receipts, else Order module)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {dayTopItems.length > 0 ? (
+                          <div className="space-y-3">
+                            {dayTopItems.map((item, index) => (
+                              <div key={item.name} className="flex items-center justify-between rounded-lg bg-[#1a1a1a] p-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-400/20 text-sm font-bold text-yellow-400">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <p className="font-medium text-gray-100">{item.name}</p>
+                                    <p className="text-xs text-gray-400">{item.count} sold</p>
+                                  </div>
+                                </div>
+                                <p className="font-semibold text-yellow-300">{formatCurrency(item.revenue)}</p>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Daily Expenses Details */}
-              {printMode === 'daily' && dayExpenses.length > 0 && (
-                <Card className="mt-6 border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Expense Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2">Item</th>
-                          <th className="text-left py-2">Category</th>
-                          <th className="text-right py-2">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dayExpenses.map((expense) => (
-                          <tr key={expense.id} className="border-b">
-                            <td className="py-2">{expense.name}</td>
-                            <td className="py-2 capitalize">{expense.category}</td>
-                            <td className="text-right py-2 font-semibold">${expense.amount?.toFixed(2)} MXN</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {printMode === 'daily' && <div className="print-break"></div>}
-
-          {/* Monthly Statistics */}
-          {(!printMode || printMode === 'monthly') && (
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-4">
-                Monthly Statistics - {monthOptions.find(m => m.value === selectedMonth)?.label}
-              </h2>
-
-              {/* Dashboard-style KPI cards */}
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-3">
-                {[
-                  {
-                    label: "App Orders Revenue",
-                    value: `$${monthStats.totalRevenue.toFixed(0)}`,
-                    sub: revenueChange !== null ? `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs prev month` : "No prev month data",
-                    positive: revenueChange === null || revenueChange >= 0,
-                    icon: DollarSign,
-                  },
-                  {
-                    label: "Total Orders",
-                    value: monthStats.totalOrders,
-                    sub: ordersChange !== null ? `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}% vs prev month` : "No prev month data",
-                    positive: ordersChange === null || ordersChange >= 0,
-                    icon: ShoppingCart,
-                  },
-                  {
-                    label: "Avg Order Value",
-                    value: `$${monthStats.avgOrderValue.toFixed(0)}`,
-                    sub: "Per order this month",
-                    positive: true,
-                    icon: TrendingUp,
-                  },
-                  {
-                    label: "Gross Profit",
-                    value: `$${grossProfit.toFixed(0)}`,
-                    sub: ingredientExpenses ? "Based on ingredient expenses" : `Estimated at $${PIZZA_COST_ESTIMATE}/order`,
-                    positive: grossProfit >= 0,
-                    icon: TrendingUp,
-                  },
-                ].map((kpi) => (
-                  <div key={kpi.label} className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <kpi.icon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                      <p className="text-xs uppercase tracking-widest text-gray-500 truncate">{kpi.label}</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
-                    <p className={`text-xs mt-1 ${kpi.positive ? 'text-emerald-400' : 'text-red-400'}`}>{kpi.sub}</p>
+                        ) : (
+                          <p className="text-center text-sm text-gray-300">No line items for this day.</p>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                ))}
-              </div>
-
-              {/* Second row of KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
-                {[
-                  {
-                    label: "Clip Card Payments",
-                    value: clipTotalMonth > 0 ? `$${clipTotalMonth.toFixed(0)}` : hasClipApiConfig(appSettings) ? "$0" : "Not connected",
-                    sub: clipTotalMonth > 0 ? `${clipApprovedMonth.length} approved transactions` : hasClipApiConfig(appSettings) ? "No Clip payments this month" : "Configure Clip in Integrations",
-                    positive: clipTotalMonth >= 0,
-                    icon: CreditCard,
-                  },
-                  {
-                    label: "Total Income (App+Clip)",
-                    value: `$${(monthStats.totalRevenue + clipTotalMonth).toFixed(0)}`,
-                    sub: "App orders + Clip card payments",
-                    positive: true,
-                    icon: DollarSign,
-                  },
-                  {
-                    label: "Food Cost %",
-                    value: `${foodCostPct.toFixed(1)}%`,
-                    sub: ingredientExpenses ? "From ingredient expenses" : "Estimated",
-                    positive: foodCostPct < 35,
-                    icon: ChefHat,
-                  },
-                  {
-                    label: "Labor Cost %",
-                    value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—",
-                    sub: laborExpenses ? "From salary expenses" : "No salary expenses",
-                    positive: laborCostPct < 25,
-                    icon: Users,
-                  },
-                ].map((kpi) => (
-                  <div key={kpi.label} className="bg-[#242424] border border-yellow-500/20 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <kpi.icon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                      <p className="text-xs uppercase tracking-widest text-gray-500 truncate">{kpi.label}</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
-                    <p className={`text-xs mt-1 ${kpi.positive ? 'text-emerald-400' : 'text-red-400'}`}>{kpi.sub}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4" />
-                      Monthly Revenue
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">${monthStats.totalRevenue.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4" />
-                      Monthly Expenses
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400/70">${monthStats.totalExpenses.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Monthly Profit
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">
-                      ${monthStats.totalProfit.toFixed(2)}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Margin: {monthStats.profitMargin.toFixed(1)}%
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Total Orders
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{monthStats.totalOrders}</div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Avg Order
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">${monthStats.avgOrderValue.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Charts - Hide in print mode */}
-              {!printMode && (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-6">
-                  {/* Revenue vs Expenses vs Profit Chart */}
-                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                    <CardHeader>
-                      <CardTitle>Daily Revenue, Expenses and Profit</CardTitle>
-                      <p className="text-sm text-gray-500">Daily Revenue, Expenses & Profit</p>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={dailyRevenue}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" fontSize={11} />
-                          <YAxis fontSize={12} />
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-                            formatter={(value) => `$${value.toFixed(2)}`}
-                          />
-                          <Line type="monotone" dataKey="revenue" stroke="#facc15" strokeWidth={3} name="Revenue" dot={{ fill: '#facc15', r: 4 }} />
-                          <Line type="monotone" dataKey="expenses" stroke="#a16207" strokeWidth={3} name="Expenses" dot={{ fill: '#a16207', r: 4 }} />
-                          <Line type="monotone" dataKey="profit" stroke="#fef08a" strokeWidth={3} name="Profit" dot={{ fill: '#fef08a', r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  {/* Orders by Type */}
-                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                    <CardHeader>
-                      <CardTitle>Orders by Type</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={ordersByType}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, value }) => `${name}: ${value}`}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {ordersByType.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
                 </div>
               )}
 
-              {/* Summary Tables for Print */}
-              {printMode === 'monthly' && (
-                <div className="space-y-6 mt-6">
-                  {/* Revenue Breakdown by Type */}
-                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
+              {printMode === "daily" && (
+                <div className="mt-6 space-y-6">
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
                     <CardHeader>
-                      <CardTitle>Revenue by Order Type</CardTitle>
+                      <CardTitle className="text-lg text-yellow-100">Merged sales by channel</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-2">Type</th>
-                            <th className="text-center py-2">Orders</th>
-                            <th className="text-right py-2">Revenue</th>
+                            <th className="py-2 text-left">Channel</th>
+                            <th className="py-2 text-center">Events</th>
+                            <th className="py-2 text-right">Revenue</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {ordersByType.map((type) => (
-                            <tr key={type.name} className="border-b">
-                              <td className="py-2">{type.name}</td>
-                              <td className="text-center py-2">{type.value}</td>
-                              <td className="text-right py-2 font-semibold">${type.revenue.toFixed(2)} MXN</td>
+                          {dayChannelPieData.map((row) => (
+                            <tr key={row.name} className="border-b">
+                              <td className="py-2">{row.name}</td>
+                              <td className="py-2 text-center">{row.value}</td>
+                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(row.revenue)}</td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold">
+                            <td className="py-2">Total (merged)</td>
+                            <td className="py-2 text-center">{formatNumber(dayMergedCount)}</td>
+                            <td className="py-2 text-right">{formatCurrencyDetailed(dayMergedRevenue)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-lg text-yellow-100">Expenses by category</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-2 text-left">Category</th>
+                            <th className="py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dayExpenseByCategory.map(({ category, total }) => (
+                            <tr key={category} className="border-b">
+                              <td className="py-2 capitalize">{category}</td>
+                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(total)}</td>
                             </tr>
                           ))}
                           <tr className="font-bold">
                             <td className="py-2">Total</td>
-                            <td className="text-center py-2">{monthStats.totalOrders}</td>
-                            <td className="text-right py-2">${monthStats.totalRevenue.toFixed(2)} MXN</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-
-                  {/* Expenses Summary by Category */}
-                  <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
-                    <CardHeader>
-                      <CardTitle>Expense Summary by Category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">Category</th>
-                            <th className="text-center py-2">Count</th>
-                            <th className="text-right py-2">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {['ingredients', 'rent', 'utilities', 'salaries', 'equipment', 'marketing', 'other'].map(cat => {
-                            const catExpenses = monthExpenses.filter(e => e.category === cat);
-                            const total = catExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-                            if (catExpenses.length === 0) return null;
-                            return (
-                              <tr key={cat} className="border-b">
-                                <td className="py-2 capitalize">{cat}</td>
-                                <td className="text-center py-2">{catExpenses.length}</td>
-                                <td className="text-right py-2 font-semibold">${total.toFixed(2)} MXN</td>
-                              </tr>
-                            );
-                          })}
-                          <tr className="font-bold">
-                            <td className="py-2">Total</td>
-                            <td className="text-center py-2">{monthExpenses.length}</td>
-                            <td className="text-right py-2">${monthStats.totalExpenses.toFixed(2)} MXN</td>
+                            <td className="py-2 text-right">{formatCurrencyDetailed(dayExpensesTotal)}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -722,61 +1012,387 @@ export default function Statistics() {
                   </Card>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Top Items */}
-              <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
-                <CardHeader>
-                  <CardTitle>Top 10 Best-Selling Items</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {topItems.length > 0 ? (
-                    <div className="space-y-4">
-                      {topItems.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-yellow-400/20 text-yellow-400">
-                              {index + 1}
-                            </div>
-                            <div>
-                              <p className="font-semibold">{item.name}</p>
-                              <p className="text-sm text-gray-600">{item.count} sold</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-lg text-yellow-400">${item.revenue.toFixed(2)}</p>
-                            <p className="text-xs text-gray-500">revenue</p>
-                          </div>
-                        </div>
-                      ))}
+          {showDailyPrint && <div className="print-break" />}
+
+          {(showMonthlyOnScreen || showMonthlyPrint) && (
+            <div>
+              <h2 className="mb-4 text-xl font-bold sm:text-2xl">
+                Monthly — {monthOptions.find((m) => m.value === selectedMonth)?.label}
+              </h2>
+
+              <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {summaryKpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <kpi.icon className="h-3.5 w-3.5 shrink-0 text-yellow-400" />
+                      <p className="truncate text-xs uppercase tracking-widest text-yellow-200/70">{kpi.label}</p>
                     </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-8">No hay datos de ventas para este perÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­odo</p>
-                  )}
+                    <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                    <p
+                      className={cn(
+                        "mt-1 text-xs",
+                        kpi.subTone === "good" && "text-emerald-400",
+                        kpi.subTone === "bad" && "text-red-400",
+                        kpi.subTone === "neutral" && "text-gray-400",
+                      )}
+                    >
+                      {kpi.sub}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
+                    Gross profit (rough)
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{formatCurrency(grossProfit)}</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {ingredientExpenses ? "After ingredient expenses" : `Estimate ${PIZZA_COST_ESTIMATE} / order`}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
+                    Food cost %
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{foodCostPct.toFixed(1)}%</p>
+                  <p className="mt-1 text-xs text-gray-400">vs merged POS net sales</p>
+                </div>
+                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
+                    <Users className="h-3.5 w-3.5 text-yellow-400" />
+                    Labor cost %
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">{laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—"}</p>
+                  <p className="mt-1 text-xs text-gray-400">{laborExpenses ? "Salary expenses" : "No salary expenses"}</p>
+                </div>
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                  <CardHeader>
+                    <CardTitle className="text-base text-yellow-100">Costs by category</CardTitle>
+                    <p className="text-xs text-gray-400">All expense rows in selected month</p>
+                  </CardHeader>
+                  <CardContent>
+                    {expenseByCategory.length ? (
+                      <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                        {expenseByCategory.map(({ category, total }) => (
+                          <div key={category} className="flex items-center justify-between rounded-lg bg-[#1a1a1a] px-3 py-2 text-sm">
+                            <span className="capitalize text-gray-300">{category}</span>
+                            <span className="font-semibold text-yellow-200">{formatCurrency(total)}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between border-t border-yellow-500/10 pt-2 text-sm font-bold text-yellow-100">
+                          <span>Total</span>
+                          <span>{formatCurrency(monthExpensesTotal)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-300">No expenses this month.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {!printMode && (
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base text-yellow-100">Revenue, expenses &amp; net by day</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <LineChart data={dailyRevenue}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+                          <XAxis dataKey="date" tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} />
+                          <YAxis tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} width={48} />
+                          <Tooltip
+                            contentStyle={chartTooltipStyle}
+                            labelStyle={{ color: "#fafaf9" }}
+                            itemStyle={{ color: "#fafaf9" }}
+                            formatter={(value) => formatCurrencyDetailed(value)}
+                          />
+                          <Line type="monotone" dataKey="revenue" stroke="#facc15" strokeWidth={2} name="Revenue" dot={false} />
+                          <Line type="monotone" dataKey="expenses" stroke="#a16207" strokeWidth={2} name="Expenses" dot={false} />
+                          <Line type="monotone" dataKey="profit" stroke="#86efac" strokeWidth={2} name="Net" dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              <Card className="mb-6 border-2 border-yellow-500/35 bg-[#1c1c14] text-gray-200 shadow-none">
+                <CardHeader className="flex flex-col gap-3 border-b border-yellow-500/25 bg-yellow-500/[0.12] pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base text-yellow-100">Daily ledger</CardTitle>
+                    <p className="mt-1 text-xs text-yellow-200/70">
+                      Spreadsheet-style view (English). Daily cash = merged POS net sales; spent = finance expenses for that date.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleOpenInExcel}
+                    className="no-print h-9 shrink-0 gap-2 border border-yellow-400/40 bg-yellow-500/20 text-xs text-yellow-100 hover:bg-yellow-500/30"
+                    variant="outline"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Open in Excel
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[920px] border-collapse text-left text-[11px] sm:text-xs">
+                      <thead>
+                        <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
+                          <th className="sticky left-0 z-10 border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5">Date</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5">Weekday</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Daily cash (POS)</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Spent</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Net</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Events</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Loyverse</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Clip</th>
+                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Manual</th>
+                          <th className="px-2 py-2.5 text-right">Order module</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyLedgerRows.map((r, i) => (
+                          <tr
+                            key={r.dateIso}
+                            className={cn(
+                              "border-b border-yellow-500/15 transition-colors hover:bg-yellow-500/[0.06]",
+                              i % 2 === 1 && "bg-black/20",
+                            )}
+                          >
+                            <td className="sticky left-0 z-[1] border-r border-yellow-500/25 bg-[#1c1c14] px-2 py-2 font-medium text-yellow-100/95 tabular-nums">
+                              {r.dateIso}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-gray-300">{r.dayEnglish}</td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-yellow-200">
+                              {formatCurrencyDetailed(r.mergedPosNet)}
+                            </td>
+                            <td
+                              className={cn(
+                                "border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums",
+                                r.expensesSpent < 0 ? "text-red-400" : "text-amber-200/90",
+                              )}
+                            >
+                              {r.expensesSpent < 0
+                                ? `-${formatCurrencyDetailed(Math.abs(r.expensesSpent))}`
+                                : formatCurrencyDetailed(r.expensesSpent)}
+                            </td>
+                            <td
+                              className={cn(
+                                "border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums",
+                                r.net >= 0 ? "text-emerald-300/90" : "text-red-300/90",
+                              )}
+                            >
+                              {formatCurrencyDetailed(r.net)}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-200">
+                              {formatNumber(r.mergedEvents)}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                              {formatCurrencyDetailed(r.loyverse)}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                              {formatCurrencyDetailed(r.clip)}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                              {formatCurrencyDetailed(r.manual)}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                              {formatCurrencyDetailed(r.orderModuleRevenue)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="border-t-2 border-yellow-500/50 bg-yellow-500/15 font-semibold text-yellow-50">
+                          <td className="sticky left-0 z-[1] border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5" colSpan={2}>
+                            Total
+                          </td>
+                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatCurrencyDetailed(dailyLedgerTotals.mergedPosNet)}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
+                              dailyLedgerTotals.expensesSpent < 0 ? "text-red-400" : "",
+                            )}
+                          >
+                            {dailyLedgerTotals.expensesSpent < 0
+                              ? `-${formatCurrencyDetailed(Math.abs(dailyLedgerTotals.expensesSpent))}`
+                              : formatCurrencyDetailed(dailyLedgerTotals.expensesSpent)}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
+                              dailyLedgerTotals.net >= 0 ? "text-emerald-200" : "text-red-200",
+                            )}
+                          >
+                            {formatCurrencyDetailed(dailyLedgerTotals.net)}
+                          </td>
+                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatNumber(dailyLedgerTotals.mergedEvents)}
+                          </td>
+                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatCurrencyDetailed(dailyLedgerTotals.loyverse)}
+                          </td>
+                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatCurrencyDetailed(dailyLedgerTotals.clip)}
+                          </td>
+                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatCurrencyDetailed(dailyLedgerTotals.manual)}
+                          </td>
+                          <td className="px-2 py-2.5 text-right font-mono tabular-nums">
+                            {formatCurrencyDetailed(dailyLedgerTotals.orderModuleRevenue)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </CardContent>
               </Card>
 
-              {/* Revenue Breakdown by Type - Not in print */}
               {!printMode && (
-                <Card className="bg-[#242424] border border-yellow-500/15 shadow-none mt-6">
-                  <CardHeader>
-                    <CardTitle>Revenue by Order Type</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {ordersByType.map((type) => (
-                        <div key={type.name} className="p-4 bg-[#1a1a1a] rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-semibold">{type.name}</span>
-                            <span className="text-sm text-gray-600">{type.value} orders</span>
+                <div className="mb-6 rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+                  <h3 className="mb-1 text-sm font-medium text-yellow-200">Breakdown</h3>
+                  <p className="mb-3 text-xs text-gray-400">Sales channel mix and top items for the selected month.</p>
+                  <StatsDetailShortcuts channelId="stats-month-channel" topItemsId="stats-month-top-items" />
+                  <div className="space-y-4">
+                    <Card id="stats-month-channel" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                      <CardHeader>
+                        <CardTitle className="text-base text-yellow-100">Merged sales by channel</CardTitle>
+                        <p className="text-xs text-gray-400">From Loyverse receipt routing (same as Dashboard)</p>
+                      </CardHeader>
+                      <CardContent>
+                        {channelPieData.length ? (
+                          <ResponsiveContainer width="100%" height={260}>
+                            <PieChart>
+                              <Pie
+                                data={channelPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={pieSectorLabel}
+                                outerRadius={88}
+                                dataKey="value"
+                              >
+                                {channelPieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={chartTooltipStyle}
+                                labelStyle={{ color: "#fafaf9" }}
+                                itemStyle={{ color: "#fafaf9" }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="py-12 text-center text-sm text-gray-300">No merged sales with channel labels this month.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card id="stats-month-top-items" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                      <CardHeader>
+                        <CardTitle className="text-base text-yellow-100">Top items (Loyverse receipts, else Order module)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {topItems.length > 0 ? (
+                          <div className="space-y-3">
+                            {topItems.map((item, index) => (
+                              <div key={item.name} className="flex items-center justify-between rounded-lg bg-[#1a1a1a] p-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-400/20 text-sm font-bold text-yellow-400">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <p className="font-medium text-gray-100">{item.name}</p>
+                                    <p className="text-xs text-gray-400">{item.count} sold</p>
+                                  </div>
+                                </div>
+                                <p className="font-semibold text-yellow-300">{formatCurrency(item.revenue)}</p>
+                              </div>
+                            ))}
                           </div>
-                          <div className="text-2xl font-bold" style={{ color: type.color }}>
-                            ${type.revenue.toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        ) : (
+                          <p className="text-center text-sm text-gray-300">No line items for this month.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
+
+              {printMode === "monthly" && (
+                <div className="mt-6 space-y-6">
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-lg text-yellow-100">Merged sales by channel</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-2 text-left">Channel</th>
+                            <th className="py-2 text-center">Events</th>
+                            <th className="py-2 text-right">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {channelPieData.map((row) => (
+                            <tr key={row.name} className="border-b">
+                              <td className="py-2">{row.name}</td>
+                              <td className="py-2 text-center">{row.value}</td>
+                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(row.revenue)}</td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold">
+                            <td className="py-2">Total (merged)</td>
+                            <td className="py-2 text-center">{formatNumber(mergedTransactionCount)}</td>
+                            <td className="py-2 text-right">{formatCurrencyDetailed(mergedRevenue)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-lg text-yellow-100">Expenses by category</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-2 text-left">Category</th>
+                            <th className="py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {expenseByCategory.map(({ category, total }) => (
+                            <tr key={category} className="border-b">
+                              <td className="py-2 capitalize">{category}</td>
+                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(total)}</td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold">
+                            <td className="py-2">Total</td>
+                            <td className="py-2 text-right">{formatCurrencyDetailed(monthExpensesTotal)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </div>
               )}
             </div>
           )}

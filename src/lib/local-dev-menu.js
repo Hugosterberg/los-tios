@@ -1,6 +1,7 @@
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
+import { extractIngredientStringsFromDescription } from "@/lib/menuIngredients";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -112,7 +113,7 @@ function mapLoyverseItemsToMenuItems(items = []) {
       category: normalizeMenuCategory(item?.category?.name || item?.category_name || item?.category_id),
       price: getLoyverseItemPrice(item),
       image_url: item.image_url || item.image || "",
-      ingredients: [],
+      ingredients: extractIngredientStringsFromDescription(item.description || ""),
       is_vegetarian: false,
       is_available: item.available !== false && item.is_archived !== true,
       preparation_time: null,

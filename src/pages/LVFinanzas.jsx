@@ -364,7 +364,7 @@ export default function LVFinanzas() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-white">{event.title}</p>
-                          <Badge className={event.source === "loyverse_receipt" ? "bg-yellow-400/15 text-yellow-300 hover:bg-yellow-400/15" : "bg-sky-500/15 text-sky-300 hover:bg-sky-500/15"}>
+                          <Badge className={event.source === "loyverse_receipt" ? "bg-yellow-400/15 text-yellow-300 hover:bg-yellow-400/15" : "bg-yellow-500/15 text-yellow-200 hover:bg-yellow-500/15"}>
                             {event.source === "loyverse_receipt" ? "Loyverse" : "Web app"}
                           </Badge>
                           <Badge className="bg-black/30 text-gray-200 hover:bg-black/30">{event.status}</Badge>

@@ -11,8 +11,9 @@ X,
 LogOut,
 Globe,
 ShoppingCart,
-Wallet,
-Users,
+  Wallet,
+  DollarSign,
+  Users,
 KeyRound,
 BookOpen,
 Settings2,
@@ -27,6 +28,7 @@ export default function Layout({ children, currentPageName }) {
   const { logout } = useAuth();
 
   const navItems = [
+    { name: "Daily Cash", shortName: "Cash", url: createPageUrl("DailyCash"), icon: DollarSign },
     { name: "Dashboard", shortName: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
     { name: "Orders", shortName: "Orders", url: createPageUrl("Orders"), icon: ShoppingBag },
     { name: "Notion", shortName: "Notion", url: createPageUrl("Notion"), icon: BookOpen },

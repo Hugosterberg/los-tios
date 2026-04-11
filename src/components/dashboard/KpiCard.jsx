@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +23,7 @@ function Sparkline({ values = [], tone = "neutral" }) {
     .join(" ");
 
   const stroke =
-    tone === "positive" ? "#4ade80" : tone === "negative" ? "#fb7185" : "#fbbf24";
+    tone === "positive" ? "#facc15" : tone === "negative" ? "#fb7185" : "#fbbf24";
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-10 w-full">
@@ -49,31 +48,35 @@ export default function KpiCard({ item }) {
   const sourceMeta = {
     clip: {
       label: "Clip",
-      tone: "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
     },
     loyverse: {
       label: "Loyverse",
-      tone: "border-violet-500/25 bg-violet-500/10 text-violet-300",
+      tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
     },
     both: {
       label: "Clip + Loyverse",
-      tone: "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-300",
+      tone: "border-amber-400/30 bg-amber-400/10 text-amber-100",
     },
-    app: {
-      label: "App",
-      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    order_records: {
+      label: "Order module",
+      tone: "border-yellow-300/25 bg-yellow-300/8 text-yellow-300",
+    },
+    finance_ledger: {
+      label: "Finance ledger",
+      tone: "border-yellow-600/30 bg-yellow-600/10 text-yellow-100",
     },
     manual: {
       label: "Manual",
-      tone: "border-sky-500/20 bg-sky-500/10 text-sky-300",
+      tone: "border-yellow-500/20 bg-yellow-500/8 text-yellow-200",
     },
     mock: {
       label: "Hardcoded",
-      tone: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+      tone: "border-yellow-400/20 bg-yellow-400/10 text-yellow-200",
     },
     live: {
       label: "Live data",
-      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+      tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
     },
   };
   const source = sourceMeta[item.dataSource] || sourceMeta.mock;

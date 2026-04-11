@@ -12,6 +12,18 @@ export default function LocalSetupHelp() {
             <code className="mx-1 rounded bg-black/30 px-2 py-1">.env.local</code>.
           </p>
 
+          <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-950/25 p-4 text-sm leading-relaxed text-amber-100/95">
+            <p className="font-semibold text-amber-200">Local dev mode.</p>
+            <p className="mt-2">
+              Shopping data and purchases are stored in this browser only — Base44 is not configured or is still a
+              placeholder. Add <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_BASE44_APP_ID</code> and{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_BASE44_BACKEND_URL</code> in{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">.env</code> to use the real backend. Set{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_LOCAL_DEV_FINANCE=false</code> to force API
+              calls in dev once configured.
+            </p>
+          </div>
+
           <div className="rounded-xl bg-black/30 border border-white/10 p-4 mb-6">
             <p className="text-sm text-slate-200 mb-3">Lagg in detta i <code>.env.local</code>:</p>
             <pre className="text-xs text-yellow-300 whitespace-pre-wrap">{`VITE_BASE44_APP_ID=din_app_id

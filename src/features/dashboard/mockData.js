@@ -27,7 +27,7 @@ export const liveOperations = [
   { id: "delayed-orders", label: "Delayed Orders", value: "6", tone: "text-amber-300", subtext: "4 over SLA by 10+ min", href: detailHref("live-operations") },
   { id: "avg-prep-time", label: "Average Prep Time", value: "17 min", tone: "text-white", subtext: "Target 14 min", href: detailHref("live-operations") },
   { id: "orders-in-kitchen", label: "Orders In Kitchen", value: "19", tone: "text-white", subtext: "5 in pizza oven queue", href: detailHref("live-operations") },
-  { id: "out-for-delivery", label: "Out For Delivery", value: "10", tone: "text-sky-300", subtext: "Median ETA 21 min", href: detailHref("live-operations") },
+  { id: "out-for-delivery", label: "Out For Delivery", value: "10", tone: "text-yellow-300", subtext: "Median ETA 21 min", href: detailHref("live-operations") },
   { id: "reservations", label: "Reservations Today", value: "42", tone: "text-white", subtext: "9 VIP tables tonight", href: detailHref("live-operations") },
   { id: "refunds", label: "Refund Count Today", value: "8", tone: "text-rose-300", subtext: "2 tied to duplicate charges", href: detailHref("payments-reconciliation") },
   { id: "cancelled", label: "Cancelled Orders", value: "14", tone: "text-amber-300", subtext: "Spike on marketplace channel", href: detailHref("alerts-exceptions") },

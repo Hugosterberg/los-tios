@@ -13,6 +13,7 @@ import ShoppingList from './pages/ShoppingList';
 import CompanyAccount from './pages/CompanyAccount';
 import EmployeeCalendar from './pages/EmployeeCalendar';
 import FinanceSummary from './pages/FinanceSummary';
+import DailyCash from './pages/DailyCash';
 import ManagementInsight from './pages/ManagementInsight';
 import __Layout from './Layout.jsx';
 
@@ -31,6 +32,7 @@ export const PAGES = {
     "Integrations": Integrations,
     "ShoppingList": ShoppingList,
     "Finance": FinanceSummary,
+    "DailyCash": DailyCash,
     "ManagementInsight": ManagementInsight,
     "CompanyAccount": CompanyAccount,
     "EmployeeCalendar": EmployeeCalendar,
