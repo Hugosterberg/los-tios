@@ -39,8 +39,9 @@ export default function CustomerOrder() {
   };
 
   const { data: menuItems = [], isLoading } = useQuery({
-    queryKey: ['menuItems'],
-    queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
+    queryKey: ["menuItems", "publicCustomer"],
+    queryFn: () =>
+      listMenuItems(() => base44.entities.MenuItem.list(), { publicCustomerMenu: true }),
   });
 
   const { data: settings = [] } = useQuery({

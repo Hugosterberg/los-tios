@@ -141,6 +141,76 @@ function isImageUrl(value) {
   return /^(https?:)?\/\//i.test(raw) && /\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(raw);
 }
 
+/** HTTP(S) image hosts often omit a file extension in the path — still treat as a curated dish photo. */
+function isLikelyRemoteImageUrl(value) {
+  const raw = String(value || "").trim();
+  return /^https?:\/\//i.test(raw) && raw.length > 15;
+}
+
+function itemHasRenderableImage(item) {
+  const u = item?.image_url;
+  return isImageUrl(u) || isLikelyRemoteImageUrl(u);
+}
+
+/** True if the database already has at least one menu row with a real dish image (manual curated menu). */
+function hasManualMenuItemsWithImages(dbItems) {
+  if (!Array.isArray(dbItems)) return false;
+  return dbItems.some((item) => itemHasRenderableImage(item));
+}
+
+/** Loyverse/Clip can hang in production (CORS, proxy, slow API) — never block the customer menu forever. */
+const INTEGRATION_MENU_TIMEOUT_MS = 12_000;
+
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise.then(
+      (v) => v,
+      () => fallback,
+    ),
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), ms);
+    }),
+  ]);
+}
+
+/** Only https/http data:image — blocks javascript: and non-image data URLs (tampered rows). */
+function isSafePublicImageUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return true;
+  if (/^\s*javascript:/i.test(s)) return false;
+  if (/^\s*data:(?!image\/)/i.test(s)) return false;
+  if (s.startsWith("data:image/")) return true;
+  if (/^https?:\/\//i.test(s)) return true;
+  return false;
+}
+
+function isValidPublicMenuRow(item) {
+  if (!item || typeof item !== "object") return false;
+  if (item.is_available === false) return false;
+  const name = String(item.name || item.name_en || "").trim();
+  if (name.length < 2) return false;
+  const price = Number(item.price);
+  if (!Number.isFinite(price) || price < 0) return false;
+  const category = String(item.category || "").trim();
+  if (category.length < 1 || category.length > 80) return false;
+  return true;
+}
+
+/**
+ * Customer-facing menu row: curated DB fields only — no guessed Clip images, no Loyverse merge.
+ * @returns {object | null}
+ */
+function normalizePublicCustomerMenuItem(item) {
+  if (!isValidPublicMenuRow(item)) return null;
+  const out = { ...item };
+  if (out.image_url && !isSafePublicImageUrl(out.image_url)) {
+    out.image_url = "";
+  }
+  delete out.source;
+  delete out.loyverse_item_id;
+  return out;
+}
+
 function getFirstImageField(payload) {
   const candidates = [
     payload?.image_url,
@@ -216,7 +286,7 @@ function matchClipImageForName(name, clipImageMap) {
 
 function enrichMenuItemsWithClipImages(menuItems, clipImageMap) {
   return (menuItems || []).map((item) => {
-    if (isImageUrl(item.image_url)) {
+    if (itemHasRenderableImage(item)) {
       return item;
     }
 
@@ -296,12 +366,23 @@ const createLocalId = () => {
 
 export const listMenuItems = async (remoteListFn) => {
   const settings = getResolvedIntegrationSettings();
+  // Load DB first so a saved menu is not blocked by slow/hanging Loyverse or Clip calls.
+  const remoteItems = await remoteListFn().catch(() => []);
+
+  // Prefer saved MenuItem rows when any have images (e.g. pizzas on black background). Loyverse is only a fallback.
+  if (hasManualMenuItemsWithImages(remoteItems)) {
+    const needsClipFill = remoteItems.some((i) => !itemHasRenderableImage(i));
+    const clipImageMap = needsClipFill
+      ? await withTimeout(getClipImageMap(settings), INTEGRATION_MENU_TIMEOUT_MS, new Map())
+      : new Map();
+    return enrichMenuItemsWithClipImages(remoteItems, clipImageMap);
+  }
+
   const [liveMenuItems, clipImageMap] = await Promise.all([
-    getLiveMenuItemsFromLoyverse(settings),
-    getClipImageMap(settings),
+    withTimeout(getLiveMenuItemsFromLoyverse(settings), INTEGRATION_MENU_TIMEOUT_MS, []),
+    withTimeout(getClipImageMap(settings), INTEGRATION_MENU_TIMEOUT_MS, new Map()),
   ]);
   const enrichedLiveMenuItems = enrichMenuItemsWithClipImages(liveMenuItems, clipImageMap);
-
   if (enrichedLiveMenuItems.length > 0) {
     return enrichedLiveMenuItems;
   }
@@ -309,7 +390,7 @@ export const listMenuItems = async (remoteListFn) => {
   if (isLocalDevMenuMode) {
     return readStoredItems();
   }
-  return remoteListFn();
+  return Array.isArray(remoteItems) ? remoteItems : [];
 };
 
 export const createMenuItem = async (data, remoteCreateFn) => {
