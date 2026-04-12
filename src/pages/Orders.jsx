@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Plus } from "lucide-react";
+import { ShoppingBag, Plus, Receipt, Truck, Banknote, CreditCard, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { toast } from "@/components/ui/use-toast";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { createOrderEntity, deleteOrderEntity, listOrders, updateOrderEntity } from "@/lib/local-dev-orders";
@@ -11,6 +14,7 @@ import OrderCard from "../components/orders/OrderCard";
 import ReceiptDialog from "../components/orders/ReceiptDialog";
 import NewOrderForm from "../components/orders/NewOrderForm";
 import TableServiceManager from "../components/orders/TableServiceManager";
+import LoyverseReceiptsSection from "../components/orders/LoyverseReceiptsSection";
 
 const ACTIVE_ORDER_STATUSES = ["pending", "preparing", "ready", "out_for_delivery"];
 const TABLE_NUMBERS = new Set(["1", "2", "3", "4", "5", "6"]);
@@ -44,6 +48,17 @@ export default function Orders() {
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
   });
+
+  const appSettings = React.useMemo(() => getResolvedIntegrationSettings(appSettingsRows[0] || {}), [appSettingsRows]);
+
+  const loyverseQuery = useQuery({
+    queryKey: ["loyverseOverview", appSettingsRows[0]?.id || "none"],
+    queryFn: () => getLoyverseOverview(appSettings),
+    enabled: hasLoyverseApiConfig(appSettings),
+    staleTime: 60_000,
+  });
+
+  const loyverseReceipts = loyverseQuery.data?.receipts || [];
 
   const updateOrder = useMutation({
     mutationFn: ({ id, data }) => updateOrderEntity(id, data, (orderId, payload) => base44.entities.Order.update(orderId, payload)),
@@ -314,6 +329,7 @@ export default function Orders() {
       </div>
 
       <ReceiptDialog order={selectedOrder} open={showReceipt} onClose={() => setShowReceipt(false)} />
+      <LoyverseReceiptsSection receipts={loyverseReceipts} isLoading={loyverseQuery.isLoading} isError={loyverseQuery.isError} onRefresh={() => loyverseQuery.refetch()} isFetching={loyverseQuery.isFetching} hasConfig={hasLoyverseApiConfig(appSettings)} />
     </div>
   );
 }
