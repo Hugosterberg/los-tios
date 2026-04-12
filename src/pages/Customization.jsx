@@ -48,7 +48,7 @@ export default function Customization() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appSettings'] });
       saveStoredIntegrationSettings(formData);
-      alert('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ConfiguraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n guardada exitosamente! / Settings saved successfully!');
+      alert("Settings saved successfully.");
     },
   });
 
@@ -56,7 +56,7 @@ export default function Customization() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!canUploadImages) {
-      alert("Bilduppladdning kraver riktig Base44-backend och inloggning. Anvand bild-URL-faltet lokalt.");
+      alert("Image upload requires a configured backend and sign-in. Use the image URL field locally.");
       return;
     }
 
@@ -77,21 +77,21 @@ export default function Customization() {
   };
 
   const resetToDefaults = () => {
-    if (confirm('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿EstÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡s seguro de restablecer a los valores predeterminados? / Are you sure you want to reset to defaults?')) {
+    if (confirm("Are you sure you want to reset to defaults?")) {
       setFormData(buildDefaultAppSettings());
     }
   };
 
   const presetThemes = [
     {
-      name: "Rojo ClÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡sico / Classic Red",
+      name: "Classic Red",
       primary: "#DC2626",
       secondary: "#F97316",
       accent: "#10B981",
       style: "classic"
     },
     {
-      name: "Azul Elegant Blue",
+      name: "Elegant Blue",
       primary: "#2563EB",
       secondary: "#7C3AED",
       accent: "#10B981",
@@ -135,7 +135,7 @@ export default function Customization() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando configuraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n... / Loading settings...</p>
+          <p className="text-gray-600">Loading settings...</p>
         </div>
       </div>
     );
@@ -212,7 +212,7 @@ export default function Customization() {
             {/* Restaurant Info */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle>InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n del Restaurante / Restaurant Info</CardTitle>
+                <CardTitle>Restaurant Info</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -226,7 +226,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">TelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono / Phone</Label>
+                  <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
                     value={formData.phone_number}
@@ -247,7 +247,7 @@ export default function Customization() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">DirecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n / Address</Label>
+                  <Label htmlFor="address">Address</Label>
                   <Textarea
                     id="address"
                     value={formData.address}
@@ -299,7 +299,7 @@ export default function Customization() {
                   )}
                   {!canUploadImages && (
                     <p className="text-sm text-amber-600">
-                      File upload kraver riktig Base44-backend och token. Anvand bild-URL lokalt eller logga in via Base44.
+                      File upload requires a configured backend and token. Use an image URL locally or sign in to the real environment.
                     </p>
                   )}
                 </div>
@@ -471,7 +471,7 @@ export default function Customization() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="modern">Modern</SelectItem>
-                      <SelectItem value="classic">ClÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡sico / Classic</SelectItem>
+                      <SelectItem value="classic">Classic</SelectItem>
                       <SelectItem value="elegant">Elegant</SelectItem>
                       <SelectItem value="playful">Playful</SelectItem>
                     </SelectContent>
@@ -486,12 +486,12 @@ export default function Customization() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
-                ConfiguraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de Pagos / Payment Settings
+                Payment Settings
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <Label>MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©todos de Pago Aceptados / Accepted Payment Methods</Label>
+                <Label>Accepted Payment Methods</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3 p-4 border rounded-lg">
                     <input
@@ -531,8 +531,8 @@ export default function Customization() {
 
               {formData.accept_card && (
                 <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-semibold text-blue-900">InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n Bancaria / Bank Information</h4>
-                  <p className="text-sm text-blue-700">Esta informaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n se mostrarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ en el recibo cuando el cliente seleccione pago con tarjeta / This information will be shown on the receipt when customer selects card payment</p>
+                  <h4 className="font-semibold text-blue-900">Bank Information</h4>
+                  <p className="text-sm text-blue-700">This information is shown on the receipt when the customer selects card payment.</p>
 
                   <div className="space-y-2">
                     <Label htmlFor="clip_payment_link">Clip payment link</Label>
@@ -569,7 +569,7 @@ export default function Customization() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="account_number">NÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºmero de Cuenta / Account Number</Label>
+                      <Label htmlFor="account_number">Account Number</Label>
                       <Input
                         id="account_number"
                         value={formData.bank_account_number}
@@ -603,7 +603,7 @@ export default function Customization() {
                 Keys and secrets now live in a dedicated admin screen so they do not get mixed into visual customization.
               </p>
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
-                <p className="font-semibold text-purple-950">Abre la pestaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±a de Integrations</p>
+                <p className="font-semibold text-purple-950">Open the Integrations page</p>
                 <p className="mt-1 text-sm text-purple-800">
                   There you can update all Clip and Loyverse public and secret keys from one place.
                 </p>

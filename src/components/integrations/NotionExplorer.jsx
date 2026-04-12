@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
+import { invokeNotionProxy } from "@/api/notionClient";
+import { useQuery } from "@tanstack/react-query";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,6 +20,14 @@ function getPageTitle(page) {
     }
   }
   return page.id;
+}
+
+function buildNotionSearchBody(overrides) {
+  const b = { ...overrides };
+  if (b.query !== undefined && String(b.query).trim() === "") {
+    delete b.query;
+  }
+  return b;
 }
 
 function getCheckboxStatus(page) {
@@ -37,8 +48,19 @@ export default function NotionExplorer() {
   const [loadingBlocks, setLoadingBlocks] = useState(false);
   const [error, setError] = useState(null);
 
+  const { data: settings = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+  const integrationSettings = useMemo(
+    () => getResolvedIntegrationSettings(settings[0] || {}),
+    [settings],
+  );
+
   const callNotion = async (path, method = "GET", body = null) => {
-    const res = await base44.functions.invoke("notionProxy", { path, method, body });
+    const payload = { path, method };
+    if (body != null) payload.body = body;
+    const res = await invokeNotionProxy(payload, integrationSettings);
     return res.data;
   };
 
@@ -49,7 +71,7 @@ export default function NotionExplorer() {
     setResults([]);
     setSelectedPage(null);
     try {
-      const data = await callNotion("search", "POST", { query: query.trim(), page_size: 20 });
+      const data = await callNotion("search", "POST", buildNotionSearchBody({ query: query.trim(), page_size: 20 }));
       setResults(data.results || []);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || "Search failed.");

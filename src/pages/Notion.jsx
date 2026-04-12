@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
+import { invokeNotionProxy } from "@/api/notionClient";
+import { useQuery } from "@tanstack/react-query";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +13,15 @@ import {
 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Omit empty query — Notion treats "" differently from leaving query out (see POST /search). */
+function buildNotionSearchBody(overrides) {
+  const b = { ...overrides };
+  if (b.query !== undefined && String(b.query).trim() === "") {
+    delete b.query;
+  }
+  return b;
+}
 
 function extractPlainText(richText = []) {
   if (!Array.isArray(richText)) return "";
@@ -180,17 +192,17 @@ function renderBlock(block) {
 
 // ─── PageContent ─────────────────────────────────────────────────────────────
 
-function PageContent({ page, onClose }) {
+function PageContent({ page, onClose, integrationSettings }) {
   const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    base44.functions.invoke("notionProxy", { path: `blocks/${page.id}/children`, method: "GET" })
+    invokeNotionProxy({ path: `blocks/${page.id}/children`, method: "GET" }, integrationSettings)
       .then((res) => setBlocks(res.data?.results || []))
       .catch(() => setBlocks([]))
       .finally(() => setLoading(false));
-  }, [page.id]);
+  }, [page.id, integrationSettings]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[#141414] flex flex-col max-h-[70vh]">
@@ -230,7 +242,6 @@ function TaskCard({ item, selectedId, onSelect, onMarkDone, commentCounts = {} }
   
   const title = getPageTitle(item);
   const status = getTaskStatus(item);
-  console.log(`TaskCard: ${title}`, { status, hasName: !!status?.name });
   const meta = getPageMeta(item);
   const isSelected = selectedId === item.id;
   const isOverdue = meta.deadline && new Date(meta.deadline) < new Date();
@@ -424,43 +435,53 @@ function ResultList({ items, selectedId, onSelect, emptyMessage }) {
 
 // ─── useNotionSearch ──────────────────────────────────────────────────────────
 
-function useNotionSearch() {
+function useNotionSearch(integrationSettings) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const search = async (body) => {
-    setLoading(true);
-    setError(null);
-    setResults([]);
-    try {
-      const res = await base44.functions.invoke("notionProxy", { path: "search", method: "POST", body });
-      setResults(res.data?.results || []);
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || "Failed to load.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const search = useCallback(
+    async (body) => {
+      setLoading(true);
+      setError(null);
+      setResults([]);
+      try {
+        const res = await invokeNotionProxy(
+          {
+            path: "search",
+            method: "POST",
+            body: buildNotionSearchBody(body),
+          },
+          integrationSettings,
+        );
+        setResults(res.data?.results || []);
+      } catch (e) {
+        setError(e?.response?.data?.error || e?.message || "Failed to load.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [integrationSettings],
+  );
 
   return { results, setResults, loading, error, search };
 }
 
 // ─── SearchTab ────────────────────────────────────────────────────────────────
 
-function SearchTab() {
+function SearchTab({ integrationSettings }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
-  const { results, loading, error, search } = useNotionSearch();
+  const { results, loading, error, search } = useNotionSearch(integrationSettings);
 
   useEffect(() => {
     if (!query.trim()) return;
     const timer = setTimeout(() => {
       setSelected(null);
-      search({ query: query.trim(), page_size: 30 });
+      search(buildNotionSearchBody({ query: query.trim(), page_size: 30 }));
     }, 400);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, search]);
 
   return (
     <div className="space-y-4">
@@ -484,7 +505,14 @@ function SearchTab() {
       {!loading && results.length > 0 && (
         <div className={`grid gap-4 ${selected ? "lg:grid-cols-2" : "grid-cols-1"}`}>
           <ResultList items={results} selectedId={selected?.id} onSelect={setSelected} emptyMessage="No results." />
-          {selected && <PageContent key={selected.id} page={selected} onClose={() => setSelected(null)} />}
+          {selected && (
+            <PageContent
+              key={selected.id}
+              page={selected}
+              onClose={() => setSelected(null)}
+              integrationSettings={integrationSettings}
+            />
+          )}
         </div>
       )}
     </div>
@@ -493,16 +521,19 @@ function SearchTab() {
 
 // ─── DocumentsTab ─────────────────────────────────────────────────────────────
 
-function DocumentsTab() {
+function DocumentsTab({ integrationSettings }) {
   const [selected, setSelected] = useState(null);
-  const { results, loading, error, search } = useNotionSearch();
+  const { results, loading, error, search } = useNotionSearch(integrationSettings);
 
   const load = () => {
     setSelected(null);
-    search({ query: "", page_size: 100 });
+    search(buildNotionSearchBody({ page_size: 100 }));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    setSelected(null);
+    search(buildNotionSearchBody({ page_size: 100 }));
+  }, [integrationSettings, search]);
 
   // Only show pages that are NOT tasks and have a real title
   const docs = results.filter((item) => {
@@ -526,7 +557,14 @@ function DocumentsTab() {
       {!loading && (
         <div className={`grid gap-4 ${selected ? "lg:grid-cols-2" : "grid-cols-1"}`}>
           <ResultList items={docs} selectedId={selected?.id} onSelect={setSelected} emptyMessage="No documents found." />
-          {selected && <PageContent key={selected.id} page={selected} onClose={() => setSelected(null)} />}
+          {selected && (
+            <PageContent
+              key={selected.id}
+              page={selected}
+              onClose={() => setSelected(null)}
+              integrationSettings={integrationSettings}
+            />
+          )}
         </div>
       )}
     </div>
@@ -535,7 +573,7 @@ function DocumentsTab() {
 
 // ─── TasksTab ─────────────────────────────────────────────────────────────────
 
-function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
+function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSettings }) {
   const [selected, setSelected] = useState(null);
   const [commentCounts, setCommentCounts] = useState({});
 
@@ -543,11 +581,13 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
     if (!selected) return;
     const fetchComments = async () => {
       try {
-        const res = await base44.functions.invoke("notionProxy", {
-          path: `blocks/${selected.id}/children`,
-          method: "GET",
-          body: {}
-        });
+        const res = await invokeNotionProxy(
+          {
+            path: `blocks/${selected.id}/children`,
+            method: "GET",
+          },
+          integrationSettings,
+        );
         const comments = (res.data?.results || []).filter(b => b.type === "comment").length;
         setCommentCounts(prev => ({ ...prev, [selected.id]: comments }));
       } catch {
@@ -555,7 +595,7 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
       }
     };
     fetchComments();
-  }, [selected?.id]);
+  }, [selected?.id, integrationSettings]);
 
   return (
     <div className="space-y-4">
@@ -588,7 +628,14 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone }) {
               />
             ))}
           </div>
-          {selected && <PageContent key={selected.id} page={selected} onClose={() => setSelected(null)} />}
+          {selected && (
+            <PageContent
+              key={selected.id}
+              page={selected}
+              onClose={() => setSelected(null)}
+              integrationSettings={integrationSettings}
+            />
+          )}
         </div>
       )}
     </div>
@@ -602,32 +649,40 @@ export default function NotionPage() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState(null);
 
+  const { data: settings = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+
+  const integrationSettings = useMemo(
+    () => getResolvedIntegrationSettings(settings[0] || {}),
+    [settings],
+  );
+
   const fetchTasks = useCallback(async () => {
     setTasksLoading(true);
     setTasksError(null);
     try {
-      const res = await base44.functions.invoke("notionProxy", {
-        path: "search", method: "POST", body: { query: "", page_size: 100 }
-      });
+      const res = await invokeNotionProxy(
+        {
+          path: "search",
+          method: "POST",
+          body: buildNotionSearchBody({ page_size: 100 }),
+        },
+        integrationSettings,
+      );
       const results = res.data?.results || [];
-      console.log("Fetched tasks:", results.slice(0, 3).map(t => {
-        const props = t.properties || {};
-        return {
-          title: getPageTitle(t),
-          status: getTaskStatus(t),
-          statusProp: Object.entries(props).find(([, p]) => p.type === "status" || p.type === "select"),
-          allProps: Object.entries(props).map(([k, v]) => ({ name: k, type: v.type }))
-        };
-      }));
       setAllResults(results);
     } catch (e) {
       setTasksError(e?.response?.data?.error || e?.message || "Failed to load.");
     } finally {
       setTasksLoading(false);
     }
-  }, []);
+  }, [integrationSettings]);
 
-  useEffect(() => { fetchTasks(); }, []);
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   const tasks = allResults.filter((item) => {
     if (item.object !== "page") return false;
@@ -638,33 +693,36 @@ export default function NotionPage() {
     return !isTaskDone(item);
   });
 
-  const handleMarkDone = async (item) => {
-    const checkboxKey = getCheckboxPropertyKey(item);
-    const statusKey = getStatusPropertyKey(item);
-    const selectKey = getSelectPropertyKey(item);
+  const handleMarkDone = useCallback(
+    async (item) => {
+      const checkboxKey = getCheckboxPropertyKey(item);
+      const statusKey = getStatusPropertyKey(item);
+      const selectKey = getSelectPropertyKey(item);
 
-    let properties = {};
-    if (checkboxKey) {
-      properties[checkboxKey] = { checkbox: true };
-    } else if (statusKey) {
-      // Try to set status to "Done" — Notion requires the exact option name that exists
-      properties[statusKey] = { status: { name: "Done" } };
-    } else if (selectKey) {
-      // Try to set select to "Done" — Notion requires the exact option name that exists
-      properties[selectKey] = { select: { name: "Done" } };
-    }
+      let properties = {};
+      if (checkboxKey) {
+        properties[checkboxKey] = { checkbox: true };
+      } else if (statusKey) {
+        properties[statusKey] = { status: { name: "Done" } };
+      } else if (selectKey) {
+        properties[selectKey] = { select: { name: "Done" } };
+      }
 
-    if (Object.keys(properties).length === 0) return;
+      if (Object.keys(properties).length === 0) return;
 
-    await base44.functions.invoke("notionProxy", {
-      path: `pages/${item.id}`,
-      method: "PATCH",
-      body: { properties },
-    });
+      await invokeNotionProxy(
+        {
+          path: `pages/${item.id}`,
+          method: "PATCH",
+          body: { properties },
+        },
+        integrationSettings,
+      );
 
-    // Remove from local list optimistically
-    setAllResults((prev) => prev.filter((p) => p.id !== item.id));
-  };
+      setAllResults((prev) => prev.filter((p) => p.id !== item.id));
+    },
+    [integrationSettings],
+  );
 
   return (
     <div className="min-h-screen bg-[#111111] text-white">
@@ -705,8 +763,12 @@ export default function NotionPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="search" className="mt-0"><SearchTab /></TabsContent>
-          <TabsContent value="documents" className="mt-0"><DocumentsTab /></TabsContent>
+          <TabsContent value="search" className="mt-0">
+            <SearchTab integrationSettings={integrationSettings} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-0">
+            <DocumentsTab integrationSettings={integrationSettings} />
+          </TabsContent>
           <TabsContent value="tasks" className="mt-0">
             <TasksTab
               tasks={tasks}
@@ -714,6 +776,7 @@ export default function NotionPage() {
               error={tasksError}
               onRefresh={fetchTasks}
               onMarkDone={handleMarkDone}
+              integrationSettings={integrationSettings}
             />
           </TabsContent>
         </Tabs>

@@ -91,19 +91,28 @@ function buildLoyverseUrl(baseUrl, path, searchParams = {}) {
   return url.toString();
 }
 
-async function loyverseFetch(path, searchParams = {}, settings = {}) {
+/**
+ * Low-level Loyverse HTTP call. GET is used throughout this module; POST is used to create receipts from the web app.
+ * In production, POST must be supported by the `loyverseProxy` Edge Function (method + JSON body) or calls will fail.
+ */
+export async function loyverseApiRequest(method, path, { searchParams = {}, body = undefined, settings = {} } = {}) {
   const config = getLoyverseResolvedConfig(settings);
   if (!config.apiToken) {
     throw new LoyverseApiError("Missing Loyverse API token");
   }
 
+  const headers = {
+    Authorization: `Bearer ${config.apiToken}`,
+    Accept: "application/json",
+    ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+  };
+
   if (import.meta.env.DEV) {
     const url = buildLoyverseUrl(getLoyverseRequestBaseUrl(config), path, searchParams);
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${config.apiToken}`,
-        Accept: "application/json",
-      },
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
     const text = await response.text();
@@ -115,8 +124,10 @@ async function loyverseFetch(path, searchParams = {}, settings = {}) {
   }
 
   const response = await base44.functions.invoke("loyverseProxy", {
+    method,
     path,
     searchParams,
+    body,
     apiToken: config.apiToken,
   });
 
@@ -125,6 +136,33 @@ async function loyverseFetch(path, searchParams = {}, settings = {}) {
   }
 
   return response.data;
+}
+
+async function loyverseFetch(path, searchParams = {}, settings = {}) {
+  return loyverseApiRequest("GET", path, { searchParams, settings });
+}
+
+/**
+ * Create a sales receipt in Loyverse (shows in Back Office / POS history). Body shape follows Loyverse Open API (receipt_lines + payments).
+ */
+export async function createLoyverseReceipt(settings, body) {
+  try {
+    return await loyverseApiRequest("POST", "receipts", { body, settings });
+  } catch (err) {
+    const status = err?.status;
+    if (status === 400 || status === 422) {
+      return loyverseApiRequest("POST", "receipts", { body: { receipt: body }, settings });
+    }
+    throw err;
+  }
+}
+
+export async function fetchLoyversePaymentTypes(settings) {
+  return fetchOptionalCollection("payment_types", "payment_types", { maxPages: 5, settings });
+}
+
+export async function fetchLoyverseStoresList(settings) {
+  return fetchOptionalCollection("stores", "stores", { maxPages: 5, settings });
 }
 
 function extractCollection(payload, collectionKey) {
@@ -183,6 +221,10 @@ async function fetchOptionalCollection(path, collectionKey, options = {}) {
   } catch {
     return [];
   }
+}
+
+export async function fetchLoyverseCategoriesList(settings) {
+  return fetchOptionalCollection("categories", "categories", { maxPages: 5, settings });
 }
 
 function getMoneyAmount(value) {

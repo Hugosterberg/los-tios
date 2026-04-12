@@ -6,6 +6,7 @@ import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { buildDefaultAppSettings, INTEGRATION_SETTINGS_SECTIONS } from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
+import { invokeNotionProxy } from "@/api/notionClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, CreditCard, Eye, EyeOff, KeyRound, Loader2, PackageSearch, Receipt, RefreshCw, Save, ShieldCheck, ShoppingBag, Store, Users, Wifi, XCircle, BookOpen } from "lucide-react";
+import { CheckCircle2, CreditCard, Eye, EyeOff, KeyRound, Loader2, PackageSearch, Receipt, RefreshCw, Save, ShieldCheck, ShoppingBag, Store, Users, Wifi, XCircle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -168,7 +169,7 @@ export default function Integrations() {
     try {
       if (sectionId === "notion") {
         try {
-          await base44.functions.invoke("notionProxy", { path: "users/me", method: "GET" });
+          await invokeNotionProxy({ path: "users/me", method: "GET" }, formData);
           setTestResults((r) => ({ ...r, notion: { ok: true, message: "Notion connection successful." } }));
         } catch (e) {
           throw new Error(e?.response?.data?.error || e?.message || "Error connecting to Notion.");
@@ -544,57 +545,7 @@ export default function Integrations() {
                       </TabsTrigger>
                     );
                   })}
-
-                {/* Notion tab trigger */}
-                  <TabsTrigger
-                    value="notion"
-                    className="rounded-xl border border-white/10 bg-[#101010] px-4 py-3 text-left text-gray-300 data-[state=active]:border-yellow-400/50 data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="font-semibold">Notion</p>
-                        <p className="text-xs text-gray-500">OAuth connected</p>
-                      </div>
-                      <Badge className="bg-emerald-500/15 text-emerald-300">Ready</Badge>
-                    </div>
-                  </TabsTrigger>
                   </TabsList>
-
-                {/* Notion tab content */}
-                <TabsContent value="notion" className="mt-0">
-                  <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                        <BookOpen className="h-5 w-5 text-yellow-400" /> Notion
-                      </h2>
-                      <p className="mt-1 max-w-2xl text-sm text-gray-400">
-                        Connected via OAuth ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no API keys needed. Test that the connection is alive.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {testResults["notion"] && (
-                        <span className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${testResults["notion"].ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
-                          {testResults["notion"].ok
-                            ? <CheckCircle2 className="h-3.5 w-3.5" />
-                            : <XCircle className="h-3.5 w-3.5" />}
-                          {testResults["notion"].message}
-                        </span>
-                      )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => runTest("notion")}
-                        disabled={testing["notion"]}
-                        className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
-                      >
-                        {testing["notion"]
-                          ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          : <Wifi className="mr-2 h-4 w-4" />}
-                        Test connection
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
 
                 {INTEGRATION_SETTINGS_SECTIONS.map((section) => (
                   <TabsContent key={section.id} value={section.id} className="mt-0">
@@ -618,14 +569,14 @@ export default function Integrations() {
                               }
                               <div className="space-y-1">
                                 {hasManual ? (
-                                  <p className="text-emerald-300 font-medium">Manual token configured ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â will be used directly.</p>
+                                  <p className="text-emerald-300 font-medium">Manual token configured — will be used directly.</p>
                                 ) : hasAuto ? (
                                   <>
                                     <p className="text-emerald-300 font-medium">Token auto-generated from public key + secret.</p>
                                     <p className="font-mono text-xs text-gray-400 break-all">{generatedToken}</p>
                                   </>
                                 ) : (
-                                  <p className="text-yellow-300 font-medium">Missing credentials ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â configure the public key and secret to generate a Basic token.</p>
+                                  <p className="text-yellow-300 font-medium">Missing credentials — configure the public key and secret to generate a Basic token.</p>
                                 )}
                               </div>
                             </div>

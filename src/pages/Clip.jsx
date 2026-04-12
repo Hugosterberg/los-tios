@@ -384,7 +384,7 @@ export default function Clip() {
               <CreditCard className="h-5 w-5 text-yellow-400" />
               <div>
                 <h1 className="text-lg font-bold text-yellow-400">Clip</h1>
-                <p className="text-xs text-gray-500">Payments, terminales y depÃƒÂ³sitos de Clip</p>
+                <p className="text-xs text-gray-500">Clip payments, terminals, and deposits</p>
               </div>
             </div>
           </div>

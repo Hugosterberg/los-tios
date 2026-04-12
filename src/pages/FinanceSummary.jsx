@@ -21,6 +21,7 @@ import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
+import { isLocalFinanceMode, localListExpenses, localListCompanyTransactions } from "@/lib/localDevFinance";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-US", {
@@ -58,6 +59,8 @@ export default function FinanceSummary() {
     import.meta.env.DEV &&
     (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
 
+  const useLocalFinance = isLocalFinanceMode();
+
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
@@ -65,13 +68,14 @@ export default function FinanceSummary() {
   });
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ["companyTransactions"],
-    queryFn: () => base44.entities.CompanyTransaction.list("-date"),
+    queryKey: ["companyTransactions", useLocalFinance ? "local" : "remote"],
+    queryFn: () =>
+      useLocalFinance ? localListCompanyTransactions() : base44.entities.CompanyTransaction.list("-date"),
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["expenses"],
-    queryFn: () => base44.entities.Expense.list("-date"),
+    queryKey: ["expenses", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
 
   const appSettings = React.useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
@@ -101,9 +105,9 @@ export default function FinanceSummary() {
     .filter((entry) => entry.type === "withdrawal")
     .reduce((sum, entry) => sum + (entry.amount || 0), 0);
 
-  const manualExpenses = expenses.filter((expense) => !expense.from_shopping_list);
-  const manualExpensesTotal = manualExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-  const manualNet = totalContributions - totalWithdrawals - manualExpensesTotal;
+  const totalExpensesAmount = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  /** All ledger expense rows (incl. Shopping List) for summaries — previously only non-shopping "manual" expenses were summed. */
+  const ledgerNet = totalContributions - totalWithdrawals - totalExpensesAmount;
 
   const loyverseGrossSales = loyverseOverview?.metrics?.grossSales || 0;
   const loyverseReceiptsCount = loyverseOverview?.metrics?.receiptsCount || 0;
@@ -127,10 +131,12 @@ export default function FinanceSummary() {
       date: entry.date,
       positive: entry.type === "contribution",
     })),
-    ...manualExpenses.map((entry) => ({
+    ...expenses.map((entry) => ({
       id: `expense-${entry.id}`,
-      title: entry.name || "Manual expense",
-      subtitle: entry.category || "Manual expense",
+      title: entry.name || "Expense",
+      subtitle: entry.from_shopping_list
+        ? `Shopping list · ${entry.category || "ingredients"}`
+        : entry.category || "Expense",
       type: "Expense",
       amount: entry.amount || 0,
       date: entry.date,
@@ -227,8 +233,8 @@ export default function FinanceSummary() {
               <SourceCard
                 title="Manual"
                 icon={TrendingUp}
-                value={formatCurrency(manualNet)}
-                hint={`${transactions.length} transactions and ${manualExpenses.length} manual expenses`}
+                value={formatCurrency(ledgerNet)}
+                hint={`${transactions.length} transactions and ${expenses.length} expenses (all sources)`}
               />
             </div>
           </TabsContent>
@@ -281,8 +287,8 @@ export default function FinanceSummary() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SourceCard title="Contributions" icon={TrendingUp} value={formatCurrency(totalContributions)} hint={`${transactions.filter((entry) => entry.type === "contribution").length} entries`} />
               <SourceCard title="Withdrawals" icon={TrendingDown} value={formatCurrency(totalWithdrawals)} hint={`${transactions.filter((entry) => entry.type === "withdrawal").length} entries`} />
-              <SourceCard title="Manual Expenses" icon={Receipt} value={formatCurrency(manualExpensesTotal)} hint={`${manualExpenses.length} entries`} />
-              <SourceCard title="Manual Net" icon={Wallet} value={formatCurrency(manualNet)} hint="Contributions - withdrawals - manual expenses" />
+              <SourceCard title="All expenses" icon={Receipt} value={formatCurrency(totalExpensesAmount)} hint={`${expenses.length} expense rows (incl. shopping)`} />
+              <SourceCard title="Ledger net" icon={Wallet} value={formatCurrency(ledgerNet)} hint="Contributions − withdrawals − all expenses" />
             </div>
 
             <Card className="border-yellow-500/20 bg-[#242424] text-white shadow-none">
@@ -303,7 +309,7 @@ export default function FinanceSummary() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-500">No manual activity recorded yet.</p>
+                  <p className="text-sm text-gray-500">No transactions or expenses recorded yet.</p>
                 )}
               </CardContent>
             </Card>

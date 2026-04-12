@@ -46,6 +46,38 @@ import {
   countByChannel,
   getRecordDate,
 } from "@/lib/mergedSales";
+import { isLocalFinanceMode, localListExpenses, localListCompanyTransactions } from "@/lib/localDevFinance";
+
+/** Calendar day for Expense.date (YYYY-MM-DD strings avoid timezone shifts). Falls back to created_* so rows still count. */
+function expenseCalendarDayKey(e) {
+  const raw = e?.date;
+  if (raw != null && raw !== "") {
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    try {
+      const d = parseISO(/^\d{4}-\d{2}-\d{2}T/.test(s) ? s : `${s.slice(0, 10)}T12:00:00`);
+      if (!Number.isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+    } catch {
+      /* ignore */
+    }
+    try {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+    } catch {
+      /* ignore */
+    }
+  }
+  const fallback = getRecordDate(e);
+  if (!Number.isNaN(fallback.getTime()) && fallback.getTime() !== 0) {
+    return format(fallback, "yyyy-MM-dd");
+  }
+  return "";
+}
+
+function expenseCalendarMonthKey(e) {
+  const d = expenseCalendarDayKey(e);
+  return d.length >= 7 ? d.slice(0, 7) : "";
+}
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("es-MX", {
@@ -129,9 +161,10 @@ export default function Statistics() {
     queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),
   });
 
+  const useLocalFinance = isLocalFinanceMode();
   const { data: expenses = [] } = useQuery({
-    queryKey: ["expenses"],
-    queryFn: () => base44.entities.Expense.list("-date"),
+    queryKey: ["expenses", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
 
   const { data: settings = [] } = useQuery({
@@ -143,8 +176,9 @@ export default function Statistics() {
   const statisticsMonth = statsView === "daily" ? format(parseISO(`${selectedDay}T12:00:00`), "yyyy-MM") : selectedMonth;
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ["companyTransactions"],
-    queryFn: () => base44.entities.CompanyTransaction.list("-date"),
+    queryKey: ["companyTransactions", useLocalFinance ? "local" : "remote"],
+    queryFn: () =>
+      useLocalFinance ? localListCompanyTransactions() : base44.entities.CompanyTransaction.list("-date"),
   });
 
   const monthAnchor = useMemo(() => parseISO(`${statisticsMonth}-01`), [statisticsMonth]);
@@ -193,10 +227,10 @@ export default function Statistics() {
   });
 
   const monthOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM") === statisticsMonth);
-  const monthExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM") === statisticsMonth);
+  const monthExpenses = expenses.filter((e) => expenseCalendarMonthKey(e) === statisticsMonth);
 
   const dayOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM-dd") === selectedDay);
-  const dayExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === selectedDay);
+  const dayExpenses = expenses.filter((e) => expenseCalendarDayKey(e) === selectedDay);
 
   const contributionInWindow = useMemo(
     () =>
@@ -260,7 +294,7 @@ export default function Statistics() {
   const laborCostPct = mergedRevenue > 0 ? (laborExpenses / mergedRevenue) * 100 : 0;
 
   const prevMonthStr = format(subMonths(monthAnchor, 1), "yyyy-MM");
-  const prevMonthExpenses = expenses.filter((e) => format(new Date(e.date), "yyyy-MM") === prevMonthStr);
+  const prevMonthExpenses = expenses.filter((e) => expenseCalendarMonthKey(e) === prevMonthStr);
   const prevMonthExpenseTotal = prevMonthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const prevMergedRevenue = sumEventAmounts(canonicalPrev);
   const prevMergedNet = prevMergedRevenue - prevMonthExpenseTotal;
@@ -355,7 +389,7 @@ export default function Statistics() {
       const ev = filterCanonicalEventsByDateRange(canonicalFull, ds, de);
       const mergedPosNet = sumEventAmounts(ev);
       const dayStr = format(day, "yyyy-MM-dd");
-      const dExp = expenses.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === dayStr);
+      const dExp = expenses.filter((e) => expenseCalendarDayKey(e) === dayStr);
       const expensesSpent = dExp.reduce((sum, e) => sum + Number(e.amount || 0), 0);
       const sourceTotals = ev.reduce(
         (acc, e) => {
@@ -475,7 +509,7 @@ export default function Statistics() {
       "Date (ISO)",
       "Weekday",
       "Daily cash — merged POS net sales (MXN)",
-      "Spent — finance expenses (MXN)",
+      "Spent — Finance expenses incl. Shopping (MXN)",
       "Net (MXN)",
       "Merged sales events",
       "Loyverse (MXN)",
@@ -582,7 +616,7 @@ export default function Statistics() {
       value: formatCurrency(orderModuleRevenue),
       sub:
         orderModuleCount > 0
-          ? `${formatNumber(orderModuleCount)} Base44 Order rows — not added to POS merge unless also in Loyverse/Clip/manual`
+          ? `${formatNumber(orderModuleCount)} Order module rows — not added to POS merge unless also in Loyverse/Clip/manual`
           : "No orders in Order module this month",
       subTone: "neutral",
       icon: Package,
@@ -633,7 +667,7 @@ export default function Statistics() {
       value: formatCurrency(dayOrderModuleRevenue),
       sub:
         dayOrders.length > 0
-          ? `${formatNumber(dayOrders.length)} Base44 Order rows — not added to POS merge unless also in Loyverse/Clip/manual`
+          ? `${formatNumber(dayOrders.length)} Order module rows — not added to POS merge unless also in Loyverse/Clip/manual`
           : "No orders in Order module this day",
       subTone: "neutral",
       icon: Package,
@@ -698,7 +732,7 @@ export default function Statistics() {
                 <strong className="text-gray-300">Net sales &amp; sales events</strong> use the same pipeline as Dashboard: Loyverse receipts + approved Clip payments + manual contribution transactions, then duplicate removal (10 min window, prefer Loyverse).
                 <strong className="text-gray-300"> Expenses</strong> are summed from Finance <strong>Expense</strong> rows
                 {statsView === "daily" ? " dated the selected calendar day." : " in the calendar month."}
-                <strong className="text-gray-300"> Order module</strong> shows Base44 <strong>Order</strong> totals separately — those are not double-counted into net sales unless the same sale also appears in Loyverse/Clip/manual.
+                <strong className="text-gray-300"> Order module</strong> shows in-app <strong>Order</strong> totals separately — those are not double-counted into net sales unless the same sale also appears in Loyverse/Clip/manual.
               </p>
             </div>
           </div>
@@ -1132,7 +1166,8 @@ export default function Statistics() {
                   <div>
                     <CardTitle className="text-base text-yellow-100">Daily ledger</CardTitle>
                     <p className="mt-1 text-xs text-yellow-200/70">
-                      Spreadsheet-style view (English). Daily cash = merged POS net sales; spent = finance expenses for that date.
+                      Spreadsheet-style view (English). Daily cash = merged POS net sales; spent = all Finance expenses for that
+                      calendar day (including purchases registered from Shopping).
                     </p>
                   </div>
                   <Button

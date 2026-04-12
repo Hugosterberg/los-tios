@@ -25,6 +25,11 @@ export const DEFAULT_APP_SETTINGS = {
   loyverse_public_key: "",
   loyverse_api_token: "",
   loyverse_api_base_url: "https://api.loyverse.com/v1.0",
+  /** Optional. If empty, first store from Loyverse API is used when posting receipts. */
+  loyverse_store_id: "",
+  loyverse_default_category_id: "",
+  /** Internal Notion integration secret (secret_…) from https://www.notion.so/my-integrations — optional if OAuth is used. */
+  notion_internal_token: "",
 };
 
 export const INTEGRATION_SETTINGS_SECTIONS = [
@@ -97,6 +102,40 @@ export const INTEGRATION_SETTINGS_SECTIONS = [
         placeholder: "https://api.loyverse.com/v1.0",
         secret: false,
         fullWidth: true,
+      },
+      {
+        key: "loyverse_store_id",
+        label: "Store ID (for API receipts)",
+        placeholder: "Optional — UUID from Loyverse Back Office → Stores",
+        secret: false,
+        helperText: "Used when syncing completed web orders to Loyverse. Leave empty to use the first store returned by the API.",
+        fullWidth: true,
+      },
+      {
+        key: "loyverse_default_category_id",
+        label: "Default category ID (for new items from web)",
+        placeholder: "Optional — UUID from Loyverse Back Office → Categories",
+        secret: false,
+        helperText: "Used when creating menu items via API. If empty, the first category from Loyverse is used.",
+        fullWidth: true,
+      },
+    ],
+  },
+  {
+    id: "notion",
+    title: "Notion",
+    description:
+      "Use OAuth from Base44 when available, or paste an internal integration token so the Notion page and proxy work without OAuth.",
+    themeClassName: "border-white/10 bg-[#141414]",
+    fields: [
+      {
+        key: "notion_internal_token",
+        label: "Internal integration token",
+        placeholder: "secret_…",
+        secret: true,
+        fullWidth: true,
+        helperText:
+          "Create an internal integration at notion.so/my-integrations (Developers → New integration), copy the secret, then share the pages you need with that integration.",
       },
     ],
   },

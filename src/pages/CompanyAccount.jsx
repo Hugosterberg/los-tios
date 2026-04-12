@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit, Receipt, Calendar as CalendarIcon, CreditCard, Store, RefreshCw, AlertTriangle, ScanLine } from "lucide-react";
+import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit, Receipt, Calendar as CalendarIcon, CreditCard, Store, RefreshCw, AlertTriangle, ScanLine, Building2, Mail, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
@@ -265,12 +265,9 @@ export default function CompanyAccount() {
 
   const loyverseOverview = loyverseOverviewQuery.data;
   const clipOverview = clipOverviewQuery.data;
-  const manualExpenses = expenses.filter((expense) => !expense.from_shopping_list);
-  const manualExpensesTotal = manualExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
   const manualTransactionCount = transactions.length;
   const manualContributionCount = transactions.filter((transaction) => transaction.type === 'contribution').length;
   const manualWithdrawalCount = transactions.filter((transaction) => transaction.type === 'withdrawal').length;
-  const manualNet = totalContributions - totalWithdrawals - manualExpensesTotal;
   const loyverseGrossSales = loyverseOverview?.metrics?.grossSales || 0;
   const loyverseReceiptsCount = loyverseOverview?.metrics?.receiptsCount || 0;
   const loyverseCompletedReceiptsCount = loyverseOverview?.metrics?.completedReceiptsCount || 0;
@@ -290,11 +287,13 @@ export default function CompanyAccount() {
       date: transaction.date,
       tone: transaction.type === 'contribution' ? 'positive' : 'negative',
     })),
-    ...manualExpenses.map((expense) => ({
+    ...expenses.map((expense) => ({
       id: `expense-${expense.id}`,
       kind: 'Expense',
-      title: expense.name || 'Manual expense',
-      subtitle: expense.category || 'Manual entry',
+      title: expense.name || 'Expense',
+      subtitle: expense.from_shopping_list
+        ? `Shopping list · ${expense.category || 'ingredients'}`
+        : expense.category || 'Expense',
       amount: expense.amount || 0,
       date: expense.date,
       tone: 'negative',
@@ -384,14 +383,14 @@ export default function CompanyAccount() {
 
   // Expense categories and units
   const expenseCategories = [
-    { id: "all", name: "All", color: "bg-gray-100 text-gray-800", icon: "Ã°Å¸â€œâ€¹" },
-    { id: "ingredients", name: "Ingredients", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸Â¥â€”" },
-    { id: "rent", name: "Rent", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸ÂÂ " },
-    { id: "utilities", name: "Utilities", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸â€™Â¡" },
-    { id: "salaries", name: "Salaries", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸â€˜Â¥" },
-    { id: "equipment", name: "Equipment", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸â€Â§" },
-    { id: "marketing", name: "Marketing", color: "bg-yellow-400/20 text-yellow-400", icon: "Ã°Å¸â€œÂ¢" },
-    { id: "other", name: "Other", color: "bg-yellow-400/10 text-yellow-400/70", icon: "Ã°Å¸â€œÂ¦" },
+    { id: "all", name: "All", color: "bg-gray-100 text-gray-800", icon: "\u{1F4CB}" },
+    { id: "ingredients", name: "Ingredients", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F957}" },
+    { id: "rent", name: "Rent", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F3E0}" },
+    { id: "utilities", name: "Utilities", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F4A1}" },
+    { id: "salaries", name: "Salaries", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F464}" },
+    { id: "equipment", name: "Equipment", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F527}" },
+    { id: "marketing", name: "Marketing", color: "bg-yellow-400/20 text-yellow-400", icon: "\u{1F4E2}" },
+    { id: "other", name: "Other", color: "bg-yellow-400/10 text-yellow-400/70", icon: "\u{1F4E6}" },
   ];
 
   const expenseUnits = [
@@ -511,14 +510,15 @@ export default function CompanyAccount() {
               <div className={`text-2xl font-bold ${companyBalance >= 0 ? 'text-yellow-400' : 'text-red-500'}`}>
                 ${companyBalance.toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">MXN en banco</p>
+              <p className="text-xs text-gray-500 mt-1">MXN in bank</p>
             </CardContent>
           </Card>
 
           <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                Ã°Å¸â€™Âµ Available Cash
+                <DollarSign className="w-4 h-4 text-yellow-400" />
+                Available Cash
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -526,7 +526,7 @@ export default function CompanyAccount() {
                 ${availableCash.toFixed(2)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                +${cashFromOrders.toFixed(2)} ventas efectivo
+                +${cashFromOrders.toFixed(2)} cash sales
               </p>
             </CardContent>
           </Card>
@@ -540,7 +540,7 @@ export default function CompanyAccount() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-400">${totalContributions.toFixed(2)}</div>
-              <p className="text-xs text-gray-500 mt-1">{transactions.filter(t => t.type === 'contribution').length} transacciones</p>
+              <p className="text-xs text-gray-500 mt-1">{transactions.filter(t => t.type === 'contribution').length} transactions</p>
             </CardContent>
           </Card>
 
@@ -554,7 +554,7 @@ export default function CompanyAccount() {
             <CardContent>
               <div className="text-2xl font-bold text-yellow-400/70">${companyExpenses.toFixed(2)}</div>
               <p className="text-xs text-gray-500 mt-1">
-                Ã°Å¸â€™Âµ${expensesFromCompanyCash.toFixed(2)} | Ã°Å¸ÂÂ¦${expensesFromCompanyAccount.toFixed(2)}
+                Cash ${expensesFromCompanyCash.toFixed(2)} | Account ${expensesFromCompanyAccount.toFixed(2)}
               </p>
             </CardContent>
           </Card>
@@ -577,7 +577,8 @@ export default function CompanyAccount() {
         <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-yellow-400">
-            Ã°Å¸â€™Âµ Cash Summary
+            <DollarSign className="w-5 h-5 text-yellow-400" />
+            Cash Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -674,7 +675,7 @@ export default function CompanyAccount() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-gray-400">Ã°Å¸â€™Â³ Clip (Cards)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Clip (cards)</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-yellow-400">${loyverseCard.toFixed(2)}</div>
@@ -684,7 +685,7 @@ export default function CompanyAccount() {
 
                     <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-gray-400">Ã°Å¸â€™Âµ Loyverse (Cash)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Loyverse (cash)</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-yellow-400">${loyverseCash.toFixed(2)}</div>
@@ -694,21 +695,21 @@ export default function CompanyAccount() {
 
                     <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-gray-400">Ã°Å¸ÂÂ·Ã¯Â¸Â Manual Cash</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Manual cash</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-yellow-400">${manualCash.toFixed(2)}</div>
-                        <p className="text-xs text-gray-500 mt-1">Registros manuales</p>
+                        <p className="text-xs text-gray-500 mt-1">Manual entries</p>
                       </CardContent>
                     </Card>
 
                     <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-gray-400">Ã°Å¸ÂÂ¦ Revolut/Bank</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Revolut / bank</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-yellow-400">${revolut.toFixed(2)}</div>
-                        <p className="text-xs text-gray-500 mt-1">Transferencias</p>
+                        <p className="text-xs text-gray-500 mt-1">Transfers</p>
                       </CardContent>
                     </Card>
                   </div>
@@ -760,14 +761,14 @@ export default function CompanyAccount() {
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
                     <CalendarIcon className="w-4 h-4" />
-                    Recurrentes Mensuales
+                    Monthly recurring
                   </div>
                   <div className="text-2xl font-bold text-yellow-400">${monthlyRecurring.toFixed(2)}</div>
                 </CardContent>
               </Card>
               <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                 <CardContent className="pt-6">
-                  <div className="text-sm text-gray-600 mb-1">Total Recurrentes</div>
+                  <div className="text-sm text-gray-600 mb-1">Total recurring</div>
                   <div className="text-2xl font-bold text-yellow-400">{recurringExpenses.length}</div>
                 </CardContent>
               </Card>
@@ -784,7 +785,7 @@ export default function CompanyAccount() {
                     <form onSubmit={handleExpenseSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="exp_name">Nombre *</Label>
+                          <Label htmlFor="exp_name">Name *</Label>
                           <Input
                             id="exp_name"
                             required
@@ -807,7 +808,7 @@ export default function CompanyAccount() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Monto (MXN) *</Label>
+                          <Label>Amount (MXN) *</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -866,7 +867,7 @@ export default function CompanyAccount() {
                               onChange={(e) => setExpenseForm({ ...expenseForm, is_recurring: e.target.checked })}
                               className="w-4 h-4"
                             />
-                            <Label htmlFor="exp_recurring" className="cursor-pointer">Recurrente</Label>
+                            <Label htmlFor="exp_recurring" className="cursor-pointer">Recurring</Label>
                           </div>
                           {expenseForm.is_recurring && (
                             <Select
@@ -875,10 +876,10 @@ export default function CompanyAccount() {
                             >
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="daily">Diario</SelectItem>
+                                <SelectItem value="daily">Daily</SelectItem>
                                 <SelectItem value="weekly">Weekly</SelectItem>
-                                <SelectItem value="monthly">Mensual</SelectItem>
-                                <SelectItem value="yearly">Anual</SelectItem>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="yearly">Yearly</SelectItem>
                               </SelectContent>
                             </Select>
                           )}
@@ -887,12 +888,12 @@ export default function CompanyAccount() {
 
                       {/* Payment Source */}
                       <div className="space-y-2">
-                        <Label>Fuente de Pago *</Label>
+                        <Label>Payment source *</Label>
                         <div className="grid grid-cols-3 gap-2">
                           {[
-                            { id: 'company_cash', label: 'Ã°Å¸â€™Âµ Cash', sublabel: 'Company' },
-                            { id: 'company_account', label: 'Ã°Å¸ÂÂ¦ Account', sublabel: 'Company' },
-                            { id: 'individual', label: 'Ã°Å¸â€˜Â¤ Individual', sublabel: 'Persona' },
+                            { id: 'company_cash', label: 'Cash', sublabel: 'Company' },
+                            { id: 'company_account', label: 'Account', sublabel: 'Company' },
+                            { id: 'individual', label: 'Individual', sublabel: 'Person' },
                           ].map(ps => (
                             <button
                               key={ps.id}
@@ -926,7 +927,7 @@ export default function CompanyAccount() {
                             </Select>
                             <Input
                               type="number"
-                              placeholder="Monto"
+                              placeholder="Amount"
                               value={contributorInput.amount}
                               onChange={(e) => setContributorInput({ ...contributorInput, amount: parseFloat(e.target.value) })}
                               className="w-24"
@@ -986,11 +987,15 @@ export default function CompanyAccount() {
                               <h3 className="font-semibold">{expense.name}</h3>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 <Badge className={cat.color} variant="secondary">{cat.name}</Badge>
-                                {expense.is_recurring && <Badge variant="outline">Ã°Å¸â€â€ž Recurrente</Badge>}
+                                {expense.is_recurring && <Badge variant="outline">Recurring</Badge>}
                                 <Badge variant="outline">{format(new Date(expense.date), 'dd MMM', { locale: es })}</Badge>
                                 {expense.payment_source && (
                                   <Badge variant="outline" className="text-xs">
-                                    {expense.payment_source === 'company_cash' ? 'Ã°Å¸â€™Âµ' : expense.payment_source === 'company_account' ? 'Ã°Å¸ÂÂ¦' : 'Ã°Å¸â€˜Â¤'}
+                                    {expense.payment_source === 'company_cash'
+                                      ? 'Cash'
+                                      : expense.payment_source === 'company_account'
+                                        ? 'Account'
+                                        : 'Individual'}
                                   </Badge>
                                 )}
                               </div>
@@ -1019,7 +1024,7 @@ export default function CompanyAccount() {
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardContent className="text-center py-12">
                     <Receipt className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-500">No hay gastos registrados</p>
+                    <p className="text-gray-500">No expenses recorded</p>
                   </CardContent>
                 </Card>
               )}
@@ -1051,7 +1056,7 @@ export default function CompanyAccount() {
                     <form onSubmit={handleTransactionSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label htmlFor="type">Tipo / Type *</Label>
+                          <Label htmlFor="type">Type *</Label>
                           <Select
                             value={transactionForm.type}
                             onValueChange={(value) => setTransactionForm({ ...transactionForm, type: value })}
@@ -1060,12 +1065,8 @@ export default function CompanyAccount() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="contribution">
-                                Ã°Å¸â€™Â° Contribution
-                              </SelectItem>
-                              <SelectItem value="withdrawal">
-                                Ã°Å¸â€™Â¸ Withdrawal
-                              </SelectItem>
+                              <SelectItem value="contribution">Contribution</SelectItem>
+                              <SelectItem value="withdrawal">Withdrawal</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1088,7 +1089,7 @@ export default function CompanyAccount() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="amount">Monto / Amount (MXN) *</Label>
+                          <Label htmlFor="amount">Amount (MXN) *</Label>
                           <Input
                             id="amount"
                             type="number"
@@ -1113,9 +1114,9 @@ export default function CompanyAccount() {
 
                         <div className="space-y-2">
                           <Label>
-                            {transactionForm.type === 'contribution' 
-                              ? 'Destino del Dinero / Money Destination *' 
-                              : 'Origen del Dinero / Money Source *'}
+                            {transactionForm.type === 'contribution'
+                              ? 'Money destination *'
+                              : 'Money source *'}
                           </Label>
                           <div className="grid grid-cols-2 gap-4">
                             <button
@@ -1127,10 +1128,10 @@ export default function CompanyAccount() {
                                   : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                               }`}
                             >
-                              <span className="text-2xl">Ã°Å¸â€™Âµ</span>
+                              <DollarSign className="w-8 h-8 shrink-0 text-yellow-400" aria-hidden />
                               <div>
                                 <p className="font-semibold">Cash</p>
-                                <p className="text-xs text-gray-600">Caja Chica / Petty Cash</p>
+                                <p className="text-xs text-gray-600">Petty cash</p>
                               </div>
                             </button>
 
@@ -1143,7 +1144,7 @@ export default function CompanyAccount() {
                                   : 'border-yellow-500/20 text-gray-400 hover:border-yellow-500/40'
                               }`}
                             >
-                              <span className="text-2xl">Ã°Å¸ÂÂ¦</span>
+                              <Building2 className="w-8 h-8 shrink-0 text-yellow-400" aria-hidden />
                               <div>
                                 <p className="font-semibold">Bank</p>
                                 <p className="text-xs text-gray-600">Account</p>
@@ -1278,8 +1279,7 @@ export default function CompanyAccount() {
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
                   <CardContent className="text-center py-20">
                     <Wallet className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500 text-lg">No hay transacciones registradas</p>
-                    <p className="text-gray-400 text-sm">No transactions recorded</p>
+                    <p className="text-gray-500 text-lg">No transactions recorded</p>
                   </CardContent>
                 </Card>
               )}
@@ -1311,7 +1311,7 @@ export default function CompanyAccount() {
                     <form onSubmit={handleContributorSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label htmlFor="name">Nombre / Name *</Label>
+                          <Label htmlFor="name">Name *</Label>
                           <Input
                             id="name"
                             required
@@ -1321,7 +1321,7 @@ export default function CompanyAccount() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="role">Rol / Role *</Label>
+                          <Label htmlFor="role">Role *</Label>
                           <Select
                             value={contributorForm.role}
                             onValueChange={(value) => setContributorForm({ ...contributorForm, role: value })}
@@ -1330,10 +1330,10 @@ export default function CompanyAccount() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="owner">Ã°Å¸â€˜â€˜ Owner</SelectItem>
-                              <SelectItem value="partner">Ã°Å¸Â¤Â Socio / Partner</SelectItem>
-                              <SelectItem value="investor">Ã°Å¸â€™Â¼ Inversionista / Investor</SelectItem>
-                              <SelectItem value="employee">Ã°Å¸â€˜Â¤ Employee</SelectItem>
+                              <SelectItem value="owner">Owner</SelectItem>
+                              <SelectItem value="partner">Partner</SelectItem>
+                              <SelectItem value="investor">Investor</SelectItem>
+                              <SelectItem value="employee">Employee</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1496,10 +1496,16 @@ export default function CompanyAccount() {
                         </div>
 
                         {contributor.email && (
-                          <p className="text-sm text-gray-600 mb-1">Ã°Å¸â€œÂ§ {contributor.email}</p>
+                          <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                            <Mail className="w-4 h-4 shrink-0 text-gray-500" aria-hidden />
+                            {contributor.email}
+                          </p>
                         )}
                         {contributor.phone && (
-                          <p className="text-sm text-gray-600 mb-3">Ã°Å¸â€œÂ± {contributor.phone}</p>
+                          <p className="text-sm text-gray-600 mb-3 flex items-center gap-2">
+                            <Phone className="w-4 h-4 shrink-0 text-gray-500" aria-hidden />
+                            {contributor.phone}
+                          </p>
                         )}
 
                         <div className="space-y-2 pt-4 border-t">
@@ -1532,8 +1538,7 @@ export default function CompanyAccount() {
                 <Card className="bg-[#242424] border border-yellow-500/15 shadow-none md:col-span-2">
                   <CardContent className="text-center py-20">
                     <Users className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500 text-lg">No hay contribuyentes registrados</p>
-                    <p className="text-gray-400 text-sm">No contributors registered</p>
+                    <p className="text-gray-500 text-lg">No contributors registered</p>
                   </CardContent>
                 </Card>
               )}

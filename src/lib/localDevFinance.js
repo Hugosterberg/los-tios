@@ -1,6 +1,6 @@
 /**
- * Offline / no-Base44 dev storage for Shopping list + Expenses.
- * Active in DEV when Base44 env is missing or clearly placeholder, or when
+ * Offline dev storage for Shopping list + Expenses when the hosted API is unavailable.
+ * Active in DEV when app env is missing or clearly placeholder, or when
  * VITE_LOCAL_DEV_FINANCE=true. Prevents "App not found" during local UI work.
  */
 
@@ -9,6 +9,8 @@ const isBrowser = typeof window !== "undefined";
 const SHOPPING_KEY = "los_tios_local_shopping_list_v1";
 const EXPENSE_KEY = "los_tios_local_expenses_v1";
 const COMPANY_TX_KEY = "los_tios_local_company_transactions_v1";
+const EMPLOYEE_KEY = "los_tios_local_employees_v1";
+const SHIFT_KEY = "los_tios_local_shifts_v1";
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -19,7 +21,7 @@ function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Use local finance storage in dev when Base44 is not configured. */
+/** Use local finance storage in dev when the backend is not configured. */
 export function isLocalFinanceMode() {
   if (!import.meta.env.DEV) return false;
   if (import.meta.env.VITE_LOCAL_DEV_FINANCE === "false") return false;
@@ -27,7 +29,7 @@ export function isLocalFinanceMode() {
   const id = import.meta.env.VITE_BASE44_APP_ID;
   const url = import.meta.env.VITE_BASE44_BACKEND_URL;
   if (!id?.trim() || !url?.trim()) return true;
-  if (/your_base44|placeholder|changeme/i.test(String(id))) return true;
+  if (/placeholder|changeme|your_app/i.test(String(id))) return true;
   return false;
 }
 
@@ -80,6 +82,40 @@ function readCompanyTransactions() {
 function writeCompanyTransactions(items) {
   if (!isBrowser) return;
   window.localStorage.setItem(COMPANY_TX_KEY, JSON.stringify(items));
+}
+
+function readEmployees() {
+  if (!isBrowser) return [];
+  try {
+    const raw = window.localStorage.getItem(EMPLOYEE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeEmployees(items) {
+  if (!isBrowser) return;
+  window.localStorage.setItem(EMPLOYEE_KEY, JSON.stringify(items));
+}
+
+function readShifts() {
+  if (!isBrowser) return [];
+  try {
+    const raw = window.localStorage.getItem(SHIFT_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeShifts(items) {
+  if (!isBrowser) return;
+  window.localStorage.setItem(SHIFT_KEY, JSON.stringify(items));
 }
 
 export async function localListShoppingList() {
@@ -141,7 +177,27 @@ export async function localCreateExpense(data) {
   return row;
 }
 
-/** Local CompanyTransaction rows (dev / no Base44). */
+export async function localUpdateExpense(id, data) {
+  const items = readExpenses();
+  const idx = items.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error("Expense not found");
+  const updated = {
+    ...items[idx],
+    ...clone(data),
+    id,
+  };
+  items[idx] = updated;
+  writeExpenses(items);
+  return updated;
+}
+
+export async function localDeleteExpense(id) {
+  const items = readExpenses().filter((x) => x.id !== id);
+  writeExpenses(items);
+  return { id };
+}
+
+/** Local CompanyTransaction rows when API is offline. */
 export async function localListCompanyTransactions() {
   const items = readCompanyTransactions();
   return [...items].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
@@ -163,5 +219,88 @@ export async function localCreateCompanyTransaction(data) {
 export async function localDeleteCompanyTransaction(id) {
   const items = readCompanyTransactions().filter((x) => x.id !== id);
   writeCompanyTransactions(items);
+  return { id };
+}
+
+/** Local Employee rows when the hosted API is unavailable (same dev gate as shopping/expenses). */
+export async function localListEmployees() {
+  const items = readEmployees();
+  return [...items].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
+}
+
+export async function localCreateEmployee(data) {
+  const items = readEmployees();
+  const now = new Date().toISOString();
+  const row = {
+    ...clone(data),
+    id: createId("emp"),
+    created_date: now,
+    updated_date: now,
+  };
+  items.push(row);
+  writeEmployees(items);
+  return row;
+}
+
+export async function localUpdateEmployee(id, data) {
+  const items = readEmployees();
+  const idx = items.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error("Employee not found");
+  const updated = {
+    ...items[idx],
+    ...clone(data),
+    id,
+    updated_date: new Date().toISOString(),
+  };
+  items[idx] = updated;
+  writeEmployees(items);
+  return updated;
+}
+
+export async function localDeleteEmployee(id) {
+  const items = readEmployees().filter((x) => x.id !== id);
+  writeEmployees(items);
+  const shifts = readShifts().filter((s) => s.employee_id !== id);
+  writeShifts(shifts);
+  return { id };
+}
+
+export async function localListShifts() {
+  const items = readShifts();
+  return [...items].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+}
+
+export async function localCreateShift(data) {
+  const items = readShifts();
+  const now = new Date().toISOString();
+  const row = {
+    ...clone(data),
+    id: createId("shf"),
+    created_date: now,
+    updated_date: now,
+  };
+  items.push(row);
+  writeShifts(items);
+  return row;
+}
+
+export async function localUpdateShift(id, data) {
+  const items = readShifts();
+  const idx = items.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error("Shift not found");
+  const updated = {
+    ...items[idx],
+    ...clone(data),
+    id,
+    updated_date: new Date().toISOString(),
+  };
+  items[idx] = updated;
+  writeShifts(items);
+  return updated;
+}
+
+export async function localDeleteShift(id) {
+  const items = readShifts().filter((x) => x.id !== id);
+  writeShifts(items);
   return { id };
 }

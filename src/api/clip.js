@@ -65,7 +65,7 @@ export const CLIP_API_CATALOG = [
       "GET /settlements period summary",
       "GET /settlements/{settlement_report_id} report detail",
     ],
-    limits: "Clip documenta consultas de hasta 90 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­as por periodo.",
+    limits: "Clip documents queries of up to 90 days per period.",
   },
   {
     key: "checkout",
@@ -77,9 +77,9 @@ export const CLIP_API_CATALOG = [
     capabilities: [
       "POST create new payment link",
       "GET payment link status",
-      "RedirecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n al checkout hospedado",
+      "Redirect to hosted checkout",
     ],
-    limits: "No se ejecuta automÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ticamente aquÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ porque crea recursos reales.",
+    limits: "Not run automatically here because it creates real resources.",
   },
   {
     key: "refunds",
@@ -90,23 +90,23 @@ export const CLIP_API_CATALOG = [
     summary: "Manages refunds for existing charges through the Clip API.",
     capabilities: [
       "Request refund",
-      "Conciliar contra la transacciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n original",
+      "Reconcile against the original transaction",
     ],
-    limits: "Es una operaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n mutante y queda fuera del dashboard de solo lectura.",
+    limits: "This is a mutating operation and is outside the read-only dashboard.",
   },
   {
     key: "webhooks",
     name: "Webhooks and Postback",
     status: "documented",
-    authHeader: "ConfiguraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n backend",
+    authHeader: "Backend configuration",
     docsUrl: "https://developer.clip.mx/docs/conciliacion-de-transacciones-apis-1",
     summary: "Notifies payment states and transaction results in real time.",
     capabilities: [
       "Checkout webhook",
       "Postback for in-person charges",
-      "ConciliaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n por payment_request_id y receipt_no",
+      "Reconciliation by payment_request_id and receipt_no",
     ],
-    limits: "Requiere endpoint backend pÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºblico para recibir eventos.",
+    limits: "Requires a public backend endpoint to receive events.",
   },
   {
     key: "pinpad",
@@ -114,13 +114,13 @@ export const CLIP_API_CATALOG = [
     status: "documented",
     authHeader: "Token Clip",
     docsUrl: "https://developer.clip.mx/docs/api-de-pinpad",
-    summary: "Permite iniciar y administrar cobros en terminales fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­sicas desde backend.",
+    summary: "Start and manage in-person terminal charges from the backend.",
     capabilities: [
       "Create payment attempt",
       "Check payment detail",
       "Cancel a started payment",
     ],
-    limits: "DiseÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±ada para backend + terminal + webhook, no solo frontend.",
+    limits: "Designed for backend + terminal + webhook, not frontend-only.",
   },
 ];
 

@@ -45,6 +45,9 @@ function readEnvSettings() {
     clip_settlements_api_base_url: normalizeString(import.meta.env.VITE_CLIP_SETTLEMENTS_API_BASE_URL),
     loyverse_api_token: normalizeString(import.meta.env.VITE_LOYVERSE_API_TOKEN),
     loyverse_api_base_url: normalizeString(import.meta.env.VITE_LOYVERSE_API_BASE_URL),
+    loyverse_store_id: normalizeString(import.meta.env.VITE_LOYVERSE_STORE_ID),
+    loyverse_default_category_id: normalizeString(import.meta.env.VITE_LOYVERSE_DEFAULT_CATEGORY_ID),
+    notion_internal_token: normalizeString(import.meta.env.VITE_NOTION_INTERNAL_TOKEN),
   };
 }
 
@@ -101,5 +104,7 @@ export function buildLoyverseResolvedConfig(settings = {}) {
   return {
     apiToken: normalizeString(merged.loyverse_api_token),
     baseUrl: normalizeString(merged.loyverse_api_base_url),
+    storeId: normalizeString(merged.loyverse_store_id),
+    defaultCategoryId: normalizeString(merged.loyverse_default_category_id),
   };
 }

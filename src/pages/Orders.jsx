@@ -3,8 +3,10 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, Plus } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { createOrderEntity, deleteOrderEntity, listOrders, updateOrderEntity } from "@/lib/local-dev-orders";
+import { syncCompletedOrderToLoyverse } from "@/lib/orderLoyverseSync";
 import OrderCard from "../components/orders/OrderCard";
 import ReceiptDialog from "../components/orders/ReceiptDialog";
 import NewOrderForm from "../components/orders/NewOrderForm";
@@ -36,6 +38,11 @@ export default function Orders() {
   const { data: menuItems = [] } = useQuery({
     queryKey: ["menuItems"],
     queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
+  });
+
+  const { data: appSettingsRows = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
   });
 
   const updateOrder = useMutation({
@@ -83,7 +90,50 @@ export default function Orders() {
     }
   };
 
-  const handleCompleteOrder = (order) => {
+  const pushOrderToLoyverseIfNeeded = async (orderSnapshot) => {
+    const settingsRow = appSettingsRows[0] || {};
+    const result = await syncCompletedOrderToLoyverse(orderSnapshot, menuItems, settingsRow);
+    if (result.skipped && result.reason === "no_loyverse_token") {
+      return;
+    }
+    if (result.skipped && result.reason === "not_completed") {
+      return;
+    }
+    if (result.skipped && result.reason === "already_synced") {
+      return;
+    }
+    if (result.skipped && result.reason === "no_loyverse_item_ids") {
+      toast({
+        title: "Loyverse",
+        description: result.message || "No menu lines have a Loyverse item ID.",
+      });
+      return;
+    }
+    if (result.ok && result.receiptId) {
+      try {
+        await updateOrder.mutateAsync({
+          id: orderSnapshot.id,
+          data: { loyverse_receipt_id: result.receiptId },
+        });
+        toast({
+          title: "Loyverse",
+          description: `Sale recorded in Loyverse (receipt ${String(result.receiptId).slice(0, 8)}…).`,
+        });
+      } catch (err) {
+        toast({
+          title: "Loyverse receipt created",
+          description: `Could not save loyverse_receipt_id on the order: ${err?.message || err}`,
+        });
+      }
+    } else if (!result.ok && !result.skipped) {
+      toast({
+        title: "Loyverse sync failed",
+        description: result.message || "Unknown error.",
+      });
+    }
+  };
+
+  const handleCompleteOrder = async (order) => {
     const paymentMethod = prompt(
       "How did the customer pay?\n\n1 = Cash\n2 = Card\n\nEnter 1 or 2:",
       order.payment_method === "card" ? "2" : "1",
@@ -91,7 +141,7 @@ export default function Orders() {
 
     if (!paymentMethod) return;
 
-    updateOrder.mutate({
+    const updated = await updateOrder.mutateAsync({
       id: order.id,
       data: {
         status: "delivered",
@@ -99,6 +149,8 @@ export default function Orders() {
         payment_status: "paid",
       },
     });
+    const merged = { ...order, ...(updated || {}), status: "delivered", payment_status: "paid", payment_method: paymentMethod === "2" ? "card" : "cash" };
+    await pushOrderToLoyverseIfNeeded(merged);
   };
 
   const handleAddItemToTable = async (tableNumber, menuItem) => {
@@ -160,7 +212,7 @@ export default function Orders() {
   };
 
   const handleClearPaidTable = async (order, details) => {
-    await updateOrder.mutateAsync({
+    const updated = await updateOrder.mutateAsync({
       id: order.id,
       data: {
         customer_name: details.customer_name,
@@ -170,6 +222,16 @@ export default function Orders() {
         status: "delivered",
       },
     });
+    const merged = {
+      ...order,
+      ...(updated || {}),
+      customer_name: details.customer_name,
+      special_instructions: details.special_instructions,
+      payment_method: details.payment_method,
+      payment_status: "paid",
+      status: "delivered",
+    };
+    await pushOrderToLoyverseIfNeeded(merged);
   };
 
   return (
@@ -181,7 +243,12 @@ export default function Orders() {
               <ShoppingBag className="w-5 h-5 text-yellow-400" />
               <div>
                 <h1 className="text-lg font-bold text-yellow-400">Order Management</h1>
-                <p className="text-gray-500 text-xs">Create and manage orders</p>
+                <p className="text-gray-500 text-xs max-w-3xl">
+                  Orders here are stored in this app (web checkout and admin).{" "}
+                  <span className="text-gray-400">
+                    Open delivery or dine-in tickets that exist only in Loyverse POS are not available through Loyverse’s public API, so they do not show in this list. After you close the sale in Loyverse, it appears in the receipts feed (e.g. Loyverse / Loyverse Orders), and this app can record a receipt when you complete a web order with Loyverse sync.
+                  </span>
+                </p>
               </div>
             </div>
             <Button onClick={() => setShowNewOrderForm(true)} className="bg-yellow-400 hover:bg-yellow-300 text-black text-sm gap-2 h-8 px-3">

@@ -1,6 +1,6 @@
 /**
  * Client-side store for Daily Cash: opening float per day + manual adjustment lines.
- * Does not replace Base44 — complements it so start cash can be set without a new entity.
+ * Complements the API: opening balances without a dedicated server entity.
  */
 
 const isBrowser = typeof window !== "undefined";

@@ -1,20 +1,18 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ShoppingCart,
   Plus,
   Trash2,
   Edit,
-  Check,
   Calendar as CalendarIcon,
   Banknote,
+  CreditCard,
   Landmark,
   User,
   FileSpreadsheet,
@@ -22,8 +20,9 @@ import {
   ChevronRight,
   CalendarRange,
   Undo2,
+  Circle,
+  CheckCircle2,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DayPickerCalendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
@@ -39,6 +38,8 @@ import {
   localDeleteShoppingList,
   localListExpenses,
   localCreateExpense,
+  localUpdateExpense,
+  localDeleteExpense,
 } from "@/lib/localDevFinance";
 import { cn } from "@/lib/utils";
 
@@ -107,21 +108,19 @@ export default function ShoppingList() {
   const [quickShoppingLabel, setQuickShoppingLabel] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
   const [quickPurchaseDate, setQuickPurchaseDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  /** "cash" → company_cash, "card" → company_account (same as Finance expenses) */
+  const [quickPurchasePayment, setQuickPurchasePayment] = useState("cash");
   const [purchaseDateOpen, setPurchaseDateOpen] = useState(false);
 
   const [quickAddBusy, setQuickAddBusy] = useState(null); // null | "all" | ingredient name
   const [recentPurchaseEntries, setRecentPurchaseEntries] = useState([]); // { id, name, amount }
-  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
-  const [purchasingItem, setPurchasingItem] = useState(null);
-  const [purchaseActualCost, setPurchaseActualCost] = useState("");
-  const [purchasePaymentSource, setPurchasePaymentSource] = useState("");
+  const [amountDraftById, setAmountDraftById] = useState({});
 
   const [formData, setFormData] = useState({
     item_name: "",
     quantity: 1,
     unit: "units",
     category: "ingredients",
-    priority: "medium",
     status: "pending",
     estimated_cost: 0,
     actual_cost: 0, // Added actual_cost
@@ -161,6 +160,7 @@ export default function ShoppingList() {
       .filter((e) => e.from_shopping_list)
       .map((e) => ({
         id: e.id,
+        shoppingListId: e.shopping_list_id || "",
         name: e.name || "",
         amount: Number(e.amount || 0),
         dateIso: String(e.date || "").slice(0, 10),
@@ -205,6 +205,10 @@ export default function ShoppingList() {
   }, [registeredPurchasesMonth]);
 
   const [registeredMonthPopoverOpen, setRegisteredMonthPopoverOpen] = useState(false);
+  const [editingRegisteredAmountId, setEditingRegisteredAmountId] = useState(null);
+  const [editingRegisteredAmountDraft, setEditingRegisteredAmountDraft] = useState("");
+  const [editingRegisteredDateId, setEditingRegisteredDateId] = useState(null);
+  const [editingRegisteredDateDraft, setEditingRegisteredDateDraft] = useState("");
 
   const setRegisteredYearMonth = (year, monthIndex0) => {
     const mm = String(monthIndex0 + 1).padStart(2, "0");
@@ -242,6 +246,106 @@ export default function ShoppingList() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
   });
+
+  const patchExpenseRow = useMutation({
+    mutationFn: async ({ id, ...patch }) => {
+      if (useLocalFinance) {
+        return localUpdateExpense(id, patch);
+      }
+      return base44.entities.Expense.update(id, patch);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+  });
+
+  const removeRegisteredPurchase = useMutation({
+    mutationFn: async ({ expenseId, shoppingListId }) => {
+      if (useLocalFinance) {
+        await localDeleteExpense(expenseId);
+      } else {
+        await base44.entities.Expense.delete(expenseId);
+      }
+      if (shoppingListId) {
+        const item = shoppingItems.find((i) => i.id === shoppingListId);
+        if (item) {
+          await updateItem.mutateAsync({
+            id: shoppingListId,
+            data: {
+              ...item,
+              converted_to_expense: false,
+              expense_id: "",
+            },
+          });
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
+    },
+  });
+
+  useEffect(() => {
+    setEditingRegisteredAmountId(null);
+    setEditingRegisteredDateId(null);
+  }, [registeredPurchasesMonth]);
+
+  const startEditingRegisteredAmount = (r) => {
+    setEditingRegisteredDateId(null);
+    setEditingRegisteredAmountId(r.id);
+    setEditingRegisteredAmountDraft(Number.isFinite(r.amount) ? String(r.amount) : "");
+  };
+
+  const startEditingRegisteredDate = (r) => {
+    setEditingRegisteredAmountId(null);
+    setEditingRegisteredDateId(r.id);
+    setEditingRegisteredDateDraft(r.dateIso || format(new Date(), "yyyy-MM-dd"));
+  };
+
+  const commitRegisteredAmountEdit = async (r, valueOverride) => {
+    const raw = String(valueOverride ?? editingRegisteredAmountDraft).trim().replace(",", ".");
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      setEditingRegisteredAmountId(null);
+      return;
+    }
+    if (Math.abs(n - r.amount) < 0.005) {
+      setEditingRegisteredAmountId(null);
+      return;
+    }
+    try {
+      await patchExpenseRow.mutateAsync({ id: r.id, amount: n });
+    } catch (e) {
+      console.error(e);
+      alert("Could not save amount.");
+    }
+    setEditingRegisteredAmountId(null);
+  };
+
+  const commitRegisteredDateEdit = async (r, valueOverride) => {
+    const v = String(valueOverride ?? editingRegisteredDateDraft).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      setEditingRegisteredDateId(null);
+      return;
+    }
+    if (v === r.dateIso) {
+      setEditingRegisteredDateId(null);
+      return;
+    }
+    try {
+      await patchExpenseRow.mutateAsync({ id: r.id, date: v });
+    } catch (e) {
+      console.error(e);
+      alert("Could not save date.");
+    }
+    setEditingRegisteredDateId(null);
+  };
+
+  const handleDeleteRegisteredRow = (r) => {
+    if (!window.confirm("Remove this purchase from the register?")) return;
+    removeRegisteredPurchase.mutate({ expenseId: r.id, shoppingListId: r.shoppingListId || undefined });
+  };
 
   const categories = [
     { id: "all", name: "All", color: "bg-yellow-400/15 text-yellow-200", icon: "🛒" },
@@ -350,14 +454,35 @@ export default function ShoppingList() {
     });
   }, [shoppingItems]);
 
+  const formCategories = useMemo(() => categories.filter((c) => c.id !== "all"), []);
+
+  useEffect(() => {
+    setAmountDraftById((prev) => {
+      const next = { ...prev };
+      for (const row of shoppingItems) {
+        if (row.status !== "pending") continue;
+        if (next[row.id] === undefined) {
+          const v = Number(row.estimated_cost) > 0 ? String(Number(row.estimated_cost)) : "";
+          next[row.id] = v;
+        }
+      }
+      return next;
+    });
+  }, [shoppingItems]);
+
   const totalEstimatedCost = pendingItems.reduce((sum, i) => sum + (i.estimated_cost || 0), 0);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      priority: "medium",
+      ...(editingItem ? {} : { status: "pending" }),
+    };
     if (editingItem) {
-      updateItem.mutate({ id: editingItem.id, data: formData }, { onSuccess: () => resetForm() });
+      updateItem.mutate({ id: editingItem.id, data: payload }, { onSuccess: () => resetForm() });
     } else {
-      createItem.mutate(formData, {
+      createItem.mutate(payload, {
         onSuccess: () => {
           setLastRemovedShoppingSnapshot(null);
           resetForm();
@@ -419,7 +544,7 @@ export default function ShoppingList() {
         date: dateStr,
         supplier: "",
         notes: "Quick purchase (Shopping List)",
-        payment_source: "company_cash",
+        payment_source: quickPurchasePayment === "card" ? "company_account" : "company_cash",
         paid_by_company: true,
         from_shopping_list: true,
         shopping_list_id: createdList.id,
@@ -431,7 +556,7 @@ export default function ShoppingList() {
       if (!expenseId) {
         throw new Error("Expense did not return an id.");
       }
-      // Patch only link fields — spreading the full record often breaks Base44 validation.
+      // Patch only link fields — spreading the full record often breaks API validation.
       await updateItem.mutateAsync({
         id: createdList.id,
         data: {
@@ -439,7 +564,11 @@ export default function ShoppingList() {
           expense_id: expenseId,
         },
       });
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      await queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      await queryClient.refetchQueries({
+        queryKey: ["expenses"],
+        type: "all",
+      });
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
       setRecentPurchaseEntries((prev) => [
         { id: `${createdList.id}-${dateStr}`, name: itemName, amount },
@@ -490,63 +619,75 @@ export default function ShoppingList() {
     }
   };
 
-  const openPurchaseDialog = (item) => {
-    setPurchasingItem(item);
-    setPurchaseActualCost(item.estimated_cost?.toString() || "");
-    setPurchasePaymentSource("");
-    setPurchaseDialogOpen(true);
+  const readPurchaseAmountForItem = (item) => {
+    const raw = amountDraftById[item.id];
+    const n = parseFloat(String(raw ?? "").replace(",", "."));
+    if (Number.isFinite(n) && n >= 0) return n;
+    return Number(item.estimated_cost || 0) || 0;
   };
 
-  const confirmPurchase = async () => {
-    if (!purchasePaymentSource) {
-      alert("Select a payment method.");
+  const finalizePurchaseFromList = async (item, paymentSource) => {
+    const actualCost = readPurchaseAmountForItem(item);
+    if (!Number.isFinite(actualCost) || actualCost <= 0) {
+      window.alert("Enter an amount (MXN) in the row before marking as purchased.");
       return;
     }
 
-    const item = purchasingItem;
-    const actualCost = purchaseActualCost !== '' ? parseFloat(purchaseActualCost) : 0;
-
-    let updateData = {
-      ...item,
-      status: 'purchased',
-      purchased_date: new Date().toISOString().split('T')[0],
-      actual_cost: actualCost
-    };
+    const today = new Date().toISOString().split("T")[0];
 
     try {
       await updateItem.mutateAsync({
         id: item.id,
-        data: updateData
+        data: {
+          status: "purchased",
+          purchased_date: today,
+          actual_cost: actualCost,
+          estimated_cost: actualCost,
+        },
       });
 
       const expenseData = {
         name: item.item_name,
         category: expenseCategoryByShoppingCategory[item.category] || "other",
-        amount: actualCost || item.estimated_cost || 0,
+        amount: actualCost,
         quantity: item.quantity,
         unit: item.unit,
-        date: new Date().toISOString().split('T')[0],
-        supplier: item.supplier || '',
-        notes: item.notes || '',
-        payment_source: purchasePaymentSource,
-        paid_by_company: purchasePaymentSource === 'company_cash' || purchasePaymentSource === 'company_account',
+        date: today,
+        supplier: item.supplier || "",
+        notes: item.notes || "",
+        payment_source: paymentSource,
+        paid_by_company: paymentSource === "company_cash" || paymentSource === "company_account",
         from_shopping_list: true,
         shopping_list_id: item.id,
       };
 
       const createdExpense = await createExpense.mutateAsync(expenseData);
 
-      updateData = { ...updateData, converted_to_expense: true, expense_id: createdExpense.id };
       await updateItem.mutateAsync({
         id: item.id,
-        data: updateData
+        data: {
+          converted_to_expense: true,
+          expense_id: createdExpense.id,
+        },
       });
-
-      setPurchaseDialogOpen(false);
-      setPurchasingItem(null);
     } catch (error) {
       console.error("Error:", error);
-      alert('Error processing');
+      window.alert("Could not record purchase. Try again.");
+    }
+  };
+
+  const commitPendingRowEstimatedCost = async (item) => {
+    const raw = amountDraftById[item.id];
+    const n = parseFloat(String(raw ?? "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) return;
+    if (Math.abs(n - Number(item.estimated_cost || 0)) < 0.005) return;
+    try {
+      await updateItem.mutateAsync({
+        id: item.id,
+        data: { estimated_cost: n },
+      });
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -576,7 +717,6 @@ export default function ShoppingList() {
       quantity: 1,
       unit: "units",
       category: "ingredients",
-      priority: "medium",
       status: "pending",
       estimated_cost: 0,
       actual_cost: 0,
@@ -611,8 +751,8 @@ export default function ShoppingList() {
         <div className="border-b border-amber-500/25 bg-amber-950/35">
           <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
             <p className="text-xs leading-relaxed text-amber-100/90">
-              <span className="font-semibold text-amber-200">Local dev mode.</span> Shopping data and purchases are stored in this browser only — Base44
-              is not configured or is still a placeholder. Add{" "}
+              <span className="font-semibold text-amber-200">Local dev mode.</span> Shopping data and purchases are stored in this browser only — the
+              backend is not configured or is still a placeholder. Add{" "}
               <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_BASE44_APP_ID</code> and{" "}
               <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_BASE44_BACKEND_URL</code> in{" "}
               <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">.env</code> to use the real backend. Set{" "}
@@ -744,46 +884,25 @@ export default function ShoppingList() {
                 </p>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="item_name" className="text-xs font-medium text-gray-400">
-                        Item name *
-                      </Label>
-                      <Input
-                        id="item_name"
-                        required
-                        value={formData.item_name}
-                        onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
-                        placeholder="Flour, oil, napkins…"
-                        className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
-                      />
-                    </div>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="item_name" className="text-xs font-medium text-gray-400">
+                      Item name *
+                    </Label>
+                    <Input
+                      id="item_name"
+                      required
+                      value={formData.item_name}
+                      onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                      placeholder="Flour, oil, napkins…"
+                      className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
+                    />
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="category" className="text-xs font-medium text-gray-400">
-                        Category *
-                      </Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
-                      >
-                        <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.filter((c) => c.id !== "all").map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              {cat.icon} {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="min-w-[6rem] space-y-2">
                       <Label htmlFor="quantity" className="text-xs font-medium text-gray-400">
-                        Quantity *
+                        Qty *
                       </Label>
                       <Input
                         id="quantity"
@@ -792,147 +911,150 @@ export default function ShoppingList() {
                         min="0"
                         required
                         value={formData.quantity}
-                        onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
-                        className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
+                        onChange={(e) =>
+                          setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })
+                        }
+                        className="h-9 border-yellow-500/20 bg-[#1a1a1a] text-white [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="unit" className="text-xs font-medium text-gray-400">
-                        Unit *
-                      </Label>
-                      <Select
-                        value={formData.unit}
-                        onValueChange={(value) => setFormData({ ...formData, unit: value })}
-                      >
-                        <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {units.map((unit) => (
-                            <SelectItem key={unit.value} value={unit.value}>
-                              {unit.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="priority" className="text-xs font-medium text-gray-400">
-                        Priority
-                      </Label>
-                      <Select
-                        value={formData.priority}
-                        onValueChange={(value) => setFormData({ ...formData, priority: value })}
-                      >
-                        <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="estimated_cost" className="text-xs font-medium text-gray-400">
-                        Estimated cost (MXN)
-                      </Label>
-                      <Input
-                        id="estimated_cost"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.estimated_cost}
-                        onChange={(e) => setFormData({ ...formData, estimated_cost: parseFloat(e.target.value) })}
-                        placeholder="0.00"
-                        className={cn(
-                          "border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500 [appearance:textfield] [-moz-appearance:textfield]",
-                          "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
+                    <div className="min-w-[11rem] flex-1 space-y-2">
                       <Label htmlFor="due_date" className="text-xs font-medium text-gray-400">
-                        Due date (optional)
+                        Due <span className="text-gray-600">(optional)</span>
                       </Label>
                       <Input
                         id="due_date"
                         type="date"
                         value={formData.due_date ? String(formData.due_date).slice(0, 10) : ""}
                         onChange={(e) => setFormData({ ...formData, due_date: e.target.value || "" })}
-                        className="border-yellow-500/20 bg-[#1a1a1a] text-white [color-scheme:dark]"
+                        className="h-9 border-yellow-500/20 bg-[#1a1a1a] text-white [color-scheme:dark]"
                       />
                     </div>
+                  </div>
 
-                    {editingItem && editingItem.status === 'purchased' && (
-                      <div className="space-y-2">
-                        <Label htmlFor="actual_cost" className="text-xs font-medium text-gray-400">
-                          Actual cost (MXN)
-                        </Label>
-                        <Input
-                          id="actual_cost"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.actual_cost || ""}
-                          onChange={(e) => setFormData({ ...formData, actual_cost: parseFloat(e.target.value) })}
-                          placeholder="0.00"
-                          className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
-                        />
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-400">Category *</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {formCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, category: cat.id })}
+                          className={cn(
+                            filterPillClass(formData.category === cat.id),
+                            "h-8 min-h-8 gap-1.5 px-2.5",
+                          )}
+                        >
+                          <span aria-hidden>{cat.icon}</span>
+                          <span className="truncate">{cat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-400">Unit *</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {units.map((u) => (
+                        <button
+                          key={u.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, unit: u.value })}
+                          className={cn(
+                            filterPillClass(formData.unit === u.value),
+                            "h-8 min-h-8 px-2.5 text-[11px]",
+                          )}
+                        >
+                          {u.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || u.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {editingItem ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-gray-400">Status</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, status: "pending" })}
+                          className={cn(
+                            "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
+                            formData.status === "pending"
+                              ? "border-yellow-400 bg-yellow-400/15 text-yellow-200"
+                              : "border-yellow-500/20 bg-[#1a1a1a] text-gray-400 hover:border-yellow-500/40",
+                          )}
+                        >
+                          <Circle className="h-4 w-4 opacity-80" aria-hidden />
+                          To buy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, status: "purchased" })}
+                          className={cn(
+                            "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
+                            formData.status === "purchased"
+                              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                              : "border-yellow-500/20 bg-[#1a1a1a] text-gray-400 hover:border-yellow-500/40",
+                          )}
+                        >
+                          <CheckCircle2 className="h-4 w-4 opacity-90" aria-hidden />
+                          Done
+                        </button>
                       </div>
-                    )}
+                    </div>
+                  ) : null}
 
+                  {editingItem && formData.status === "purchased" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_cost" className="text-xs font-medium text-gray-400">
+                        Amount paid (MXN)
+                      </Label>
+                      <Input
+                        id="actual_cost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.actual_cost || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, actual_cost: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="0.00"
+                        className="h-9 max-w-[12rem] border-yellow-500/20 bg-[#1a1a1a] text-white [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="supplier" className="text-xs font-medium text-gray-400">
-                        Supplier
+                        Supplier <span className="text-gray-600">(optional)</span>
                       </Label>
                       <Input
                         id="supplier"
                         value={formData.supplier}
                         onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                         placeholder="Supplier name…"
-                        className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
+                        className="h-9 border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
                       />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="status" className="text-xs font-medium text-gray-400">
-                        Status
-                      </Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value) => setFormData({ ...formData, status: value })}
-                      >
-                        <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="purchased">Purchased</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="notes" className="text-xs font-medium text-gray-400">
-                        Notes
+                        Notes <span className="text-gray-600">(optional)</span>
                       </Label>
-                      <Textarea
+                      <Input
                         id="notes"
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Optional details…"
-                        rows={3}
-                        className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
+                        placeholder="Short note…"
+                        className="h-9 border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
                       />
                     </div>
                   </div>
+
+                  <p className="text-[11px] leading-relaxed text-gray-500">
+                    New lines are always <strong className="text-gray-400">To buy</strong>. Enter amounts and mark paid on the table below (fastest). Use{" "}
+                    <strong className="text-gray-400">Register purchase</strong> to post straight to Finance.
+                  </p>
 
                   <div className="flex gap-3 justify-end">
                     <Button type="button" variant="outline" onClick={resetForm} className="border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10">
@@ -961,26 +1083,35 @@ export default function ShoppingList() {
             </div>
           ) : pendingListRows.length > 0 ? (
             <div className="overflow-x-auto rounded-lg border border-yellow-500/25 bg-[#1a1a1a] shadow-inner">
-              <table className="w-full min-w-[36rem] border-collapse text-sm">
+              <table className="w-full min-w-[44rem] border-collapse text-sm">
                 <caption className="sr-only">Shopping list, pending items</caption>
                 <thead>
                   <tr className="border-b border-yellow-500/25 bg-[#2a2818] text-left text-xs font-semibold uppercase tracking-wide text-yellow-200/90">
                     <th scope="col" className="px-3 py-2.5">
                       Item
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
-                      Est. price (MXN)
+                    <th scope="col" className="hidden px-2 py-2.5 sm:table-cell">
+                      Category
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
-                      Due date
+                    <th scope="col" className="px-2 py-2.5">
+                      Due
                     </th>
-                    <th scope="col" className="px-3 py-2.5 text-right">
-                      Actions
+                    <th scope="col" className="px-2 py-2.5">
+                      <span className="block">Sum</span>
+                      <span className="block text-[10px] font-normal normal-case text-yellow-200/60">MXN</span>
+                    </th>
+                    <th scope="col" className="px-2 py-2.5 text-center">
+                      Pay
+                    </th>
+                    <th scope="col" className="px-2 py-2.5 text-right">
+                      ···
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingListRows.map((item, idx) => (
+                  {pendingListRows.map((item, idx) => {
+                    const cat = categories.find((c) => c.id === item.category);
+                    return (
                     <tr
                       key={item.id}
                       className={cn(
@@ -988,8 +1119,8 @@ export default function ShoppingList() {
                         idx % 2 === 0 ? "bg-[#242424]/90" : "bg-[#1e1e18]/90",
                       )}
                     >
-                      <td className="max-w-[14rem] px-3 py-2.5 align-middle font-medium text-gray-100">
-                        <span className="line-clamp-2">{item.item_name}</span>
+                      <td className="max-w-[13rem] px-3 py-2 align-middle font-medium text-gray-100">
+                        <span className="line-clamp-2 leading-snug">{item.item_name}</span>
                         {(() => {
                           const q = Number(item.quantity);
                           const u = String(item.unit || "");
@@ -1001,24 +1132,86 @@ export default function ShoppingList() {
                             </span>
                           ) : null;
                         })()}
+                        <span className="mt-1 inline-flex sm:hidden">
+                          {cat ? (
+                            <span className={cn("rounded px-1.5 py-0.5 text-[10px]", cat.color)}>
+                              {cat.icon} {cat.name}
+                            </span>
+                          ) : null}
+                        </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 align-middle tabular-nums text-gray-200">
-                        {item.estimated_cost > 0 ? `$${Number(item.estimated_cost).toFixed(2)}` : "—"}
+                      <td className="hidden max-w-[7rem] px-2 py-2 align-middle sm:table-cell">
+                        {cat ? (
+                          <span className={cn("inline-flex max-w-full items-center gap-1 truncate rounded px-2 py-0.5 text-[11px]", cat.color)}>
+                            <span className="shrink-0">{cat.icon}</span>
+                            <span className="truncate">{cat.name}</span>
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 align-middle text-gray-300">
+                      <td className="whitespace-nowrap px-2 py-2 align-middle text-[12px] text-gray-300">
                         {formatShoppingDueDate(item.due_date) ?? "—"}
                       </td>
-                      <td className="px-3 py-2.5 align-middle text-right">
-                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                      <td className="w-[7rem] min-w-[6.5rem] px-1 py-1.5 align-middle">
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0"
+                          aria-label={`Amount for ${item.item_name}`}
+                          value={amountDraftById[item.id] ?? ""}
+                          onChange={(e) =>
+                            setAmountDraftById((prev) => ({ ...prev, [item.id]: e.target.value }))
+                          }
+                          onBlur={() => commitPendingRowEstimatedCost(item)}
+                          placeholder="0"
+                          className={cn(
+                            "h-8 border-yellow-500/25 bg-[#141414] px-2 text-[13px] text-white tabular-nums",
+                            "[appearance:textfield] [-moz-appearance:textfield]",
+                            "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                          )}
+                        />
+                      </td>
+                      <td className="px-1 py-1.5 align-middle">
+                        <div className="flex flex-wrap items-center justify-center gap-0.5">
                           <Button
                             type="button"
-                            size="sm"
-                            onClick={() => openPurchaseDialog(item)}
-                            className="h-8 gap-1.5 bg-yellow-400 text-black hover:bg-yellow-300"
+                            size="icon"
+                            variant="outline"
+                            title="Mark paid — company cash"
+                            disabled={updateItem.isPending || createExpense.isPending}
+                            onClick={() => finalizePurchaseFromList(item, "company_cash")}
+                            className="h-8 w-8 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
                           >
-                            <Check className="h-3.5 w-3.5" />
-                            Mark purchased
+                            <Banknote className="h-4 w-4" />
                           </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            title="Mark paid — company account / card"
+                            disabled={updateItem.isPending || createExpense.isPending}
+                            onClick={() => finalizePurchaseFromList(item, "company_account")}
+                            className="h-8 w-8 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                          >
+                            <Landmark className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            title="Mark paid — individual"
+                            disabled={updateItem.isPending || createExpense.isPending}
+                            onClick={() => finalizePurchaseFromList(item, "individual")}
+                            className="h-8 w-8 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 align-middle text-right">
+                        <div className="inline-flex flex-wrap items-center justify-end gap-1">
                           <Button
                             type="button"
                             size="icon"
@@ -1042,7 +1235,8 @@ export default function ShoppingList() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1068,7 +1262,7 @@ export default function ShoppingList() {
               <h2 className="text-sm font-bold text-yellow-400">Register purchase</h2>
               <p className="mt-1 text-xs text-gray-400">
                 Pick <strong className="text-gray-300">Shopping</strong> for a custom name, or any menu line below. Then enter
-                amount and date. Use one date for several lines from the same trip.
+                amount, whether you paid <strong className="text-gray-300">cash</strong> or <strong className="text-gray-300">card</strong>, and the date. Use one date for several lines from the same trip.
               </p>
             </div>
 
@@ -1224,6 +1418,41 @@ export default function ShoppingList() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-400">3 — Paid with</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuickPurchasePayment("cash")}
+                      className={cn(
+                        "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors sm:max-w-[12rem]",
+                        quickPurchasePayment === "cash"
+                          ? "border-yellow-400 bg-yellow-400/15 text-yellow-100"
+                          : "border-yellow-500/20 bg-[#1a1a1a] text-gray-400 hover:border-yellow-500/40 hover:text-gray-200",
+                      )}
+                    >
+                      <Banknote className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                      Cash
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickPurchasePayment("card")}
+                      className={cn(
+                        "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors sm:max-w-[12rem]",
+                        quickPurchasePayment === "card"
+                          ? "border-yellow-400 bg-yellow-400/15 text-yellow-100"
+                          : "border-yellow-500/20 bg-[#1a1a1a] text-gray-400 hover:border-yellow-500/40 hover:text-gray-200",
+                      )}
+                    >
+                      <CreditCard className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                      Card
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Cash posts to company cash; card posts to company account (same as Finance expenses).
+                  </p>
+                </div>
+
                 <Button
                   type="button"
                   className="bg-yellow-400 text-black hover:bg-yellow-300"
@@ -1260,7 +1489,7 @@ export default function ShoppingList() {
               <div>
                 <CardTitle className="text-base text-yellow-100">Registered purchases</CardTitle>
                 <p className="mt-1 text-xs text-yellow-200/70">
-                  Finance rows from this shopping flow. Pick a month to filter the table and the total.
+                  Finance rows from this shopping flow. Pick a month to filter the table and the total.                   Click amount or date to edit (Enter or blur saves); use the trash icon to remove a row.
                 </p>
               </div>
               <Button
@@ -1385,12 +1614,15 @@ export default function ShoppingList() {
                   </p>
                 ) : (
                   <div className="overflow-x-auto border-t border-yellow-500/15">
-                    <table className="w-full min-w-[520px] border-collapse text-left text-[11px] sm:text-xs">
+                    <table className="w-full min-w-[560px] border-collapse text-left text-[11px] sm:text-xs">
                       <thead>
                         <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
                           <th className="border-r border-yellow-500/30 px-3 py-2.5">Purchase</th>
                           <th className="border-r border-yellow-500/20 px-3 py-2.5 text-right">Sum (MXN)</th>
-                          <th className="px-3 py-2.5">Date</th>
+                          <th className="border-r border-yellow-500/20 px-3 py-2.5">Date</th>
+                          <th className="w-10 px-1 py-2.5 text-center">
+                            <span className="sr-only">Delete</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1403,13 +1635,86 @@ export default function ShoppingList() {
                             )}
                           >
                             <td className="border-r border-yellow-500/15 px-3 py-2 font-medium text-yellow-100/95">{r.name}</td>
-                            <td className="border-r border-yellow-500/15 px-3 py-2 text-right font-mono tabular-nums text-amber-200/90">
-                              ${r.amount.toFixed(2)}
+                            <td className="border-r border-yellow-500/15 px-2 py-1.5 text-right align-middle">
+                              {editingRegisteredAmountId === r.id ? (
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoFocus
+                                  disabled={patchExpenseRow.isPending}
+                                  value={editingRegisteredAmountDraft}
+                                  onChange={(e) => setEditingRegisteredAmountDraft(e.target.value)}
+                                  onBlur={(e) => void commitRegisteredAmountEdit(r, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void commitRegisteredAmountEdit(r, e.currentTarget.value);
+                                    }
+                                    if (e.key === "Escape") {
+                                      setEditingRegisteredAmountId(null);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "h-8 border-yellow-500/40 bg-[#141410] text-right font-mono text-sm text-amber-200 [appearance:textfield] [-moz-appearance:textfield]",
+                                    "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  )}
+                                  aria-label="Edit amount MXN"
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={patchExpenseRow.isPending}
+                                  onClick={() => startEditingRegisteredAmount(r)}
+                                  className="min-h-8 w-full min-w-[5.5rem] rounded border border-transparent px-2 py-1 text-right font-mono tabular-nums text-amber-200/90 transition-colors hover:border-yellow-500/35 hover:bg-yellow-500/10"
+                                >
+                                  ${r.amount.toFixed(2)}
+                                </button>
+                              )}
                             </td>
-                            <td className="px-3 py-2 tabular-nums text-gray-300">
-                              {r.dateIso
-                                ? format(parseISO(`${r.dateIso}T12:00:00`), "MMM d, yyyy", { locale: enUS })
-                                : "—"}
+                            <td className="border-r border-yellow-500/15 px-2 py-1.5 align-middle">
+                              {editingRegisteredDateId === r.id ? (
+                                <Input
+                                  type="date"
+                                  autoFocus
+                                  disabled={patchExpenseRow.isPending}
+                                  value={editingRegisteredDateDraft}
+                                  onChange={(e) => setEditingRegisteredDateDraft(e.target.value)}
+                                  onBlur={(e) => void commitRegisteredDateEdit(r, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void commitRegisteredDateEdit(r, e.currentTarget.value);
+                                    }
+                                    if (e.key === "Escape") {
+                                      setEditingRegisteredDateId(null);
+                                    }
+                                  }}
+                                  className="h-8 border-yellow-500/40 bg-[#141410] text-sm text-gray-200 [color-scheme:dark]"
+                                  aria-label="Edit purchase date"
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={patchExpenseRow.isPending}
+                                  onClick={() => startEditingRegisteredDate(r)}
+                                  className="min-h-8 w-full min-w-[7.5rem] rounded border border-transparent px-2 py-1 text-left tabular-nums text-gray-300 transition-colors hover:border-yellow-500/35 hover:bg-yellow-500/10"
+                                >
+                                  {r.dateIso
+                                    ? format(parseISO(`${r.dateIso}T12:00:00`), "MMM d, yyyy", { locale: enUS })
+                                    : "—"}
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-1 py-1 text-center align-middle">
+                              <button
+                                type="button"
+                                disabled={removeRegisteredPurchase.isPending || patchExpenseRow.isPending}
+                                onClick={() => handleDeleteRegisteredRow(r)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 opacity-70 transition-colors hover:bg-red-950/45 hover:text-red-400 hover:opacity-100 disabled:opacity-30"
+                                aria-label="Delete row"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.25} />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1420,7 +1725,8 @@ export default function ShoppingList() {
                           <td className="border-r border-yellow-500/20 px-3 py-2.5 text-right font-mono tabular-nums">
                             ${registeredPurchasesMonthTotal.toFixed(2)}
                           </td>
-                          <td className="px-3 py-2.5 text-gray-500" />
+                          <td className="border-r border-yellow-500/20 px-3 py-2.5 text-gray-500" />
+                          <td className="px-1 py-2.5" />
                         </tr>
                       </tfoot>
                     </table>
@@ -1432,109 +1738,6 @@ export default function ShoppingList() {
         </Card>
       </div>
 
-      {/* Purchase Dialog */}
-      <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
-        <DialogContent className="max-w-md border-yellow-500/20 bg-[#242424] text-gray-200">
-          <DialogHeader>
-            <DialogTitle className="text-yellow-100">Mark as purchased</DialogTitle>
-          </DialogHeader>
-
-          {purchasingItem && (
-            <div className="space-y-6">
-              <div className="rounded-lg border border-yellow-500/15 bg-[#1a1a1a] p-4">
-                <h3 className="text-lg font-bold text-white">{purchasingItem.item_name}</h3>
-                <p className="text-sm text-gray-400">
-                  {purchasingItem.quantity} {purchasingItem.unit} · Estimated ${(purchasingItem.estimated_cost || 0).toFixed(2)} MXN
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-gray-400">Actual amount paid (MXN)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={purchaseActualCost}
-                  onChange={(e) => setPurchaseActualCost(e.target.value)}
-                  placeholder="0.00"
-                  className="border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-xs font-medium text-gray-400">How was it paid? *</Label>
-                <div className="grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPurchasePaymentSource("company_cash")}
-                    className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                      purchasePaymentSource === "company_cash"
-                        ? "border-yellow-400 bg-yellow-400/10 text-white"
-                        : "border-yellow-500/20 text-gray-400 hover:border-yellow-500/40"
-                    }`}
-                  >
-                    <Banknote className="h-6 w-6 shrink-0 text-yellow-400" />
-                    <div>
-                      <p className="font-semibold">Company cash</p>
-                      <p className="text-xs text-gray-500">Paid from the register / petty cash</p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPurchasePaymentSource("company_account")}
-                    className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                      purchasePaymentSource === "company_account"
-                        ? "border-yellow-400 bg-yellow-400/10 text-white"
-                        : "border-yellow-500/20 text-gray-400 hover:border-yellow-500/40"
-                    }`}
-                  >
-                    <Landmark className="h-6 w-6 shrink-0 text-yellow-400" />
-                    <div>
-                      <p className="font-semibold">Company account</p>
-                      <p className="text-xs text-gray-500">Card transfer or business account</p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPurchasePaymentSource("individual")}
-                    className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                      purchasePaymentSource === "individual"
-                        ? "border-yellow-400 bg-yellow-400/10 text-white"
-                        : "border-yellow-500/20 text-gray-400 hover:border-yellow-500/40"
-                    }`}
-                  >
-                    <User className="h-6 w-6 shrink-0 text-yellow-400" />
-                    <div>
-                      <p className="font-semibold">Individual</p>
-                      <p className="text-xs text-gray-500">Personal card or cash — track for reimbursement if needed</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setPurchaseDialogOpen(false)}
-                  className="flex-1 border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmPurchase}
-                  disabled={!purchasePaymentSource || updateItem.isPending || createExpense.isPending}
-                  className="flex-1 bg-yellow-400 text-black hover:bg-yellow-300"
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Confirm
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

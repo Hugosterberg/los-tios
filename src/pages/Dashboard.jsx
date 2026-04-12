@@ -39,6 +39,13 @@ import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { buildMergedCanonicalEvents } from "@/lib/mergedSales";
 import { listOrders } from "@/lib/local-dev-orders";
+import {
+  isLocalFinanceMode,
+  localListExpenses,
+  localListCompanyTransactions,
+  localListEmployees,
+  localListShifts,
+} from "@/lib/localDevFinance";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
 import KpiCard from "@/components/dashboard/KpiCard";
 import InsightTable from "@/components/dashboard/InsightTable";
@@ -867,6 +874,8 @@ export default function Dashboard() {
     [selectedDedupeWindow],
   );
 
+  const useLocalFinance = isLocalFinanceMode();
+
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
@@ -880,23 +889,24 @@ export default function Dashboard() {
   });
 
   const expensesQuery = useQuery({
-    queryKey: ["expenses"],
-    queryFn: () => base44.entities.Expense.list("-date"),
+    queryKey: ["expenses", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
 
   const transactionsQuery = useQuery({
-    queryKey: ["companyTransactions"],
-    queryFn: () => base44.entities.CompanyTransaction.list("-date"),
+    queryKey: ["companyTransactions", useLocalFinance ? "local" : "remote"],
+    queryFn: () =>
+      useLocalFinance ? localListCompanyTransactions() : base44.entities.CompanyTransaction.list("-date"),
   });
 
   const employeesQuery = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => base44.entities.Employee.list("name"),
+    queryKey: ["employees", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListEmployees() : base44.entities.Employee.list("name")),
   });
 
   const shiftsQuery = useQuery({
-    queryKey: ["shifts"],
-    queryFn: () => base44.entities.Shift.list("-date"),
+    queryKey: ["shifts", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListShifts() : base44.entities.Shift.list("-date")),
   });
 
   const loyverseQuery = useQuery({
@@ -1506,7 +1516,7 @@ export default function Dashboard() {
   ];
 
   const liveOperations = [
-    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Order module: Base44 Order rows (status in your ordering flow)", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
+    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Order module: in-app Order rows (status in your ordering flow)", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
     { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: `Order module: SLA estimate for selected ${selectedRangeLabelLower}`, href: "/managementinsight?view=live-operations", dataSource: orders.length ? "order_records" : "mock" },
     { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? `Order module for selected ${selectedRangeLabelLower}` : "Order module: needs preparation_minutes or estimated_delivery_minutes on Order records.", href: "/managementinsight?view=live-operations", dataSource: orders.length ? "order_records" : "mock" },
     { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Order module: status = preparing", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
@@ -1614,7 +1624,7 @@ export default function Dashboard() {
   const liveSourceStates = [
     { id: "loyverse", label: "Loyverse", connected: hasLoyverseApiConfig(appSettings) },
     { id: "clip", label: "Clip", connected: hasClipApiConfig(appSettings) },
-    { id: "order-module", label: "Order module (Base44)", connected: orders.length > 0 },
+    { id: "order-module", label: "Order module", connected: orders.length > 0 },
   ];
   const connectedLiveSourcesCount = liveSourceStates.filter((source) => source.connected).length;
 
@@ -1643,7 +1653,7 @@ export default function Dashboard() {
                 Los Tios management dashboard
               </h1>
               <p className="mt-3 text-sm leading-6 text-gray-400 sm:text-base">
-                Live data is loaded from Loyverse, Clip, the Order module (Base44 orders), and the Finance ledger (expenses, shifts) wherever integrations are already available.
+                Live data is loaded from Loyverse, Clip, the Order module (in-app orders), and the Finance ledger (expenses, shifts) wherever integrations are already available.
                 Anything that still needs replacement is clearly marked as <span className="text-yellow-300">Hardcoded</span>.
               </p>
             </div>
@@ -1699,7 +1709,7 @@ export default function Dashboard() {
                   <SourceBadge source="both" />
                   <span className="text-sm text-gray-300">Combined Clip + Loyverse</span>
                   <SourceBadge source="order_records" />
-                  <span className="text-sm text-gray-300">Order module (Base44 Order)</span>
+                  <span className="text-sm text-gray-300">Order module (in-app orders)</span>
                   <SourceBadge source="finance_ledger" />
                   <span className="text-sm text-gray-300">Finance ledger (Expense, shifts)</span>
                   <SourceBadge source="mock" />
@@ -2024,7 +2034,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="mt-4 text-xs text-gray-400">
-                  Om Clip returnerar betalningar med `amount`, `total_amount` eller `approved_amount` och status `approved`/`paid`, ska pengar synas här.
+                  If Clip returns payments with `amount`, `total_amount`, or `approved_amount` and status `approved`/`paid`, funds should appear here.
                 </p>
                 <details className="mt-4 rounded-xl border border-yellow-500/10 bg-black/10 p-3">
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">

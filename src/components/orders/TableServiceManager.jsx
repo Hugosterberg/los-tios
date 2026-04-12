@@ -53,6 +53,11 @@ export default function TableServiceManager({
               Table Service
             </CardTitle>
             <p className="text-sm text-gray-500 mt-1">Six active tables with tabs, payment flow, and closeout history</p>
+            <p className="mt-2 rounded-lg border border-yellow-500/15 bg-yellow-500/5 px-3 py-2 text-[11px] leading-snug text-yellow-100/85">
+              Loyverse does not expose a public API for open tabs or tables — changes here are not synced to Loyverse until you{" "}
+              <span className="font-semibold text-yellow-300">mark the bill as paid</span> (then a sales receipt is created via the API
+              when the menu is linked).
+            </p>
           </div>
           <div className="flex gap-3 text-sm">
             <div className="rounded-xl border border-yellow-500/20 bg-[#1a1a1a] px-4 py-2">

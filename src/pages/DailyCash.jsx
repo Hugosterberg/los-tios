@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, format, isSameDay, parseISO, subDays } from "date-fns";
+import { addDays, endOfDay, format, isSameDay, parseISO, startOfDay, subDays } from "date-fns";
 import { enUS } from "date-fns/locale";
 import {
   Banknote,
@@ -12,6 +12,10 @@ import {
   Undo2,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
+import { appParams } from "@/lib/app-params";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
+import { buildMergedCanonicalEvents, filterCanonicalEventsByDateRange } from "@/lib/mergedSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,11 +70,47 @@ function matchesDay(isoDate, key) {
   return String(isoDate).slice(0, 10) === key;
 }
 
+/** Align with Loyverse overview: exclude voided / cancelled receipts */
+function isLoyverseReceiptCompleted(receipt) {
+  const status =
+    receipt?.status ||
+    receipt?.receipt_status ||
+    (receipt?.canceled_at ? "cancelled" : "completed");
+  return !String(status).toLowerCase().includes("cancel");
+}
+
 export default function DailyCash() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const dayStr = dayKey(selectedDate);
   const useLocalFinance = isLocalFinanceMode();
+  const isLocalOnlyMode =
+    import.meta.env.DEV &&
+    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
+
+  const dayWindow = useMemo(
+    () => ({ start: startOfDay(selectedDate), end: endOfDay(selectedDate) }),
+    [selectedDate],
+  );
+
+  const { data: settings = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    enabled: !isLocalOnlyMode,
+  });
+  const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
+
+  const loyverseQuery = useQuery({
+    queryKey: ["dailyCashLoyverse", settings[0]?.id || "none", dayStr],
+    queryFn: () =>
+      getLoyverseOverview(appSettings, {
+        start: dayWindow.start,
+        end: dayWindow.end,
+      }),
+    enabled: hasLoyverseApiConfig(appSettings),
+    staleTime: 60_000,
+  });
+  const loyverseOverview = loyverseQuery.data;
 
   const [openingInput, setOpeningInput] = useState("");
   const [storeTick, setStoreTick] = useState(0);
@@ -137,6 +177,50 @@ export default function DailyCash() {
 
   const manualLines = useMemo(() => getManualLines(dayStr), [dayStr, storeTick]);
 
+  const loyverseCashRows = useMemo(() => {
+    if (!loyverseOverview?.receipts?.length) return [];
+    const receipts = loyverseOverview.receipts.filter(isLoyverseReceiptCompleted);
+    if (!receipts.length) return [];
+    const { canonicalEvents } = buildMergedCanonicalEvents({
+      receipts,
+      clipPayments: [],
+      contributionTransactions: [],
+      stores: loyverseOverview.stores || [],
+      paymentSource: "Cash",
+      branch: "All branches",
+      channel: "All channels",
+    });
+    const inRange = filterCanonicalEventsByDateRange(
+      canonicalEvents,
+      dayWindow.start,
+      dayWindow.end,
+    );
+    return inRange
+      .filter((e) => e.source === "loyverse")
+      .map((event) => {
+        const receipt = event.payload;
+        const rid = receipt?.id ?? event.id;
+        const parts = [];
+        if (receipt?.receipt_number != null && String(receipt.receipt_number).trim() !== "") {
+          parts.push(`#${receipt.receipt_number}`);
+        }
+        if (event.branch) {
+          parts.push(event.branch);
+        }
+        const detail = parts.length > 0 ? parts.join(" · ") : "Sale (cash)";
+        const timeIso = receipt?.created_at ?? receipt?.receipt_date ?? event.timestamp;
+        return {
+          id: `loyverse-${rid}`,
+          sortTime: event.timestamp.getTime(),
+          timeLabel: rowTimeLabel(timeIso),
+          source: "Loyverse POS",
+          detail,
+          inAmount: event.amount,
+          outAmount: null,
+        };
+      });
+  }, [loyverseOverview, dayWindow.start, dayWindow.end]);
+
   const tableRows = useMemo(() => {
     const rows = [];
 
@@ -153,6 +237,10 @@ export default function DailyCash() {
         inAmount: amt,
         outAmount: null,
       });
+    }
+
+    for (const lv of loyverseCashRows) {
+      rows.push(lv);
     }
 
     for (const t of transactions) {
@@ -193,12 +281,16 @@ export default function DailyCash() {
       if (!matchesDay(e.date, dayStr)) continue;
       if (e.payment_source !== "company_cash") continue;
       const amt = Number(e.amount || 0);
+      const fromShopping = Boolean(e.from_shopping_list);
+      const whenIso =
+        e.created_date ||
+        (e.date ? `${String(e.date).slice(0, 10)}T12:00:00` : `${dayStr}T12:00:00`);
       rows.push({
         id: `exp-${e.id}`,
-        sortTime: new Date(e.date || `${dayStr}T12:00:00`).getTime(),
-        timeLabel: rowTimeLabel(e.date),
-        source: "Expense (cash)",
-        detail: e.name || e.category || "Expense",
+        sortTime: new Date(whenIso).getTime(),
+        timeLabel: rowTimeLabel(whenIso),
+        source: fromShopping ? "Register purchase" : "Expense (cash)",
+        detail: e.name || e.category || (fromShopping ? "Purchase" : "Expense"),
         inAmount: null,
         outAmount: amt,
       });
@@ -222,7 +314,7 @@ export default function DailyCash() {
 
     rows.sort((a, b) => a.sortTime - b.sortTime);
     return rows;
-  }, [orders, transactions, expenses, manualLines, dayStr]);
+  }, [orders, loyverseCashRows, transactions, expenses, manualLines, dayStr]);
 
   const totals = useMemo(() => {
     let cashIn = 0;
@@ -328,7 +420,9 @@ export default function DailyCash() {
                   Register & movement
                 </h1>
                 <p className="mt-1 max-w-xl text-sm text-gray-500">
-                  Cash sales, drawer movements, and cash-paid expenses for one calendar day. Start balance is saved in this
+                  Cash sales, drawer movements, and cash-paid expenses for one calendar day. Purchases logged as{" "}
+                  <strong className="font-medium text-gray-400">Cash</strong> under Shopping → Register purchase appear here as{" "}
+                  <strong className="font-medium text-gray-400">Register purchase</strong> (out). Start balance is saved in this
                   browser only.
                 </p>
               </div>
@@ -532,8 +626,10 @@ export default function DailyCash() {
           <div className="border-b border-yellow-500/15 bg-[#1a1810] px-4 py-2.5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-600/90">Cash ledger</h2>
             <p className="text-[11px] text-gray-600">
-              From orders (cash), company transactions, manual cash registered above, and expenses paid from cash. Edit other
-              records in Company account or Shopping.
+              Includes <strong className="font-medium text-gray-500">Loyverse POS</strong> cash receipts, customer cash orders,
+              Shopping <strong className="font-medium text-gray-500">Register purchase</strong> lines paid with{" "}
+              <strong className="font-medium text-gray-500">Cash</strong>, other cash expenses, and manual rows above. Card-paid
+              shopping purchases go to the bank account, not this drawer. Edit source rows in Company account or Shopping.
             </p>
           </div>
           <div className="overflow-x-auto">

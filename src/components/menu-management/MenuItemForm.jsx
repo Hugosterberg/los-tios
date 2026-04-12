@@ -24,6 +24,7 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
     is_vegetarian: false,
     is_available: true,
     preparation_time: 15,
+    loyverse_item_id: "",
   });
 
   const [ingredientInput, setIngredientInput] = useState("");
@@ -54,7 +55,7 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!canUploadImages) {
-      alert("Image upload requires a real Base44 backend and login. Use the image URL field locally.");
+      alert("Image upload requires a configured backend and login. Use the image URL field locally.");
       return;
     }
 
@@ -113,6 +114,18 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
               <Input id="prep_time" type="number" min="0" value={formData.preparation_time} onChange={(event) => setFormData({ ...formData, preparation_time: parseInt(event.target.value, 10) })} />
             </div>
 
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="loyverse_item_id">Loyverse item ID (optional)</Label>
+              <Input
+                id="loyverse_item_id"
+                value={formData.loyverse_item_id || ""}
+                onChange={(event) => setFormData({ ...formData, loyverse_item_id: event.target.value.trim() })}
+                placeholder="UUID from Loyverse Back Office → Items (required for web → Loyverse receipt sync)"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500">When set, completed orders including this product can create a matching sales receipt in Loyverse.</p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="image">Image</Label>
               <div className="space-y-2">
@@ -125,7 +138,7 @@ export default function MenuItemForm({ item, onSubmit, onCancel, isLoading }) {
                 </div>
                 {!canUploadImages && (
                   <p className="text-xs text-amber-400">
-                    File upload is not available in local bypass without Base44 configuration and a token. Paste an image URL or sign in against the real backend.
+                    File upload is not available in local bypass without backend configuration and a token. Paste an image URL or sign in against the real backend.
                   </p>
                 )}
                 {formData.image_url && (

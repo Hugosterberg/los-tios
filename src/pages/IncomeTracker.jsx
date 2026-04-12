@@ -9,18 +9,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Calendar as CalendarIcon } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { listOrders } from "@/lib/local-dev-orders";
+import { isLocalFinanceMode, localListCompanyTransactions } from "@/lib/localDevFinance";
 
 export default function IncomeTracker() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const useLocalFinance = isLocalFinanceMode();
 
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => base44.entities.Order.list('-created_date'),
+    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),
   });
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ['companyTransactions'],
-    queryFn: () => base44.entities.CompanyTransaction.list('-date'),
+    queryKey: ['companyTransactions', useLocalFinance ? 'local' : 'remote'],
+    queryFn: () =>
+      useLocalFinance ? localListCompanyTransactions() : base44.entities.CompanyTransaction.list('-date'),
   });
 
   // Filter data by selected date
@@ -273,7 +277,7 @@ export default function IncomeTracker() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">No hay registros de efectivo para esta fecha</p>
+                  <p className="text-sm text-gray-500">No cash records for this date</p>
                 )}
               </CardContent>
             </Card>
@@ -283,7 +287,7 @@ export default function IncomeTracker() {
           <TabsContent value="revolut" className="space-y-4">
             <Card className="bg-[#242424] border border-yellow-500/15 shadow-none">
               <CardHeader>
-                <CardTitle>Revolut / Transfers Bancarias</CardTitle>
+                <CardTitle>Revolut / bank transfers</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-yellow-400 mb-4">
@@ -307,7 +311,7 @@ export default function IncomeTracker() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">No hay Transfers para esta fecha</p>
+                  <p className="text-sm text-gray-500">No transfers for this date</p>
                 )}
               </CardContent>
             </Card>

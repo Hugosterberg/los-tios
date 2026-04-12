@@ -6,8 +6,8 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 const AuthContext = createContext();
 const isLocalDevBypass =
   import.meta.env.DEV && import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH !== 'false';
-const hasBase44Config = Boolean(appParams.appId && appParams.serverUrl);
-const isLocalDevWithoutBase44Config = import.meta.env.DEV && !hasBase44Config;
+const hasBackendConfig = Boolean(appParams.appId && appParams.serverUrl);
+const isLocalDevWithoutBackendConfig = import.meta.env.DEV && !hasBackendConfig;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      if (isLocalDevBypass || isLocalDevWithoutBase44Config) {
+      if (isLocalDevBypass || isLocalDevWithoutBackendConfig) {
         setAppPublicSettings({ local_dev_bypass: true });
         setUser({
           id: 'local-dev-admin',
@@ -40,10 +40,10 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      if (!hasBase44Config) {
+      if (!hasBackendConfig) {
         setAuthError({
           type: 'local_config_missing',
-          message: 'Missing Base44 local configuration'
+          message: 'Missing backend configuration (app id and server URL)'
         });
         setIsLoadingPublicSettings(false);
         setIsLoadingAuth(false);

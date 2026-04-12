@@ -1,10 +1,18 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "@/components/ui/use-toast";
+import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
+import {
+  shouldSyncMenuToLoyverse,
+  createLoyverseMenuItem,
+  updateLoyverseMenuItem,
+  deleteLoyverseMenuItem,
+} from "@/lib/loyverseMenuWrite";
 import { createMenuItem, deleteMenuItem, listMenuItems, updateMenuItem } from "@/lib/local-dev-menu";
 import MenuItemCard from "../components/menu-management/MenuItemCard";
 import MenuItemForm from "../components/menu-management/MenuItemForm";
@@ -22,8 +30,39 @@ export default function MenuManagement() {
     queryFn: () => listMenuItems(() => base44.entities.MenuItem.list()),
   });
 
+  const { data: appSettingsRows = [] } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+
+  const integrationSettings = useMemo(
+    () => getResolvedIntegrationSettings(appSettingsRows[0] || {}),
+    [appSettingsRows],
+  );
+
+  const appSettingsRecord = appSettingsRows[0] || {};
+
   const createItem = useMutation({
-    mutationFn: (data) => createMenuItem(data, (payload) => base44.entities.MenuItem.create(payload)),
+    mutationFn: async (data) => {
+      const created = await createMenuItem(data, (payload) => base44.entities.MenuItem.create(payload));
+      if (!shouldSyncMenuToLoyverse(appSettingsRecord)) {
+        return created;
+      }
+      try {
+        const { id: lvId } = await createLoyverseMenuItem(integrationSettings, created);
+        if (lvId) {
+          return await updateMenuItem(created.id, { loyverse_item_id: lvId }, (itemId, payload) =>
+            base44.entities.MenuItem.update(itemId, payload),
+          );
+        }
+      } catch (e) {
+        toast({
+          title: "Loyverse",
+          description: `Menu saved locally but could not be created in Loyverse: ${e?.message || e}`,
+        });
+      }
+      return created;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["menuItems"] });
       setShowForm(false);
@@ -32,7 +71,26 @@ export default function MenuManagement() {
   });
 
   const updateItem = useMutation({
-    mutationFn: ({ id, data }) => updateMenuItem(id, data, (itemId, payload) => base44.entities.MenuItem.update(itemId, payload)),
+    mutationFn: async ({ id, data }) => {
+      const list = queryClient.getQueryData(["menuItems"]) || [];
+      const current = list.find((x) => x.id === id) || {};
+      const updated = await updateMenuItem(id, data, (itemId, payload) => base44.entities.MenuItem.update(itemId, payload));
+      const full = { ...current, ...updated, ...data };
+      if (shouldSyncMenuToLoyverse(appSettingsRecord)) {
+        const lvId = full.loyverse_item_id || (full.source === "loyverse" ? full.id : null);
+        if (lvId) {
+          try {
+            await updateLoyverseMenuItem(integrationSettings, lvId, full);
+          } catch (e) {
+            toast({
+              title: "Loyverse",
+              description: `Menu updated but Loyverse sync failed: ${e?.message || e}`,
+            });
+          }
+        }
+      }
+      return updated;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["menuItems"] });
       setShowForm(false);
@@ -41,7 +99,24 @@ export default function MenuManagement() {
   });
 
   const deleteItem = useMutation({
-    mutationFn: (id) => deleteMenuItem(id, (itemId) => base44.entities.MenuItem.delete(itemId)),
+    mutationFn: async (id) => {
+      const list = queryClient.getQueryData(["menuItems"]) || [];
+      const row = list.find((x) => x.id === id);
+      if (shouldSyncMenuToLoyverse(appSettingsRecord)) {
+        const lvId = row?.loyverse_item_id || (row?.source === "loyverse" ? row?.id : null);
+        if (lvId) {
+          try {
+            await deleteLoyverseMenuItem(integrationSettings, lvId);
+          } catch (e) {
+            toast({
+              title: "Loyverse",
+              description: `Could not delete in Loyverse (continuing with local/backend): ${e?.message || e}`,
+            });
+          }
+        }
+      }
+      return deleteMenuItem(id, (itemId) => base44.entities.MenuItem.delete(itemId));
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["menuItems"] }),
   });
 
