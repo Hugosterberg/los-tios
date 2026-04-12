@@ -9,8 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wallet, Plus, TrendingUp, TrendingDown, Users, DollarSign, Trash2, Edit, Receipt, Calendar as CalendarIcon, CreditCard, Store, RefreshCw, AlertTriangle, ScanLine, Building2, Mail, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfDay, endOfDay } from "date-fns";
-import { es } from "date-fns/locale";
+import { startOfDay, endOfDay } from "date-fns";
+import {
+  dateFromMexicoDateKey,
+  formatMexicoDateShort,
+  formatMexicoLongDateEs,
+  formatMexicoMonthDayShort,
+} from "@/lib/mexicoTime";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listOrders } from "@/lib/local-dev-orders";
@@ -615,7 +620,7 @@ export default function CompanyAccount() {
                 />
               </div>
               <div className="text-sm text-gray-400 pb-2">
-                {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: es })}
+                {formatMexicoLongDateEs(dateFromMexicoDateKey(selectedDate))}
               </div>
             </div>
 
@@ -988,7 +993,7 @@ export default function CompanyAccount() {
                               <div className="flex flex-wrap gap-1 mt-1">
                                 <Badge className={cat.color} variant="secondary">{cat.name}</Badge>
                                 {expense.is_recurring && <Badge variant="outline">Recurring</Badge>}
-                                <Badge variant="outline">{format(new Date(expense.date), 'dd MMM', { locale: es })}</Badge>
+                                <Badge variant="outline">{formatMexicoMonthDayShort(expense.date)}</Badge>
                                 {expense.payment_source && (
                                   <Badge variant="outline" className="text-xs">
                                     {expense.payment_source === 'company_cash'
@@ -1224,7 +1229,7 @@ export default function CompanyAccount() {
                                     {transaction.type === 'contribution' ? 'Contribution' : 'Withdrawal'}
                                   </Badge>
                                   <Badge variant="outline">
-                                    {format(new Date(transaction.date), 'dd MMM yyyy', { locale: es })}
+                                    {formatMexicoDateShort(transaction.date)}
                                   </Badge>
                                   <Badge variant="outline" className="capitalize">
                                     {transaction.payment_method}

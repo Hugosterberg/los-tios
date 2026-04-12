@@ -47,29 +47,39 @@ import {
   getRecordDate,
 } from "@/lib/mergedSales";
 import { isLocalFinanceMode, localListExpenses, localListCompanyTransactions } from "@/lib/localDevFinance";
+import {
+  dateFromMexicoDateKey,
+  formatMexicoGeneratedTimestamp,
+  formatMexicoLongDateEs,
+  getMexicoDateKey,
+  getMexicoNowDateKey,
+  getMexicoNowYearMonth,
+  getMexicoYearMonthKey,
+} from "@/lib/mexicoTime";
 
 /** Calendar day for Expense.date (YYYY-MM-DD strings avoid timezone shifts). Falls back to created_* so rows still count. */
 function expenseCalendarDayKey(e) {
   const raw = e?.date;
   if (raw != null && raw !== "") {
     const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
     try {
       const d = parseISO(/^\d{4}-\d{2}-\d{2}T/.test(s) ? s : `${s.slice(0, 10)}T12:00:00`);
-      if (!Number.isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+      if (!Number.isNaN(d.getTime())) return getMexicoDateKey(d);
     } catch {
       /* ignore */
     }
     try {
-      const d = new Date(raw);
-      if (!Number.isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+      const k = getMexicoDateKey(raw);
+      if (k) return k;
     } catch {
       /* ignore */
     }
   }
   const fallback = getRecordDate(e);
   if (!Number.isNaN(fallback.getTime()) && fallback.getTime() !== 0) {
-    return format(fallback, "yyyy-MM-dd");
+    return getMexicoDateKey(fallback);
   }
   return "";
 }
@@ -152,8 +162,8 @@ function pctChangeLabel(current, previous) {
 }
 
 export default function Statistics() {
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
-  const [selectedDay, setSelectedDay] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedMonth, setSelectedMonth] = useState(() => getMexicoNowYearMonth());
+  const [selectedDay, setSelectedDay] = useState(() => getMexicoNowDateKey());
   const [printMode, setPrintMode] = useState(null);
   const [statsView, setStatsView] = useState("monthly");
   const { data: orders = [] } = useQuery({
@@ -219,17 +229,18 @@ export default function Statistics() {
   });
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
-    const date = subMonths(new Date(), i);
+    const anchor = parseISO(`${getMexicoNowYearMonth()}-01`);
+    const date = subMonths(anchor, i);
     return {
       value: format(date, "yyyy-MM"),
       label: format(date, "MMMM yyyy", { locale: es }),
     };
   });
 
-  const monthOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM") === statisticsMonth);
+  const monthOrders = orders.filter((o) => getMexicoYearMonthKey(o.created_date) === statisticsMonth);
   const monthExpenses = expenses.filter((e) => expenseCalendarMonthKey(e) === statisticsMonth);
 
-  const dayOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM-dd") === selectedDay);
+  const dayOrders = orders.filter((o) => getMexicoDateKey(o.created_date) === selectedDay);
   const dayExpenses = expenses.filter((e) => expenseCalendarDayKey(e) === selectedDay);
 
   const contributionInWindow = useMemo(
@@ -398,7 +409,7 @@ export default function Statistics() {
         },
         { loyverse: 0, clip: 0, manual: 0 },
       );
-      const dOrders = orders.filter((o) => format(new Date(o.created_date), "yyyy-MM-dd") === dayStr);
+      const dOrders = orders.filter((o) => getMexicoDateKey(o.created_date) === dayStr);
       const orderModuleRevenue = dOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
       return {
         dateIso: dayStr,
@@ -795,10 +806,10 @@ export default function Statistics() {
                 <h1 className="mb-2 text-3xl font-bold">Los Tios Pizzeria</h1>
                 <h2 className="text-xl text-gray-700">
                   {printMode === "daily"
-                    ? `Daily report — ${format(selectedDayDate, "dd MMMM yyyy", { locale: es })}`
+                    ? `Daily report — ${formatMexicoLongDateEs(dateFromMexicoDateKey(selectedDay))}`
                     : `Monthly report — ${monthOptions.find((m) => m.value === selectedMonth)?.label}`}
                 </h2>
-                <p className="mt-2 text-sm text-gray-600">Generated {format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                <p className="mt-2 text-sm text-gray-600">Generated {formatMexicoGeneratedTimestamp()}</p>
               </div>
             </div>
           )}
@@ -806,7 +817,7 @@ export default function Statistics() {
           {(showDailyOnScreen || showDailyPrint) && (
             <div className="mb-8">
               <h2 className="mb-4 text-xl font-bold sm:text-2xl">
-                Daily — {format(selectedDayDate, "MMMM d, yyyy", { locale: es })}
+                Daily — {formatMexicoLongDateEs(dateFromMexicoDateKey(selectedDay))}
               </h2>
 
               <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

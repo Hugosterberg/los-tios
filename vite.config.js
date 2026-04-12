@@ -24,6 +24,18 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/clip\/settlements/, ''),
       },
+      '/api/revolut': {
+        target: 'https://b2b.revolut.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/revolut/, '/api'),
+      },
+      '/api/revolut-sandbox': {
+        target: 'https://sandbox-b2b.revolut.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/revolut-sandbox/, '/api'),
+      },
     },
   },
   plugins: [

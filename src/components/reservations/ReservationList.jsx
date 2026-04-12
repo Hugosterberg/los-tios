@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { dateFromMexicoDateKey, formatMexicoLongDateEs } from "@/lib/mexicoTime";
 import { Calendar, Clock, Users, Mail, Phone } from "lucide-react";
 import {
   Select,
@@ -60,7 +60,11 @@ export default function ReservationList({ reservations, isLoading, onUpdateStatu
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      {format(new Date(reservation.date), "MMMM d, yyyy")}
+                      {formatMexicoLongDateEs(
+                        typeof reservation.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(reservation.date)
+                          ? dateFromMexicoDateKey(reservation.date)
+                          : reservation.date,
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />

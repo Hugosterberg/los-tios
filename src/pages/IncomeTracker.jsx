@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Calendar as CalendarIcon } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
-import { es } from "date-fns/locale";
+import { startOfDay, endOfDay } from "date-fns";
+import { formatMexicoLongDateEs } from "@/lib/mexicoTime";
 import { listOrders } from "@/lib/local-dev-orders";
 import { isLocalFinanceMode, localListCompanyTransactions } from "@/lib/localDevFinance";
 
@@ -101,7 +101,7 @@ export default function IncomeTracker() {
             />
           </div>
           <div className="text-sm text-gray-400">
-            {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: es })}
+            {formatMexicoLongDateEs(selectedDate)}
           </div>
         </div>
 

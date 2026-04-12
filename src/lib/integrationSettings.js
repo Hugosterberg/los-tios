@@ -48,6 +48,10 @@ function readEnvSettings() {
     loyverse_store_id: normalizeString(import.meta.env.VITE_LOYVERSE_STORE_ID),
     loyverse_default_category_id: normalizeString(import.meta.env.VITE_LOYVERSE_DEFAULT_CATEGORY_ID),
     notion_internal_token: normalizeString(import.meta.env.VITE_NOTION_INTERNAL_TOKEN),
+    revolut_connection_type: normalizeString(import.meta.env.VITE_REVOLUT_CONNECTION_TYPE),
+    revolut_api_base_url: normalizeString(import.meta.env.VITE_REVOLUT_API_BASE_URL),
+    revolut_access_token: normalizeString(import.meta.env.VITE_REVOLUT_ACCESS_TOKEN),
+    revolut_account_id: normalizeString(import.meta.env.VITE_REVOLUT_ACCOUNT_ID),
   };
 }
 
@@ -106,5 +110,22 @@ export function buildLoyverseResolvedConfig(settings = {}) {
     baseUrl: normalizeString(merged.loyverse_api_base_url),
     storeId: normalizeString(merged.loyverse_store_id),
     defaultCategoryId: normalizeString(merged.loyverse_default_category_id),
+  };
+}
+
+/** @returns {"business" | "personal"} */
+export function normalizeRevolutConnectionType(value) {
+  const v = normalizeString(value).toLowerCase();
+  return v === "personal" ? "personal" : "business";
+}
+
+export function buildRevolutResolvedConfig(settings = {}) {
+  const merged = buildResolvedSettings(settings);
+
+  return {
+    accessToken: normalizeString(merged.revolut_access_token),
+    baseUrl: normalizeString(merged.revolut_api_base_url),
+    accountId: normalizeString(merged.revolut_account_id),
+    connectionType: normalizeRevolutConnectionType(merged.revolut_connection_type),
   };
 }

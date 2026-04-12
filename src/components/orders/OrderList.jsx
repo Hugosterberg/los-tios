@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingBag, Package, Truck, CheckCircle, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { formatMexicoOrderList } from "@/lib/mexicoTime";
 import {
   Select,
   SelectContent,
@@ -55,7 +55,7 @@ export default function OrderList({ orders, isLoading, onUpdateStatus }) {
                       <div>
                         <h3 className="text-xl font-semibold">{order.customer_name}</h3>
                         <p className="text-sm text-gray-500">
-                          {format(new Date(order.created_date), "MMM d, yyyy 'at' h:mm a")}
+                          {formatMexicoOrderList(order.created_date)}
                         </p>
                       </div>
                       <Badge className={`${statusConfig[order.status]?.color} border flex items-center gap-1`}>

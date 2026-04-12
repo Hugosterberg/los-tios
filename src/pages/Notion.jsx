@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { invokeNotionProxy } from "@/api/notionClient";
 import { useQuery } from "@tanstack/react-query";
+import { buildDefaultAppSettings } from "@/lib/appSettings";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,25 @@ function buildNotionSearchBody(overrides) {
     delete b.query;
   }
   return b;
+}
+
+/** Pages only (excludes top-level data_source objects from search). Follows Notion search pagination. */
+async function fetchAllNotionSearchPages(integrationSettings, extra = {}, maxPages = 30) {
+  const all = [];
+  let cursor;
+  for (let i = 0; i < maxPages; i++) {
+    const body = buildNotionSearchBody({
+      page_size: 100,
+      filter: { property: "object", value: "page" },
+      ...extra,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    const data = await invokeNotionProxy({ path: "search", method: "POST", body }, integrationSettings);
+    all.push(...(data?.results || []));
+    if (!data?.has_more || !data?.next_cursor) break;
+    cursor = data.next_cursor;
+  }
+  return all;
 }
 
 function extractPlainText(richText = []) {
@@ -199,7 +219,7 @@ function PageContent({ page, onClose, integrationSettings }) {
   useEffect(() => {
     setLoading(true);
     invokeNotionProxy({ path: `blocks/${page.id}/children`, method: "GET" }, integrationSettings)
-      .then((res) => setBlocks(res.data?.results || []))
+      .then((data) => setBlocks(data?.results || []))
       .catch(() => setBlocks([]))
       .finally(() => setLoading(false));
   }, [page.id, integrationSettings]);
@@ -441,22 +461,32 @@ function useNotionSearch(integrationSettings) {
   const [error, setError] = useState(null);
 
   const search = useCallback(
-    async (body) => {
+    async (body, options = {}) => {
+      const { fetchAllPages = false } = options;
       setLoading(true);
       setError(null);
       setResults([]);
       try {
-        const res = await invokeNotionProxy(
-          {
-            path: "search",
-            method: "POST",
-            body: buildNotionSearchBody(body),
-          },
-          integrationSettings,
-        );
-        setResults(res.data?.results || []);
+        if (fetchAllPages) {
+          const all = await fetchAllNotionSearchPages(integrationSettings, buildNotionSearchBody(body));
+          setResults(all);
+        } else {
+          const b = buildNotionSearchBody({
+            ...body,
+            filter: body?.filter ?? { property: "object", value: "page" },
+          });
+          const data = await invokeNotionProxy(
+            { path: "search", method: "POST", body: b },
+            integrationSettings,
+          );
+          setResults(data?.results || []);
+        }
       } catch (e) {
-        setError(e?.response?.data?.error || e?.message || "Failed to load.");
+        setError(
+          typeof e?.response?.data?.error === "string"
+            ? e.response.data.error
+            : e?.response?.data?.error?.message || e?.message || "Failed to load.",
+        );
       } finally {
         setLoading(false);
       }
@@ -527,12 +557,12 @@ function DocumentsTab({ integrationSettings }) {
 
   const load = () => {
     setSelected(null);
-    search(buildNotionSearchBody({ page_size: 100 }));
+    search({ page_size: 100 }, { fetchAllPages: true });
   };
 
   useEffect(() => {
     setSelected(null);
-    search(buildNotionSearchBody({ page_size: 100 }));
+    search({ page_size: 100 }, { fetchAllPages: true });
   }, [integrationSettings, search]);
 
   // Only show pages that are NOT tasks and have a real title
@@ -581,14 +611,14 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSet
     if (!selected) return;
     const fetchComments = async () => {
       try {
-        const res = await invokeNotionProxy(
+        const data = await invokeNotionProxy(
           {
             path: `blocks/${selected.id}/children`,
             method: "GET",
           },
           integrationSettings,
         );
-        const comments = (res.data?.results || []).filter(b => b.type === "comment").length;
+        const comments = (data?.results || []).filter((b) => b.type === "comment").length;
         setCommentCounts(prev => ({ ...prev, [selected.id]: comments }));
       } catch {
         setCommentCounts(prev => ({ ...prev, [selected.id]: 0 }));
@@ -655,7 +685,7 @@ export default function NotionPage() {
   });
 
   const integrationSettings = useMemo(
-    () => getResolvedIntegrationSettings(settings[0] || {}),
+    () => buildDefaultAppSettings(getResolvedIntegrationSettings(settings[0] || {})),
     [settings],
   );
 
@@ -663,18 +693,14 @@ export default function NotionPage() {
     setTasksLoading(true);
     setTasksError(null);
     try {
-      const res = await invokeNotionProxy(
-        {
-          path: "search",
-          method: "POST",
-          body: buildNotionSearchBody({ page_size: 100 }),
-        },
-        integrationSettings,
-      );
-      const results = res.data?.results || [];
+      const results = await fetchAllNotionSearchPages(integrationSettings, {});
       setAllResults(results);
     } catch (e) {
-      setTasksError(e?.response?.data?.error || e?.message || "Failed to load.");
+      setTasksError(
+        typeof e?.response?.data?.error === "string"
+          ? e.response.data.error
+          : e?.response?.data?.error?.message || e?.message || "Failed to load.",
+      );
     } finally {
       setTasksLoading(false);
     }

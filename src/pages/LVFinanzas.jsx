@@ -41,9 +41,11 @@ const formatRelativeDate = (value) =>
 
 const formatDateTime = (value) =>
   value
-    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(
-        new Date(value),
-      )
+    ? new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Mexico_City",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value))
     : "N/A";
 
 function getReceiptStatus(receipt) {

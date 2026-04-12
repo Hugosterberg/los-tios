@@ -222,6 +222,20 @@ export async function localDeleteCompanyTransaction(id) {
   return { id };
 }
 
+export async function localUpdateCompanyTransaction(id, data) {
+  const items = readCompanyTransactions();
+  const idx = items.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error("Company transaction not found");
+  const updated = {
+    ...items[idx],
+    ...clone(data),
+    id,
+  };
+  items[idx] = updated;
+  writeCompanyTransactions(items);
+  return updated;
+}
+
 /** Local Employee rows when the hosted API is unavailable (same dev gate as shopping/expenses). */
 export async function localListEmployees() {
   const items = readEmployees();

@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
-import { format } from "date-fns";
+import { formatMexicoDateTimeSlashed } from "@/lib/mexicoTime";
 
 export default function ReceiptDialog({ order, open, onClose }) {
   const receiptRef = useRef(null);
@@ -30,7 +30,7 @@ export default function ReceiptDialog({ order, open, onClose }) {
             <h2 className="text-2xl font-bold">Los Tios</h2>
             <p className="text-sm text-gray-600">Pizzeria</p>
             <p className="text-xs text-gray-500 mt-1">Order #{order.id.slice(0, 8)}</p>
-            <p className="text-xs text-gray-500">{format(new Date(order.created_date), "dd/MM/yyyy HH:mm")}</p>
+            <p className="text-xs text-gray-500">{formatMexicoDateTimeSlashed(order.created_date)}</p>
           </div>
 
           <div className="mb-4 text-sm">

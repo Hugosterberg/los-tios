@@ -25,8 +25,7 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DayPickerCalendar } from "@/components/ui/calendar";
-import { format, parseISO } from "date-fns";
-import { enUS } from "date-fns/locale";
+import { parseISO } from "date-fns";
 import { motion } from "framer-motion";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { collectMenuIngredientOptionsFromItems, ingredientMatchKey } from "@/lib/menuIngredients";
@@ -42,6 +41,13 @@ import {
   localDeleteExpense,
 } from "@/lib/localDevFinance";
 import { cn } from "@/lib/utils";
+import {
+  formatMexicoDateShort,
+  formatMexicoMonthYearLabel,
+  getMexicoDateKey,
+  getMexicoNowDateKey,
+  getMexicoNowYearMonth,
+} from "@/lib/mexicoTime";
 
 function escapeCsvField(value) {
   const s = String(value);
@@ -60,7 +66,7 @@ function shoppingListCreatePayloadFromRow(row) {
 function formatShoppingDueDate(iso) {
   if (!iso || String(iso).length < 8) return null;
   try {
-    return format(parseISO(`${String(iso).slice(0, 10)}T12:00:00`), "MMM d, yyyy", { locale: enUS });
+    return formatMexicoDateShort(String(iso).slice(0, 10));
   } catch {
     return null;
   }
@@ -107,7 +113,7 @@ export default function ShoppingList() {
   const [quickMenuIngredient, setQuickMenuIngredient] = useState("");
   const [quickShoppingLabel, setQuickShoppingLabel] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
-  const [quickPurchaseDate, setQuickPurchaseDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [quickPurchaseDate, setQuickPurchaseDate] = useState(() => getMexicoNowDateKey());
   /** "cash" → company_cash, "card" → company_account (same as Finance expenses) */
   const [quickPurchasePayment, setQuickPurchasePayment] = useState("cash");
   const [purchaseDateOpen, setPurchaseDateOpen] = useState(false);
@@ -171,9 +177,7 @@ export default function ShoppingList() {
       });
   }, [expenses]);
 
-  const [registeredPurchasesMonth, setRegisteredPurchasesMonth] = useState(() =>
-    format(new Date(), "yyyy-MM"),
-  );
+  const [registeredPurchasesMonth, setRegisteredPurchasesMonth] = useState(() => getMexicoNowYearMonth());
 
   const registeredPurchasesForMonth = useMemo(() => {
     const prefix = registeredPurchasesMonth;
@@ -185,13 +189,10 @@ export default function ShoppingList() {
     [registeredPurchasesForMonth],
   );
 
-  const registeredMonthLabel = useMemo(() => {
-    try {
-      return format(parseISO(`${registeredPurchasesMonth}-01T12:00:00`), "MMMM yyyy", { locale: enUS });
-    } catch {
-      return registeredPurchasesMonth;
-    }
-  }, [registeredPurchasesMonth]);
+  const registeredMonthLabel = useMemo(
+    () => formatMexicoMonthYearLabel(registeredPurchasesMonth),
+    [registeredPurchasesMonth],
+  );
 
   const parsedRegisteredMonth = useMemo(() => {
     const parts = registeredPurchasesMonth.split("-");
@@ -300,7 +301,7 @@ export default function ShoppingList() {
   const startEditingRegisteredDate = (r) => {
     setEditingRegisteredAmountId(null);
     setEditingRegisteredDateId(r.id);
-    setEditingRegisteredDateDraft(r.dateIso || format(new Date(), "yyyy-MM-dd"));
+    setEditingRegisteredDateDraft(r.dateIso || getMexicoNowDateKey());
   };
 
   const commitRegisteredAmountEdit = async (r, valueOverride) => {
@@ -515,7 +516,7 @@ export default function ShoppingList() {
       return;
     }
 
-    const dateStr = quickPurchaseDate || format(new Date(), "yyyy-MM-dd");
+    const dateStr = quickPurchaseDate || getMexicoNowDateKey();
 
     const listPayload = {
       item_name: itemName,
@@ -1368,7 +1369,7 @@ export default function ShoppingList() {
                           aria-label="Choose purchase date"
                         >
                           <span className="tabular-nums text-gray-100">
-                            {format(parseISO(`${quickPurchaseDate}T12:00:00`), "MMM d, yyyy", { locale: enUS })}
+                            {formatMexicoDateShort(quickPurchaseDate)}
                           </span>
                           <CalendarIcon className="h-4 w-4 shrink-0 text-yellow-400/85" aria-hidden />
                         </button>
@@ -1382,7 +1383,7 @@ export default function ShoppingList() {
                           selected={parseISO(`${quickPurchaseDate}T12:00:00`)}
                           onSelect={(d) => {
                             if (d) {
-                              setQuickPurchaseDate(format(d, "yyyy-MM-dd"));
+                              setQuickPurchaseDate(getMexicoDateKey(d));
                               setPurchaseDateOpen(false);
                             }
                           }}
@@ -1699,9 +1700,7 @@ export default function ShoppingList() {
                                   onClick={() => startEditingRegisteredDate(r)}
                                   className="min-h-8 w-full min-w-[7.5rem] rounded border border-transparent px-2 py-1 text-left tabular-nums text-gray-300 transition-colors hover:border-yellow-500/35 hover:bg-yellow-500/10"
                                 >
-                                  {r.dateIso
-                                    ? format(parseISO(`${r.dateIso}T12:00:00`), "MMM d, yyyy", { locale: enUS })
-                                    : "—"}
+                                  {r.dateIso ? formatMexicoDateShort(r.dateIso) : "—"}
                                 </button>
                               )}
                             </td>

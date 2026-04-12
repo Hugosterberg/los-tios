@@ -34,8 +34,9 @@ import {
 import { enUS } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { formatMexicoLongDateEn } from "@/lib/mexicoTime";
 import {
   isLocalFinanceMode,
   localListEmployees,
@@ -238,6 +239,9 @@ export default function EmployeeCalendar() {
     notes: "",
     workDays: defaultWorkDayChecks(),
   });
+  /** String inputs so number fields stay editable (controlled `type="number"` fights partial input). */
+  const [dailyRateText, setDailyRateText] = useState("");
+  const [hourlyRateText, setHourlyRateText] = useState("");
 
   const [shiftForm, setShiftForm] = useState({
     employee_id: "",
@@ -481,9 +485,18 @@ export default function EmployeeCalendar() {
       alert("Select at least one workday.");
       return;
     }
-    const payload = buildEmployeePayload(employeeForm);
+    const merged = {
+      ...employeeForm,
+      daily_rate: parseFloat(String(dailyRateText).replace(",", ".")) || 0,
+      hourly_rate: parseFloat(String(hourlyRateText).replace(",", ".")) || 0,
+    };
+    const payload = buildEmployeePayload(merged);
     if (!payload.name) {
       alert("Enter a name.");
+      return;
+    }
+    if (!editingEmployee && !String(payload.phone || "").trim()) {
+      alert("Enter a phone number.");
       return;
     }
     if (editingEmployee) {
@@ -509,6 +522,8 @@ export default function EmployeeCalendar() {
   const openNewEmployeeForm = () => {
     setEditingEmployee(null);
     setEmployeeForm(freshEmployeeFormState());
+    setDailyRateText("");
+    setHourlyRateText("");
     setShowEmployeeForm(true);
   };
 
@@ -529,11 +544,23 @@ export default function EmployeeCalendar() {
       notes: stripWorkDaysTag(employee?.notes || ""),
       workDays: parseWorkDaysFromEmployee(employee),
     });
+    setDailyRateText(
+      employee?.daily_rate != null && String(employee.daily_rate).trim() !== ""
+        ? String(employee.daily_rate)
+        : "",
+    );
+    setHourlyRateText(
+      employee?.hourly_rate != null && String(employee.hourly_rate).trim() !== ""
+        ? String(employee.hourly_rate)
+        : "",
+    );
     setShowEmployeeForm(true);
   };
 
   const resetEmployeeForm = () => {
     setEmployeeForm(freshEmployeeFormState());
+    setDailyRateText("");
+    setHourlyRateText("");
     setEditingEmployee(null);
     setShowEmployeeForm(false);
   };
@@ -751,7 +778,7 @@ export default function EmployeeCalendar() {
                       <SelectTrigger className="border-yellow-500/20 bg-black/30 text-left text-gray-100">
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
-                      <SelectContent className="border-yellow-500/20 bg-[#1a1810] text-gray-100">
+                      <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
                         {activeEmployees.map((e) => (
                           <SelectItem key={e.id} value={e.id}>
                             {e.name}
@@ -920,195 +947,6 @@ export default function EmployeeCalendar() {
               </Button>
             </div>
 
-            {showEmployeeForm && (
-              <div>
-                <Card className={panelClass}>
-                  <CardHeader>
-                    <CardTitle className="text-gray-100">
-                      {editingEmployee ? "Edit employee" : "New employee"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleEmployeeSubmit} className="space-y-6 pb-4">
-                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="employee-name" className="text-gray-300">
-                            Name *
-                          </Label>
-                          <Input
-                            id="employee-name"
-                            name="employee-name"
-                            required
-                            autoComplete="off"
-                            autoCorrect="off"
-                            spellCheck={false}
-                            data-1p-ignore
-                            data-lpignore="true"
-                            data-form-type="other"
-                            value={employeeForm.name ?? ""}
-                            onChange={(e) => setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))}
-                            className="relative z-10 border-yellow-500/20 bg-black/30"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-gray-300">Role *</Label>
-                          <Select
-                            value={resolvedRole}
-                            onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, role: v }))}
-                          >
-                            <SelectTrigger className="border-yellow-500/20 bg-black/30">
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                            <SelectContent className="border-yellow-500/20 bg-[#1a1810] text-gray-100">
-                              {Object.entries(roleLabels).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-gray-300">Phone</Label>
-                          <Input
-                            value={employeeForm.phone ?? ""}
-                            onChange={(e) => setEmployeeForm((prev) => ({ ...prev, phone: e.target.value }))}
-                            className="border-yellow-500/20 bg-black/30"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-gray-300">Email</Label>
-                          <Input
-                            type="email"
-                            value={employeeForm.email ?? ""}
-                            onChange={(e) => setEmployeeForm((prev) => ({ ...prev, email: e.target.value }))}
-                            className="border-yellow-500/20 bg-black/30"
-                          />
-                        </div>
-
-                        <div className="space-y-3 md:col-span-2">
-                          <Label className="text-gray-300">Workdays *</Label>
-                          <p className="text-xs text-gray-500">
-                            Used for the weekly template and forecasting. Then set daily wage below (or hourly rate).
-                          </p>
-                          <div className="flex flex-wrap gap-3 rounded-xl border border-yellow-500/15 bg-black/20 p-3">
-                            {WORK_DAY_DEFS.map((d) => (
-                              <label
-                                key={d.key}
-                                className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-0.5 text-sm text-gray-200 hover:bg-white/5"
-                              >
-                                <Checkbox
-                                  checked={employeeForm.workDays[d.key]}
-                                  onCheckedChange={(checked) =>
-                                    setEmployeeForm((prev) => ({
-                                      ...prev,
-                                      workDays: { ...prev.workDays, [d.key]: checked === true },
-                                    }))
-                                  }
-                                  className="border-yellow-500/50 data-[state=checked]:bg-yellow-400 data-[state=checked]:text-black"
-                                />
-                                {d.label}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-gray-300">Pay type</Label>
-                          <Select
-                            value={resolvedPayType}
-                            onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, payment_type: v }))}
-                          >
-                            <SelectTrigger className="border-yellow-500/20 bg-black/30">
-                              <SelectValue placeholder="Pay type" />
-                            </SelectTrigger>
-                            <SelectContent className="border-yellow-500/20 bg-[#1a1810] text-gray-100">
-                              <SelectItem value="daily">Daily (fixed per shift day)</SelectItem>
-                              <SelectItem value="hourly">Hourly</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {resolvedPayType === "daily" ? (
-                          <div className="space-y-2">
-                            <Label className="text-gray-300">Daily wage (MXN)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={employeeForm.daily_rate}
-                              onChange={(e) =>
-                                setEmployeeForm((prev) => ({
-                                  ...prev,
-                                  daily_rate: parseFloat(e.target.value) || 0,
-                                }))
-                              }
-                              className="border-yellow-500/20 bg-black/30"
-                            />
-                            <p className="text-xs text-gray-500">
-                              Applied automatically as shift amount when you pick this employee (one scheduled day = one daily
-                              wage).
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <Label className="text-gray-300">Hourly rate (MXN)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={employeeForm.hourly_rate}
-                              onChange={(e) =>
-                                setEmployeeForm((prev) => ({
-                                  ...prev,
-                                  hourly_rate: parseFloat(e.target.value) || 0,
-                                }))
-                              }
-                              className="border-yellow-500/20 bg-black/30"
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-2 md:col-span-2">
-                          <Label className="text-gray-300">Notes</Label>
-                          <Textarea
-                            value={employeeForm.notes}
-                            onChange={(e) => setEmployeeForm((prev) => ({ ...prev, notes: e.target.value }))}
-                            rows={2}
-                            className="border-yellow-500/20 bg-black/30"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2 md:col-span-2">
-                          <input
-                            type="checkbox"
-                            id="is_active"
-                            checked={employeeForm.is_active}
-                            onChange={(e) => setEmployeeForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                            className="rounded border-yellow-500/40"
-                          />
-                          <Label htmlFor="is_active" className="text-gray-300">
-                            Active (can be scheduled)
-                          </Label>
-                        </div>
-                      </div>
-                      <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-yellow-500/20 bg-[#141210]/95 py-4 backdrop-blur-sm sm:static sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
-                        <Button type="button" variant="outline" onClick={resetEmployeeForm} className="border-yellow-500/30">
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={createEmployee.isPending || updateEmployee.isPending}
-                          className="bg-yellow-400 font-semibold text-black hover:bg-yellow-300"
-                        >
-                          {createEmployee.isPending || updateEmployee.isPending
-                            ? "Saving…"
-                            : editingEmployee
-                              ? "Save"
-                              : "Create"}
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {employees.map((employee) => (
                 <motion.div key={employee.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -1174,12 +1012,205 @@ export default function EmployeeCalendar() {
         </Tabs>
       </div>
 
+      <Dialog
+        open={showEmployeeForm}
+        onOpenChange={(open) => {
+          if (!open) resetEmployeeForm();
+        }}
+      >
+        <DialogContent className="pointer-events-auto max-h-[min(90vh,720px)] max-w-xl overflow-y-auto border border-yellow-500/20 bg-[#141210] p-5 text-gray-100 shadow-2xl z-[200] sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-gray-100">
+              {editingEmployee ? "Edit employee" : "New employee"}
+            </DialogTitle>
+            <DialogDescription className="text-left text-sm text-gray-500">
+              Name and phone are required for scheduling. Email is optional. Pick workdays and daily wage — amounts roll
+              into the calendar, Daily Cash (when paid), and Dashboard labor totals.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEmployeeSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="employee-name" className="text-gray-300">
+                  Name *
+                </Label>
+                <Input
+                  id="employee-name"
+                  name="employee-name"
+                  required
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  value={employeeForm.name ?? ""}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="border-yellow-500/20 bg-black/30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Role</Label>
+                <Select
+                  value={resolvedRole}
+                  onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, role: v }))}
+                >
+                  <SelectTrigger className="border-yellow-500/20 bg-black/30">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
+                    {Object.entries(roleLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employee-phone" className="text-gray-300">
+                  Phone *
+                </Label>
+                <Input
+                  id="employee-phone"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={employeeForm.phone ?? ""}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  className="border-yellow-500/20 bg-black/30"
+                  placeholder="+52 …"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employee-email" className="text-gray-300">
+                  Email (optional)
+                </Label>
+                <Input
+                  id="employee-email"
+                  type="email"
+                  autoComplete="email"
+                  value={employeeForm.email ?? ""}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, email: e.target.value }))}
+                  className="border-yellow-500/20 bg-black/30"
+                />
+              </div>
+
+              <div className="space-y-3 md:col-span-2">
+                <Label className="text-gray-300">Workdays *</Label>
+                <p className="text-xs text-gray-500">
+                  Used for the weekly template and labor totals. Daily wage applies for each scheduled day.
+                </p>
+                <div className="flex flex-wrap gap-3 rounded-xl border border-yellow-500/15 bg-black/20 p-3">
+                  {WORK_DAY_DEFS.map((d) => (
+                    <label
+                      key={d.key}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-0.5 text-sm text-gray-200 hover:bg-white/5"
+                    >
+                      <Checkbox
+                        checked={employeeForm.workDays[d.key]}
+                        onCheckedChange={(checked) =>
+                          setEmployeeForm((prev) => ({
+                            ...prev,
+                            workDays: { ...prev.workDays, [d.key]: checked === true },
+                          }))
+                        }
+                        className="border-yellow-500/50 data-[state=checked]:bg-yellow-400 data-[state=checked]:text-black"
+                      />
+                      {d.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-300">Pay type</Label>
+                <Select
+                  value={resolvedPayType}
+                  onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, payment_type: v }))}
+                >
+                  <SelectTrigger className="border-yellow-500/20 bg-black/30">
+                    <SelectValue placeholder="Pay type" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
+                    <SelectItem value="daily">Daily (fixed per shift day)</SelectItem>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {resolvedPayType === "daily" ? (
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Daily wage (MXN) *</Label>
+                  <Input
+                    inputMode="decimal"
+                    value={dailyRateText}
+                    onChange={(e) => setDailyRateText(e.target.value)}
+                    className="border-yellow-500/20 bg-black/30"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-gray-500">
+                    One shift on the calendar = this amount until you mark the shift paid from cash/bank.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Hourly rate (MXN)</Label>
+                  <Input
+                    inputMode="decimal"
+                    value={hourlyRateText}
+                    onChange={(e) => setHourlyRateText(e.target.value)}
+                    className="border-yellow-500/20 bg-black/30"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-gray-300">Notes (optional)</Label>
+                <Textarea
+                  value={employeeForm.notes}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={2}
+                  className="border-yellow-500/20 bg-black/30"
+                />
+              </div>
+              <div className="flex items-center gap-2 md:col-span-2">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={employeeForm.is_active}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                  className="rounded border-yellow-500/40"
+                />
+                <Label htmlFor="is_active" className="text-gray-300">
+                  Active (can be scheduled)
+                </Label>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-yellow-500/20 pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={resetEmployeeForm} className="border-yellow-500/30">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createEmployee.isPending || updateEmployee.isPending}
+                className="bg-yellow-400 font-semibold text-black hover:bg-yellow-300"
+              >
+                {createEmployee.isPending || updateEmployee.isPending
+                  ? "Saving…"
+                  : editingEmployee
+                    ? "Save"
+                    : "Create"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
         <DialogContent className="max-w-md border border-yellow-500/20 bg-[#141210] text-gray-100 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-yellow-100">
               {editingShift ? "Edit shift" : "New shift"} —{" "}
-              {selectedDate && format(selectedDate, "MMM d, yyyy", { locale: dateLocale })}
+              {selectedDate && formatMexicoLongDateEn(selectedDate)}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleShiftSubmit} className="space-y-4">
@@ -1189,7 +1220,7 @@ export default function EmployeeCalendar() {
                 <SelectTrigger className="border-yellow-500/20 bg-black/30">
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
-                <SelectContent className="border-yellow-500/20 bg-[#1a1810] text-gray-100">
+                <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
                   {activeEmployees.map((e) => (
                     <SelectItem key={e.id} value={e.id}>
                       {e.name} · {roleLabels[e.role]}

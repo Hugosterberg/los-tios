@@ -3,18 +3,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getClipOverview, hasClipApiConfig, CLIP_API_CATALOG } from "@/api/clip";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
+import {
+  formatRevolutLegsSummary,
+  getRevolutIntegrationPreview,
+  hasRevolutApiConfig,
+  isRevolutPersonalMode,
+} from "@/api/revolut";
 import { buildDefaultAppSettings, INTEGRATION_SETTINGS_SECTIONS } from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
+import { formatMexicoDateTimeMediumShort } from "@/lib/mexicoTime";
 import { invokeNotionProxy } from "@/api/notionClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, CreditCard, Eye, EyeOff, KeyRound, Loader2, PackageSearch, Receipt, RefreshCw, Save, ShieldCheck, ShoppingBag, Store, Users, Wifi, XCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, Eye, EyeOff, KeyRound, Loader2, PackageSearch, Receipt, RefreshCw, Save, ShieldCheck, ShoppingBag, Store, Users, Wallet, Wifi, XCircle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -154,6 +162,7 @@ export default function Integrations() {
   const [showSnapshotSecrets, setShowSnapshotSecrets] = useState({
     clip: false,
     loyverse: false,
+    revolut: false,
   });
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
@@ -169,7 +178,18 @@ export default function Integrations() {
     try {
       if (sectionId === "notion") {
         try {
-          await invokeNotionProxy({ path: "users/me", method: "GET" }, formData);
+          // POST /search works for internal integrations; GET /users/me can 404 on some API/token combinations.
+          await invokeNotionProxy(
+            {
+              path: "search",
+              method: "POST",
+              body: {
+                page_size: 1,
+                filter: { property: "object", value: "page" },
+              },
+            },
+            formData,
+          );
           setTestResults((r) => ({ ...r, notion: { ok: true, message: "Notion connection successful." } }));
         } catch (e) {
           throw new Error(e?.response?.data?.error || e?.message || "Error connecting to Notion.");
@@ -188,6 +208,24 @@ export default function Integrations() {
             message: overview?.paymentMethods?.length
               ? "Clip connection successful."
               : "Clip reporting loaded, but no payment methods were returned.",
+          },
+        }));
+      } else if (sectionId === "revolut") {
+        if (isRevolutPersonalMode(formData)) {
+          throw new Error(
+            "Personal Revolut cannot use the Business API from this app. Switch Account type to Business after you migrate, then add a token — or keep tracking bank activity manually.",
+          );
+        }
+        if (!hasRevolutApiConfig(formData)) throw new Error("Revolut access token is missing.");
+        const preview = await getRevolutIntegrationPreview(formData);
+        setTestResults((r) => ({
+          ...r,
+          revolut: {
+            ok: true,
+            message:
+              preview?.accounts?.length || preview?.transactions?.length
+                ? `Revolut OK: ${preview.accounts?.length || 0} account(s), ${preview.transactions?.length || 0} transaction(s) in preview.`
+                : "Revolut connection OK, but no accounts or transactions returned for the selected window.",
           },
         }));
       }
@@ -241,6 +279,21 @@ export default function Integrations() {
     ],
     queryFn: () => getLoyverseOverview(deferredFormData),
     enabled: hasLoyverseApiConfig(deferredFormData),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const revolutOverviewQuery = useQuery({
+    queryKey: [
+      "integrations",
+      "revolutPreview",
+      deferredFormData.revolut_connection_type,
+      deferredFormData.revolut_access_token,
+      deferredFormData.revolut_api_base_url,
+      deferredFormData.revolut_account_id,
+    ],
+    queryFn: () => getRevolutIntegrationPreview(deferredFormData),
+    enabled: hasRevolutApiConfig(deferredFormData),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
@@ -325,8 +378,10 @@ export default function Integrations() {
 
   const clipOverview = clipOverviewQuery.data;
   const loyverseOverview = loyverseOverviewQuery.data;
+  const revolutPreview = revolutOverviewQuery.data;
   const clipConfigured = hasClipApiConfig(formData);
   const loyverseConfigured = hasLoyverseApiConfig(formData);
+  const revolutConfigured = hasRevolutApiConfig(formData);
   const topClipPaymentTypes = clipOverview?.analytics?.paymentTypeSummary?.slice(0, 6) || [];
   const topClipIssuers = clipOverview?.analytics?.issuerSummary?.slice(0, 6) || [];
   const clipDaily = clipOverview?.analytics?.dailyPayments?.slice(-7).reverse() || [];
@@ -494,7 +549,7 @@ export default function Integrations() {
               <div>
                 <CardTitle className="text-white">Credentials Vault</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Use tabs to manage Clip and Loyverse credentials. Fields marked as secrets can be hidden or revealed.
+                    Use tabs to manage Clip, Loyverse, Revolut, and Notion credentials. Fields marked as secrets can be hidden or revealed.
                   </CardDescription>
               </div>
 
@@ -584,6 +639,16 @@ export default function Integrations() {
                         );
                       })()}
 
+                      {section.id === "revolut" && isRevolutPersonalMode(formData) ? (
+                        <div className="rounded-2xl border border-sky-500/30 bg-sky-950/40 p-4 text-sm text-sky-100">
+                          <p className="font-semibold text-sky-200">Personal Revolut — ingen automatisk bank-synk här</p>
+                          <p className="mt-2 text-sky-100/90">
+                            Den här appen anropar bara Revoluts <strong className="text-white">Business API</strong> (b2b.revolut.com). Ett privat Revolut-konto kan inte använda samma integration.
+                            När ni migrerar till Revolut Business: ändra <strong className="text-white">Account type</strong> till Business och klistra in access token enligt guiden nedan.
+                          </p>
+                        </div>
+                      ) : null}
+
                       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <h2 className="text-xl font-semibold text-white">{section.title}</h2>
@@ -603,7 +668,7 @@ export default function Integrations() {
                             type="button"
                             variant="outline"
                             onClick={() => runTest(section.id)}
-                            disabled={testing[section.id]}
+                            disabled={testing[section.id] || (section.id === "revolut" && isRevolutPersonalMode(formData))}
                             className="border-yellow-500/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
                           >
                             {testing[section.id]
@@ -655,15 +720,33 @@ export default function Integrations() {
                               </div>
 
                               <div className="mt-4">
-                                <Input
-                                  id={field.key}
-                                  type={field.secret && !isVisibleSecret ? "password" : "text"}
-                                  value={formData[field.key] || ""}
-                                  onChange={(event) => handleFieldChange(field.key, event.target.value)}
-                                  placeholder={field.placeholder}
-                                  autoComplete="off"
-                                  className="border-white/10 bg-[#0d0d0d] text-white placeholder:text-gray-500"
-                                />
+                                {field.fieldType === "select" && field.options?.length ? (
+                                  <Select
+                                    value={formData[field.key] || field.options[0]?.value || ""}
+                                    onValueChange={(v) => handleFieldChange(field.key, v)}
+                                  >
+                                    <SelectTrigger id={field.key} className="border-white/10 bg-[#0d0d0d] text-white">
+                                      <SelectValue placeholder={field.placeholder || "Select…"} />
+                                    </SelectTrigger>
+                                    <SelectContent className="z-[500] max-h-[min(70vh,420px)] border-white/10 bg-[#141414] text-white">
+                                      {field.options.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value} className="focus:bg-white/10">
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    id={field.key}
+                                    type={field.secret && !isVisibleSecret ? "password" : "text"}
+                                    value={formData[field.key] || ""}
+                                    onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                                    placeholder={field.placeholder}
+                                    autoComplete="off"
+                                    className="border-white/10 bg-[#0d0d0d] text-white placeholder:text-gray-500"
+                                  />
+                                )}
                               </div>
                             </div>
                           );
@@ -1101,6 +1184,105 @@ export default function Integrations() {
                                   )}
                                 />
                               </div>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {section.id === "revolut" ? (
+                        <div className="space-y-4">
+                          <DataStateCard
+                            title="Revolut live data unavailable"
+                            description="Add a Revolut Business API access token (READ scope) and the matching API base URL. Official docs: developer.revolut.com (Business API — accounts & transactions)."
+                            query={revolutOverviewQuery}
+                            configured={revolutConfigured || isRevolutPersonalMode(formData)}
+                          />
+
+                          {revolutConfigured && !revolutOverviewQuery.isLoading && !revolutOverviewQuery.isFetching && !revolutOverviewQuery.isError ? (
+                            <>
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                <MetricTile
+                                  label="Accounts visible"
+                                  value={formatNumber(revolutPreview?.accounts?.length || 0)}
+                                  hint="GET /accounts"
+                                  icon={Wallet}
+                                />
+                                <MetricTile
+                                  label="Transactions (preview)"
+                                  value={formatNumber(revolutPreview?.transactions?.length || 0)}
+                                  hint={
+                                    revolutPreview?.meta?.accountFilter
+                                      ? `Filtered by account · window ${revolutPreview?.meta?.from || ""} → ${revolutPreview?.meta?.to || ""}`
+                                      : `Last ~30 days · window ${revolutPreview?.meta?.from || ""} → ${revolutPreview?.meta?.to || ""}`
+                                  }
+                                  icon={Receipt}
+                                />
+                                <MetricTile
+                                  label="API environment"
+                                  value={(formData.revolut_api_base_url || "").includes("sandbox") ? "Sandbox" : "Production"}
+                                  hint="Base URL must match the token environment"
+                                  icon={ShieldCheck}
+                                />
+                                <MetricTile
+                                  label="Account filter"
+                                  value={formData.revolut_account_id?.trim() ? "One account" : "All accounts"}
+                                  hint={formData.revolut_account_id?.trim() || "Optional UUID from accounts list"}
+                                  icon={Store}
+                                />
+                              </div>
+
+                              <RankingCard
+                                title="Business accounts"
+                                subtitle="Live from GET /accounts (balances & currencies)."
+                                rows={revolutPreview?.accounts || []}
+                                emptyText="No accounts returned."
+                                renderRow={(acc) => (
+                                  <div key={acc.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 p-3">
+                                    <div>
+                                      <p className="font-medium text-white">{acc.name || acc.id}</p>
+                                      <p className="mt-1 text-xs text-gray-400">
+                                        {acc.state || "—"} · {acc.id}
+                                      </p>
+                                    </div>
+                                    <p className="font-semibold text-sky-300">
+                                      {Number(acc.balance || 0).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}{" "}
+                                      {acc.currency || ""}
+                                    </p>
+                                  </div>
+                                )}
+                              />
+
+                              <RankingCard
+                                title="Recent transactions"
+                                subtitle="GET /transactions (up to 100 rows, ~30 day lookback; amounts per leg)."
+                                rows={revolutPreview?.transactions || []}
+                                emptyText="No transactions in this window. Try clearing the account filter or extending the date range in Revolut."
+                                renderRow={(tx) => (
+                                  <div key={tx.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div>
+                                        <p className="font-medium text-white">{tx.type || "transaction"}</p>
+                                        <p className="mt-1 text-xs text-gray-400">
+                                          {tx.state || "—"} · {tx.created_at ? formatMexicoDateTimeMediumShort(tx.created_at) : "—"}
+                                        </p>
+                                      </div>
+                                      <Badge className="border-sky-500/30 bg-sky-500/15 text-sky-200">{tx.id?.slice(0, 8) || "—"}…</Badge>
+                                    </div>
+                                    {tx.reference ? (
+                                      <p className="mt-2 text-xs text-gray-500">Ref: {tx.reference}</p>
+                                    ) : null}
+                                    <p className="mt-2 text-sm font-semibold text-white">{formatRevolutLegsSummary(tx)}</p>
+                                  </div>
+                                )}
+                              />
+
+                              <p className="text-xs text-gray-500">
+                                Access tokens expire about every 40 minutes. Refresh via OAuth / <code className="text-gray-400">auth/token</code> as described in Revolut&apos;s guide &quot;Make your first API request&quot;. Production calls from this app use the{" "}
+                                <code className="text-gray-400">revolutProxy</code> Edge Function when not in local dev.
+                              </p>
                             </>
                           ) : null}
                         </div>

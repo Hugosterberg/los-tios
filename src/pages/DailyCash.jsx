@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, endOfDay, format, isSameDay, parseISO, startOfDay, subDays } from "date-fns";
-import { enUS } from "date-fns/locale";
+import { addDays, endOfDay, isSameDay, startOfDay, subDays } from "date-fns";
 import {
   Banknote,
   CalendarDays,
@@ -22,27 +21,42 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { listOrders } from "@/lib/local-dev-orders";
+import { listOrders, updateOrderEntity } from "@/lib/local-dev-orders";
 import {
   isLocalFinanceMode,
   localCreateCompanyTransaction,
   localDeleteCompanyTransaction,
   localListCompanyTransactions,
   localListExpenses,
+  localListShifts,
+  localUpdateCompanyTransaction,
+  localUpdateExpense,
 } from "@/lib/localDevFinance";
 import {
   addManualLine,
+  getDetailOverrides,
   getManualLines,
   getOpeningBalance,
   removeManualLine,
+  setDetailOverride,
   setOpeningBalance,
+  updateManualLine,
 } from "@/lib/dailyCashLocal";
+import {
+  dateFromMexicoDateKey,
+  formatMexicoLongDateEn,
+  formatMexicoTime,
+  formatMexicoWeekdayLongEn,
+  getMexicoDateKey,
+  getMexicoNowDateKey,
+  matchesMexicoCalendarDay,
+} from "@/lib/mexicoTime";
 
 /** Marks rows created from Daily Cash so they can be removed / undone from this page */
 const DAILY_CASH_TX_MARKER = "los_tios:daily_cash";
 
 function dayKey(d) {
-  return format(d, "yyyy-MM-dd");
+  return getMexicoDateKey(d);
 }
 
 function formatMx(value) {
@@ -55,19 +69,81 @@ function formatMx(value) {
 }
 
 function rowTimeLabel(iso) {
-  if (!iso) return "—";
-  try {
-    const d = typeof iso === "string" ? parseISO(iso) : new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
-    return format(d, "HH:mm");
-  } catch {
-    return "—";
-  }
+  return formatMexicoTime(iso);
 }
 
 function matchesDay(isoDate, key) {
-  if (!isoDate) return false;
-  return String(isoDate).slice(0, 10) === key;
+  return matchesMexicoCalendarDay(isoDate, key);
+}
+
+/** Map edited ledger detail back to Order.customer_name (display is `Order · ${name}`). */
+function detailEditToCustomerName(text) {
+  const t = text.trim();
+  const prefix = "Order · ";
+  if (t.startsWith(prefix)) {
+    return t.slice(prefix.length).trim() || "Customer";
+  }
+  return t || "Customer";
+}
+
+function LedgerDetailCell({ displayDetail, onCommit }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(displayDetail);
+  const skipBlurCommit = useRef(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(displayDetail);
+    }
+  }, [displayDetail, editing]);
+
+  const submit = () => {
+    const p = onCommit(draft);
+    Promise.resolve(p).finally(() => setEditing(false));
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (skipBlurCommit.current) {
+            skipBlurCommit.current = false;
+            return;
+          }
+          submit();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+          if (e.key === "Escape") {
+            skipBlurCommit.current = true;
+            setDraft(displayDetail);
+            setEditing(false);
+          }
+        }}
+        className="h-8 border-yellow-500/40 bg-[#0f0f0c] text-sm text-gray-200"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="w-full min-w-[6rem] rounded px-1 py-0.5 text-left text-gray-400 hover:bg-yellow-500/10 hover:text-gray-200"
+      onClick={() => {
+        skipBlurCommit.current = false;
+        setDraft(displayDetail);
+        setEditing(true);
+      }}
+    >
+      {displayDetail || "—"}
+    </button>
+  );
 }
 
 /** Align with Loyverse overview: exclude voided / cancelled receipts */
@@ -81,7 +157,7 @@ function isLoyverseReceiptCompleted(receipt) {
 
 export default function DailyCash() {
   const queryClient = useQueryClient();
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => dateFromMexicoDateKey(getMexicoNowDateKey()));
   const dayStr = dayKey(selectedDate);
   const useLocalFinance = isLocalFinanceMode();
   const isLocalOnlyMode =
@@ -152,10 +228,47 @@ export default function DailyCash() {
     },
   });
 
+  const saveTransactionDescription = useMutation({
+    mutationFn: ({ id, data }) =>
+      useLocalFinance
+        ? localUpdateCompanyTransaction(id, data)
+        : base44.entities.CompanyTransaction.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+    },
+  });
+
+  const saveOrderDetail = useMutation({
+    mutationFn: ({ id, data }) =>
+      updateOrderEntity(id, data, (orderId, payload) => base44.entities.Order.update(orderId, payload)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+  });
+
+  const saveExpenseDetail = useMutation({
+    mutationFn: ({ id, data }) =>
+      useLocalFinance ? localUpdateExpense(id, data) : base44.entities.Expense.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+  });
+
   const { data: expenses = [] } = useQuery({
     queryKey: ["expenses", useLocalFinance ? "local" : "remote"],
     queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
+
+  const { data: shifts = [] } = useQuery({
+    queryKey: ["shifts", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListShifts() : base44.entities.Shift.list("-date")),
+  });
+
+  const unpaidShiftLaborDay = useMemo(() => {
+    return shifts
+      .filter((s) => matchesDay(s.date, dayStr) && s.status !== "cancelled" && s.status !== "paid")
+      .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  }, [shifts, dayStr]);
 
   useEffect(() => {
     const v = getOpeningBalance(dayStr);
@@ -176,6 +289,8 @@ export default function DailyCash() {
   }, [dayStr, openingInput]);
 
   const manualLines = useMemo(() => getManualLines(dayStr), [dayStr, storeTick]);
+
+  const detailOverrides = useMemo(() => getDetailOverrides(dayStr), [dayStr, storeTick]);
 
   const loyverseCashRows = useMemo(() => {
     if (!loyverseOverview?.receipts?.length) return [];
@@ -399,8 +514,63 @@ export default function DailyCash() {
     }
   };
 
-  const weekday = format(selectedDate, "EEEE", { locale: enUS });
-  const longDate = format(selectedDate, "MMMM d, yyyy", { locale: enUS });
+  const handleDetailCommit = useCallback(
+    async (row, text) => {
+      const trimmed = text.trim();
+      const baseDetail = row.detail;
+
+      try {
+        if (row.id.startsWith("loyverse-")) {
+          if (trimmed === baseDetail) {
+            setDetailOverride(dayStr, row.id, null);
+          } else {
+            setDetailOverride(dayStr, row.id, trimmed);
+          }
+          setStoreTick((t) => t + 1);
+          return;
+        }
+
+        if (row.id.startsWith("order-")) {
+          const orderId = row.id.slice("order-".length);
+          await saveOrderDetail.mutateAsync({
+            id: orderId,
+            data: { customer_name: detailEditToCustomerName(text) },
+          });
+          return;
+        }
+
+        if ((row.id.startsWith("tx-in-") || row.id.startsWith("tx-out-")) && row.transactionId) {
+          const fallback = row.inAmount != null ? "Cash contribution" : "Cash withdrawal";
+          await saveTransactionDescription.mutateAsync({
+            id: row.transactionId,
+            data: { description: trimmed || fallback },
+          });
+          return;
+        }
+
+        if (row.id.startsWith("exp-")) {
+          const expId = row.id.slice("exp-".length);
+          await saveExpenseDetail.mutateAsync({
+            id: expId,
+            data: { name: trimmed || "Expense" },
+          });
+          return;
+        }
+
+        if (row.isManual && row.manualId) {
+          updateManualLine(dayStr, row.manualId, { note: trimmed || "Adjustment" });
+          setStoreTick((t) => t + 1);
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Could not save detail. Try again.");
+      }
+    },
+    [dayStr, saveOrderDetail, saveTransactionDescription, saveExpenseDetail],
+  );
+
+  const weekday = formatMexicoWeekdayLongEn(selectedDate);
+  const longDate = formatMexicoLongDateEn(selectedDate);
 
   return (
     <div className="min-h-screen bg-[#0f0f0c] text-white">
@@ -542,6 +712,21 @@ export default function DailyCash() {
           </div>
         </div>
 
+        <div className="rounded-xl border border-sky-500/25 bg-[#101820] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-500/90">Labor (employees)</p>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Scheduled shifts not yet paid from cash</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-sky-200">{formatMx(unpaidShiftLaborDay)}</p>
+            </div>
+            <p className="max-w-xl text-[11px] leading-relaxed text-gray-500 sm:text-right">
+              Same amounts as on the Employees calendar for this date. Salary paid from the cash drawer appears in the register
+              as an expense row when you complete a shift with &quot;Complete &amp; pay&quot; (company cash). Dashboard labor
+              includes both booked salary expenses and unpaid scheduled shifts.
+            </p>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-yellow-500/15 bg-[#161612] p-4">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -629,7 +814,8 @@ export default function DailyCash() {
               Includes <strong className="font-medium text-gray-500">Loyverse POS</strong> cash receipts, customer cash orders,
               Shopping <strong className="font-medium text-gray-500">Register purchase</strong> lines paid with{" "}
               <strong className="font-medium text-gray-500">Cash</strong>, other cash expenses, and manual rows above. Card-paid
-              shopping purchases go to the bank account, not this drawer. Edit source rows in Company account or Shopping.
+              shopping purchases go to the bank account, not this drawer. Click a detail cell to edit (saved on blur or Enter);
+              Loyverse labels are stored in this browser only.
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -662,7 +848,12 @@ export default function DailyCash() {
                     >
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-500">{r.timeLabel}</td>
                       <td className="px-3 py-2 text-gray-300">{r.source}</td>
-                      <td className="px-3 py-2 text-gray-400">{r.detail}</td>
+                      <td className="px-2 py-1 align-middle text-gray-400">
+                        <LedgerDetailCell
+                          displayDetail={detailOverrides[r.id] ?? r.detail}
+                          onCommit={(value) => handleDetailCommit(r, value)}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-right font-medium tabular-nums text-emerald-300/90">
                         {r.inAmount != null ? formatMx(r.inAmount) : "—"}
                       </td>

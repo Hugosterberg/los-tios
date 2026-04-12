@@ -1,8 +1,16 @@
 import React, { useState, useMemo } from "react";
+import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from "date-fns";
+import {
+  formatMexicoLongDateEn,
+  formatMexicoMonthShortDayYearEn,
+  formatMexicoMonthYearLabel,
+  formatMexicoMonthDayShortEn,
+  getMexicoYearMonthKey,
+} from "@/lib/mexicoTime";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Plus, Receipt, Truck, Banknote, CreditCard, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { ShoppingBag, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
@@ -14,7 +22,7 @@ import OrderCard from "../components/orders/OrderCard";
 import ReceiptDialog from "../components/orders/ReceiptDialog";
 import NewOrderForm from "../components/orders/NewOrderForm";
 import TableServiceManager from "../components/orders/TableServiceManager";
-import LoyverseReceiptsSection from "../components/orders/LoyverseReceiptsSection";
+import PaidOrdersReceiptsFeed from "../components/orders/PaidOrdersReceiptsFeed";
 
 const ACTIVE_ORDER_STATUSES = ["pending", "preparing", "ready", "out_for_delivery"];
 const TABLE_NUMBERS = new Set(["1", "2", "3", "4", "5", "6"]);
@@ -32,7 +40,30 @@ export default function Orders() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
   const [selectedView, setSelectedView] = useState("active");
+  const [loyverseReceiptRange, setLoyverseReceiptRange] = useState(/** @type {"day" | "week" | "month"} */ ("day"));
   const queryClient = useQueryClient();
+
+  const loyverseDateWindow = useMemo(() => {
+    const now = new Date();
+    if (loyverseReceiptRange === "day") {
+      return { start: startOfDay(now), end: endOfDay(now) };
+    }
+    if (loyverseReceiptRange === "week") {
+      return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
+    }
+    return { start: startOfMonth(now), end: endOfMonth(now) };
+  }, [loyverseReceiptRange]);
+
+  const loyversePeriodLabel = useMemo(() => {
+    const { start, end } = loyverseDateWindow;
+    if (loyverseReceiptRange === "day") {
+      return formatMexicoLongDateEn(start);
+    }
+    if (loyverseReceiptRange === "week") {
+      return `${formatMexicoMonthDayShortEn(start)} – ${formatMexicoMonthShortDayYearEn(end)}`;
+    }
+    return formatMexicoMonthYearLabel(getMexicoYearMonthKey(start));
+  }, [loyverseDateWindow, loyverseReceiptRange]);
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -52,8 +83,18 @@ export default function Orders() {
   const appSettings = React.useMemo(() => getResolvedIntegrationSettings(appSettingsRows[0] || {}), [appSettingsRows]);
 
   const loyverseQuery = useQuery({
-    queryKey: ["loyverseOverview", appSettingsRows[0]?.id || "none"],
-    queryFn: () => getLoyverseOverview(appSettings),
+    queryKey: [
+      "loyverseOverview",
+      appSettingsRows[0]?.id || "none",
+      loyverseReceiptRange,
+      loyverseDateWindow.start.toISOString(),
+      loyverseDateWindow.end.toISOString(),
+    ],
+    queryFn: () =>
+      getLoyverseOverview(appSettings, {
+        start: loyverseDateWindow.start,
+        end: loyverseDateWindow.end,
+      }),
     enabled: hasLoyverseApiConfig(appSettings),
     staleTime: 60_000,
   });
@@ -275,6 +316,21 @@ export default function Orders() {
       </div>
 
       <div className="max-w-[1360px] mx-auto px-3 sm:px-5 lg:px-6 py-5">
+        <PaidOrdersReceiptsFeed
+          orders={orders}
+          loyverseReceipts={loyverseReceipts}
+          dateWindow={loyverseDateWindow}
+          range={loyverseReceiptRange}
+          onRangeChange={setLoyverseReceiptRange}
+          periodLabel={loyversePeriodLabel}
+          loyverseLoading={loyverseQuery.isLoading}
+          loyverseError={loyverseQuery.isError}
+          onLoyverseRefresh={() => loyverseQuery.refetch()}
+          loyverseFetching={loyverseQuery.isFetching}
+          hasLoyverseConfig={hasLoyverseApiConfig(appSettings)}
+          onPrintReceipt={handlePrintReceipt}
+        />
+
         <TableServiceManager
           menuItems={menuItems}
           activeTableOrders={activeTableOrders}
@@ -329,7 +385,6 @@ export default function Orders() {
       </div>
 
       <ReceiptDialog order={selectedOrder} open={showReceipt} onClose={() => setShowReceipt(false)} />
-      <LoyverseReceiptsSection receipts={loyverseReceipts} isLoading={loyverseQuery.isLoading} isError={loyverseQuery.isError} onRefresh={() => loyverseQuery.refetch()} isFetching={loyverseQuery.isFetching} hasConfig={hasLoyverseApiConfig(appSettings)} />
     </div>
   );
 }

@@ -32,6 +32,13 @@ import {
   YAxis,
 } from "recharts";
 import { subDays, format, isValid } from "date-fns";
+import {
+  formatMexicoDateTimeNumeric,
+  formatMexicoTime,
+  getMexicoDateKey,
+  isPlainDateKey,
+  MEXICO_DISPLAY_TIMEZONE,
+} from "@/lib/mexicoTime";
 import { base44 } from "@/api/base44Client";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
@@ -83,6 +90,19 @@ function formatDateSafe(value, pattern, fallback = "N/A") {
   const date = value instanceof Date ? value : new Date(value);
   if (!isValid(date)) {
     return fallback;
+  }
+
+  if (pattern === "HH:mm") {
+    return formatMexicoTime(date, fallback);
+  }
+  if (pattern === "yyyy-MM-dd HH:mm") {
+    return formatMexicoDateTimeNumeric(date, fallback);
+  }
+  if (pattern === "yyyy-MM-dd") {
+    if (typeof value === "string" && isPlainDateKey(value.trim())) {
+      return value.trim().slice(0, 10);
+    }
+    return getMexicoDateKey(date) || fallback;
   }
 
   return format(date, pattern);
@@ -542,12 +562,17 @@ function buildOrdersByHourFromEvents(events) {
   });
 }
 
+const mexicoWeekdayShort = new Intl.DateTimeFormat("en-US", {
+  timeZone: MEXICO_DISPLAY_TIMEZONE,
+  weekday: "short",
+});
+
 function buildSevenDayRevenueFromEvents(events) {
   return Array.from({ length: 7 }, (_, index) => {
     const date = subDays(new Date(), 6 - index);
     const dayEvents = events.filter((event) => isSameDay(event.timestamp, date));
     return {
-      day: format(date, "EEE"),
+      day: mexicoWeekdayShort.format(date),
       revenue: dayEvents.reduce((sum, event) => sum + event.amount, 0),
       orders: dayEvents.length,
     };
@@ -986,7 +1011,6 @@ export default function Dashboard() {
   const manualIngredientExpenseRows = ingredientExpenseRows.filter((expense) => !expense.from_shopping_list);
   const salaryExpenseRows = filteredExpenses.filter((expense) => getExpenseCategory(expense) === "salaries");
   const shiftLaborExpenseRows = salaryExpenseRows.filter((expense) => shiftExpenseIds.has(expense.id));
-  const manualLaborExpenseRows = salaryExpenseRows.filter((expense) => !shiftExpenseIds.has(expense.id));
   const recurringExpenseRows = filteredExpenses.filter((expense) => expense.is_recurring);
   const otherOperatingExpenseRows = filteredExpenses.filter((expense) => {
     const category = getExpenseCategory(expense);
@@ -1001,13 +1025,18 @@ export default function Dashboard() {
   const estimatedIngredientCost = filteredOrders.length * PIZZA_COST_ESTIMATE;
   const ingredientExpenses = rawIngredientExpenses || estimatedIngredientCost;
   const isIngredientCostEstimated = !rawIngredientExpenses && estimatedIngredientCost > 0;
-  const shiftLaborExpenses = shiftLaborExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const manualLaborExpenses = manualLaborExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const laborExpenses = shiftLaborExpenses || manualLaborExpenses;
+  const shiftLaborExpenseTotal = shiftLaborExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  /** Salary expenses booked in Finance (includes shift-linked payouts when marked paid). */
+  const salaryLedgerInRange = salaryExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  /** Scheduled / completed shifts not yet paid — economic labor cost from the calendar. */
+  const unpaidShiftLaborAccrued = filteredShifts
+    .filter((s) => s.status !== "cancelled" && s.status !== "paid")
+    .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const laborExpenses = salaryLedgerInRange + unpaidShiftLaborAccrued;
   const recurringExpenses = recurringExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const otherOperatingExpenses = otherOperatingExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const ingredientExpensesInRange = ingredientExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
-  const laborExpensesInRange = salaryExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  const laborExpensesInRange = laborExpenses;
   const filteredRefundVolume = filteredClipPayments.reduce((sum, payment) => sum + getClipPaymentRefundAmount(payment), 0);
   const paymentFees = filteredClipSettlements.reduce((sum, settlement) => sum + getClipSettlementFeeAmount(settlement), 0);
   const grossSales = filteredReceipts.length ? filteredReceipts.reduce((sum, receipt) => sum + getReceiptGrossBeforeDiscount(receipt), 0) : totalRevenue;
@@ -1493,7 +1522,13 @@ export default function Dashboard() {
       id: "labor-cost",
       label: "Labor Cost %",
       value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—",
-      delta: laborExpenses ? (shiftLaborExpenses ? "Shift-linked salary expenses" : "Based on salary expenses") : "No salary expenses logged yet. Add shifts via Employee Calendar or log salary expenses in Finance to populate this.",
+      delta: laborExpenses
+        ? unpaidShiftLaborAccrued > 0
+          ? `Includes ${formatCurrency(unpaidShiftLaborAccrued)} from unpaid scheduled shifts`
+          : shiftLaborExpenseTotal
+            ? "Shift-linked salary expenses"
+            : "Based on salary expenses"
+        : "No salary expenses logged yet. Add shifts via Employee Calendar or log salary expenses in Finance to populate this.",
       trend: "down",
       comparisonLabel: laborExpenses ? "Uses employee calendar payouts where available" : "Needs salary expenses or completed shifts. Go to Employees → log shifts, or Finance → add a salary expense.",
       sparkTone: "negative",

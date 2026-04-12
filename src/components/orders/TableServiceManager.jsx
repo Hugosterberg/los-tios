@@ -1,5 +1,5 @@
 import React from "react";
-import { format } from "date-fns";
+import { formatMexicoTableService } from "@/lib/mexicoTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ function PaidTableCard({ order }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">Mesa {order.table_number}</p>
-          <p className="text-sm text-gray-500">{format(new Date(order.updated_date || order.created_date), "d MMM yyyy, h:mm a")}</p>
+          <p className="text-sm text-gray-500">{formatMexicoTableService(order.updated_date || order.created_date)}</p>
         </div>
         <Badge className="bg-green-500/15 text-green-400 border-transparent">Pagado</Badge>
       </div>

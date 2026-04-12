@@ -30,6 +30,17 @@ export const DEFAULT_APP_SETTINGS = {
   loyverse_default_category_id: "",
   /** Internal Notion integration secret (secret_…) from https://www.notion.so/my-integrations — optional if OAuth is used. */
   notion_internal_token: "",
+  /**
+   * Which Revolut product you use. `business` = same token/URLs as Revolut Business API.
+   * `personal` = no in-app API sync (Revolut does not expose the b2b Business API for personal accounts).
+   */
+  revolut_connection_type: "business",
+  /** Revolut Business API: production https://b2b.revolut.com/api/1.0 — sandbox https://sandbox-b2b.revolut.com/api/1.0 */
+  revolut_api_base_url: "https://b2b.revolut.com/api/1.0",
+  /** Bearer access token with READ scope (expires ~40 min — refresh via OAuth / auth flow in Revolut dashboard). */
+  revolut_access_token: "",
+  /** Optional: limit transaction list to one business account UUID (from GET /accounts). */
+  revolut_account_id: "",
 };
 
 export const INTEGRATION_SETTINGS_SECTIONS = [
@@ -118,6 +129,55 @@ export const INTEGRATION_SETTINGS_SECTIONS = [
         secret: false,
         helperText: "Used when creating menu items via API. If empty, the first category from Loyverse is used.",
         fullWidth: true,
+      },
+    ],
+  },
+  {
+    id: "revolut",
+    title: "Revolut",
+    description:
+      "Choose Personal vs Business. Live sync uses only the official Revolut Business API (b2b.revolut.com). Personal accounts are not supported by that API — select Personal to acknowledge manual tracking until you migrate to Business.",
+    themeClassName: "border-sky-500/20 bg-sky-950/40",
+    fields: [
+      {
+        key: "revolut_connection_type",
+        label: "Account type",
+        placeholder: "",
+        secret: false,
+        fullWidth: true,
+        fieldType: "select",
+        options: [
+          { value: "business", label: "Revolut Business — use Business API (recommended for automation)" },
+          { value: "personal", label: "Personal Revolut — no Business API sync in this app (manual until migration)" },
+        ],
+        helperText:
+          "Private/personal Revolut accounts cannot use the same OAuth Business API tokens as Revolut Business. Open Banking (EU/UK PSD2) is a different integration and is not implemented here.",
+      },
+      {
+        key: "revolut_api_base_url",
+        label: "API base URL",
+        placeholder: "https://b2b.revolut.com/api/1.0",
+        secret: false,
+        fullWidth: true,
+        helperText:
+          "Production: https://b2b.revolut.com/api/1.0 · Sandbox: https://sandbox-b2b.revolut.com/api/1.0 — must match the environment where the token was issued.",
+      },
+      {
+        key: "revolut_access_token",
+        label: "Access token (Bearer)",
+        placeholder: "Paste access_token from OAuth / auth/token exchange",
+        secret: true,
+        fullWidth: true,
+        helperText:
+          "Create an app in Revolut Business → APIs → Business API, complete certificate + consent, then exchange the code for tokens (READ scope for GET /accounts and /transactions). Tokens expire about every 40 minutes unless you implement refresh.",
+      },
+      {
+        key: "revolut_account_id",
+        label: "Account ID (optional)",
+        placeholder: "UUID from GET /accounts — leave empty to query all accounts",
+        secret: false,
+        fullWidth: true,
+        helperText: "If set, transaction preview filters to this account only.",
       },
     ],
   },

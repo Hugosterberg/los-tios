@@ -60,8 +60,8 @@ export default function NotionExplorer() {
   const callNotion = async (path, method = "GET", body = null) => {
     const payload = { path, method };
     if (body != null) payload.body = body;
-    const res = await invokeNotionProxy(payload, integrationSettings);
-    return res.data;
+    const data = await invokeNotionProxy(payload, integrationSettings);
+    return data;
   };
 
   const handleSearch = async () => {

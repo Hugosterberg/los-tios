@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { formatMexicoOrderList } from "@/lib/mexicoTime";
 import {
   Package,
   Truck,
@@ -58,7 +58,7 @@ export default function OrderCard({ order, onUpdateStatus, onPrintReceipt, onDel
                   </Badge>
                 </div>
                 <p className="text-sm text-gray-500">
-                  {format(new Date(order.created_date), "MMM d, yyyy 'at' h:mm a")}
+                  {formatMexicoOrderList(order.created_date)}
                 </p>
               </div>
 

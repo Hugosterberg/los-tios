@@ -19,7 +19,14 @@ import { listOrders } from "@/lib/local-dev-orders";
 const formatCurrency = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value || 0);
 const formatNumber = (value) => new Intl.NumberFormat("en-US").format(value || 0);
 const formatRelativeDate = (value) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: enUS }) : "Unknown time";
-const formatDateTime = (value) => value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "N/A";
+const formatDateTime = (value) =>
+  value
+    ? new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Mexico_City",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value))
+    : "N/A";
 const getReceiptId = (receipt) => receipt.receipt_number || receipt.receipt_no || receipt.id || "Unknown";
 const getReceiptStatus = (receipt) => (receipt.status || receipt.receipt_status || (receipt.canceled_at ? "cancelled" : "completed")).toLowerCase();
 const statusBadgeClass = (active) => active ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15" : "bg-gray-500/15 text-gray-300 hover:bg-gray-500/15";

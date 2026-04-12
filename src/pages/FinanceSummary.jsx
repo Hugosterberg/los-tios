@@ -1,7 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatMexicoDateTimeMedium } from "@/lib/mexicoTime";
 import {
   AlertTriangle,
   CreditCard,
@@ -251,7 +250,7 @@ export default function FinanceSummary() {
                   icon={ScanLine}
                   value={
                     loyverseOverview?.metrics?.latestSyncAt
-                      ? format(new Date(loyverseOverview.metrics.latestSyncAt), "dd MMM yyyy HH:mm", { locale: es })
+                      ? formatMexicoDateTimeMedium(loyverseOverview.metrics.latestSyncAt)
                       : "Not synced"
                   }
                 />
@@ -273,7 +272,7 @@ export default function FinanceSummary() {
                   icon={ScanLine}
                   value={
                     clipOverview?.metrics?.latestSyncAt
-                      ? format(new Date(clipOverview.metrics.latestSyncAt), "dd MMM yyyy HH:mm", { locale: es })
+                      ? formatMexicoDateTimeMedium(clipOverview.metrics.latestSyncAt)
                       : "Not synced"
                   }
                 />
