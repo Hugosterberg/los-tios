@@ -5,9 +5,68 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Receipt, ShoppingBag, Table2, Wallet } from "lucide-react";
+import { Receipt, ShoppingBag, Table2, Wallet, Banknote, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
 
 const formatMoney = (amount) => `$${(amount || 0).toFixed(2)}`;
+
+function PaidTableCard({ order }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const isCard = order.payment_method === "card";
+  const PayIcon = isCard ? CreditCard : Banknote;
+
+  return (
+    <div className="rounded-xl border border-yellow-500/10 bg-[#242424] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-white">Mesa {order.table_number}</p>
+          <p className="text-sm text-gray-500">{format(new Date(order.updated_date || order.created_date), "d MMM yyyy, h:mm a")}</p>
+        </div>
+        <Badge className="bg-green-500/15 text-green-400 border-transparent">Pagado</Badge>
+      </div>
+
+      {order.customer_name && order.customer_name !== `Table ${order.table_number}` && (
+        <p className="text-sm text-gray-300 mt-2">{order.customer_name}</p>
+      )}
+
+      <div className="flex items-center gap-2 mt-2">
+        <PayIcon className="w-3.5 h-3.5 text-gray-400" />
+        <span className="text-xs text-gray-400">{isCard ? "Tarjeta / Card" : "Efectivo / Cash"}</span>
+      </div>
+
+      <div className="flex items-center justify-between mt-3">
+        <p className="text-yellow-400 font-bold text-lg">{formatMoney(order.total_amount)}</p>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+        >
+          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          {expanded ? "Ocultar" : "Ver detalle"}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-3 border-t border-yellow-500/10 pt-3 space-y-1.5">
+          {order.items?.map((item, idx) => (
+            <div key={idx} className="flex justify-between text-sm">
+              <span className="text-gray-300">
+                <span className="font-semibold text-white">{item.quantity}×</span> {item.item_name}
+              </span>
+              <span className="text-yellow-400 font-medium">{formatMoney((item.price || 0) * item.quantity)}</span>
+            </div>
+          ))}
+          {order.special_instructions && (
+            <p className="text-xs text-gray-500 italic mt-2">Nota: {order.special_instructions}</p>
+          )}
+          <div className="pt-2 border-t border-yellow-500/10 flex justify-between font-bold">
+            <span className="text-gray-300">Total</span>
+            <span className="text-yellow-400">{formatMoney(order.total_amount)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TableServiceManager({
   menuItems,
@@ -235,17 +294,7 @@ export default function TableServiceManager({
           {tableHistory.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {tableHistory.map((order) => (
-                <div key={order.id} className="rounded-xl border border-yellow-500/10 bg-[#242424] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-bold text-white">Table {order.table_number}</p>
-                      <p className="text-sm text-gray-500">{format(new Date(order.updated_date || order.created_date), "d MMM yyyy, h:mm a")}</p>
-                    </div>
-                    <Badge className="bg-green-500/15 text-green-400 border-transparent">Paid</Badge>
-                  </div>
-                  <p className="text-sm text-gray-300 mt-3">Order #{order.id.slice(0, 8)}</p>
-                  <p className="text-yellow-400 font-bold mt-1">{formatMoney(order.total_amount)}</p>
-                </div>
+                <PaidTableCard key={order.id} order={order} />
               ))}
             </div>
           ) : (
