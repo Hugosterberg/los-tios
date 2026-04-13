@@ -267,7 +267,17 @@ export default function EmployeeCalendar() {
     }
   };
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.is_active), [employees]);
+  // Live preview: when editing an employee, overlay form workdays so the calendar updates in real-time
+  const previewEmployees = useMemo(() => {
+    if (!showEmployeeForm || !editingEmployee) return employees;
+    const wd = isoDaysFromChecks(employeeForm.workDays);
+    const work_days = wd.length ? wd.join(",") : "";
+    return employees.map((e) =>
+      e.id === editingEmployee.id ? { ...e, work_days, notes: e.notes } : e,
+    );
+  }, [employees, showEmployeeForm, editingEmployee, employeeForm.workDays]);
+
+  const activeEmployees = useMemo(() => previewEmployees.filter((e) => e.is_active), [previewEmployees]);
 
   const templateEmployee = useMemo(
     () => (templateEmployeeId ? activeEmployees.find((e) => e.id === templateEmployeeId) ?? null : null),
