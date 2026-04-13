@@ -844,6 +844,17 @@ export default function DailyCash() {
     );
   }, [periodMode, monthLedgerSections]);
 
+  const laborInNet = useMemo(() => {
+    if (periodMode === "month") {
+      return monthLedgerSections.reduce((sum, s) => {
+        const laborRow = s.rows.find((r) => r.isSyntheticLabor);
+        return sum + (laborRow?.outAmount || 0);
+      }, 0);
+    }
+    const laborRow = tableRows.find((r) => r.isSyntheticLabor);
+    return laborRow?.outAmount || 0;
+  }, [periodMode, tableRows, monthLedgerSections]);
+
   const totals = useMemo(() => {
     if (periodMode === "month" && monthDrawerTotals) {
       const net = monthDrawerTotals.cashIn - monthDrawerTotals.cashOut;
@@ -1406,6 +1417,11 @@ export default function DailyCash() {
               In {formatMx(totals.cashIn)} · Out {formatMx(totals.cashOut)}
               {periodMode === "month" ? " · drawer only" : ""}
             </p>
+            {laborInNet > 0 && (
+              <p className="mt-1 text-[11px] text-sky-400/80">
+                Varav lön: {formatMx(laborInNet)}
+              </p>
+            )}
           </div>
           <div className="rounded-xl border border-yellow-500/20 bg-gradient-to-br from-[#1f1c12] to-[#14120c] p-4 shadow-[0_0_40px_rgba(250,204,21,0.06)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-600/90">
