@@ -319,6 +319,9 @@ export default function Orders() {
         <PaidOrdersReceiptsFeed
           orders={orders}
           loyverseReceipts={loyverseReceipts}
+          loyverseCustomers={loyverseQuery.data?.customers}
+          loyverseEmployees={loyverseQuery.data?.employees}
+          loyverseStores={loyverseQuery.data?.stores}
           dateWindow={loyverseDateWindow}
           range={loyverseReceiptRange}
           onRangeChange={setLoyverseReceiptRange}

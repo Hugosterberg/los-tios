@@ -364,7 +364,28 @@ const createLocalId = () => {
   return `local-dev-${Date.now()}`;
 };
 
-export const listMenuItems = async (remoteListFn) => {
+/**
+ * @param {() => Promise<Array>} remoteListFn
+ * @param {{ publicCustomerMenu?: boolean }} [options]
+ *   When `publicCustomerMenu` is true (e.g. CustomerOrder): only `MenuItem` rows from the database,
+ *   validated and stripped — never Loyverse, never Clip payment heuristics (no random name→image pairing).
+ */
+export const listMenuItems = async (remoteListFn, options = {}) => {
+  const { publicCustomerMenu = false } = options;
+
+  if (publicCustomerMenu) {
+    let items = await remoteListFn().catch(() => []);
+    items = Array.isArray(items) ? items : [];
+    let out = items.map(normalizePublicCustomerMenuItem).filter(Boolean);
+    if (out.length === 0 && isLocalDevMenuMode) {
+      const local = readStoredItems();
+      out = (Array.isArray(local) ? local : [])
+        .map(normalizePublicCustomerMenuItem)
+        .filter(Boolean);
+    }
+    return out;
+  }
+
   const settings = getResolvedIntegrationSettings();
   // Load DB first so a saved menu is not blocked by slow/hanging Loyverse or Clip calls.
   const remoteItems = await remoteListFn().catch(() => []);

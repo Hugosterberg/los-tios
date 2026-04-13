@@ -26,9 +26,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DayPickerCalendar } from "@/components/ui/calendar";
 import { parseISO } from "date-fns";
+import { enUS } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { listMenuItems } from "@/lib/local-dev-menu";
-import { collectMenuIngredientOptionsFromItems, ingredientMatchKey } from "@/lib/menuIngredients";
+import { collectShoppingIngredientPillLabels, ingredientMatchKey } from "@/lib/menuIngredients";
 import {
   isLocalFinanceMode,
   localListShoppingList,
@@ -42,8 +43,8 @@ import {
 } from "@/lib/localDevFinance";
 import { cn } from "@/lib/utils";
 import {
-  formatMexicoDateShort,
-  formatMexicoMonthYearLabel,
+  formatMexicoDateShortEn,
+  formatMexicoMonthYearLabelEn,
   getMexicoDateKey,
   getMexicoNowDateKey,
   getMexicoNowYearMonth,
@@ -66,7 +67,7 @@ function shoppingListCreatePayloadFromRow(row) {
 function formatShoppingDueDate(iso) {
   if (!iso || String(iso).length < 8) return null;
   try {
-    return formatMexicoDateShort(String(iso).slice(0, 10));
+    return formatMexicoDateShortEn(String(iso).slice(0, 10));
   } catch {
     return null;
   }
@@ -156,8 +157,8 @@ export default function ShoppingList() {
     queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
 
-  const menuIngredientOptions = useMemo(
-    () => collectMenuIngredientOptionsFromItems(menuItems),
+  const shoppingPillLabels = useMemo(
+    () => collectShoppingIngredientPillLabels(menuItems),
     [menuItems],
   );
 
@@ -190,7 +191,7 @@ export default function ShoppingList() {
   );
 
   const registeredMonthLabel = useMemo(
-    () => formatMexicoMonthYearLabel(registeredPurchasesMonth),
+    () => formatMexicoMonthYearLabelEn(registeredPurchasesMonth),
     [registeredPurchasesMonth],
   );
 
@@ -386,7 +387,7 @@ export default function ShoppingList() {
     );
   };
 
-  const missingMenuIngredientsCount = menuIngredientOptions.filter((ing) => !hasPendingIngredient(ing)).length;
+  const missingMenuIngredientsCount = shoppingPillLabels.filter((ing) => !hasPendingIngredient(ing)).length;
 
   const buildPendingIngredientPayload = (name) => ({
     item_name: String(name).trim(),
@@ -420,7 +421,7 @@ export default function ShoppingList() {
   };
 
   const handleQuickAddAllMissing = async () => {
-    const toAdd = menuIngredientOptions.filter((ing) => !hasPendingIngredient(ing));
+    const toAdd = shoppingPillLabels.filter((ing) => !hasPendingIngredient(ing));
     if (toAdd.length === 0 || quickAddBusy) return;
     setQuickAddBusy("all");
     try {
@@ -822,13 +823,14 @@ export default function ShoppingList() {
           </div>
         </div>
 
-        {menuIngredientOptions.length > 0 && (
+        {shoppingPillLabels.length > 0 && (
           <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="text-sm font-bold text-yellow-400">Quick add (menu ingredients)</h3>
+                <h3 className="text-sm font-bold text-yellow-400">Quick add (menu + kitchen)</h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  Tap to add a pending line. Names already on the list as pending ingredients are skipped.
+                  Tap to add a pending line. Includes catalog ingredients from Menu Management plus common English kitchen
+                  supplies. Names already pending are skipped.
                 </p>
               </div>
               <Button
@@ -842,7 +844,7 @@ export default function ShoppingList() {
               </Button>
             </div>
             <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1 [scrollbar-color:rgba(250,204,21,0.35)_transparent]">
-              {menuIngredientOptions.map((ing) => {
+              {shoppingPillLabels.map((ing) => {
                 const onList = hasPendingIngredient(ing);
                 const busyThis = quickAddBusy === ing;
                 return (
@@ -1279,8 +1281,8 @@ export default function ShoppingList() {
                   <div>
                     <Label className="text-xs font-medium text-gray-400">1 — Pick purchase</Label>
                     <p className="mt-0.5 text-[11px] text-gray-500">
-                      Shopping is for anything not in the list — you will name it below. Other pills use your menu catalog (English
-                      labels).
+                      Shopping is for anything not in the pills — you will name it below. Other pills use menu-derived names plus
+                      kitchen quick picks (English).
                     </p>
                   </div>
                   <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-yellow-500/15 bg-[#1a1a1a]/80 p-3 [scrollbar-color:rgba(250,204,21,0.35)_transparent]">
@@ -1297,7 +1299,7 @@ export default function ShoppingList() {
                     >
                       <span className="truncate">Shopping</span>
                     </Button>
-                    {menuIngredientOptions.map((ing) => (
+                    {shoppingPillLabels.map((ing) => (
                       <Button
                         key={`purchase-pick-${ing}`}
                         type="button"
@@ -1315,10 +1317,10 @@ export default function ShoppingList() {
                       </Button>
                     ))}
                   </div>
-                  {menuIngredientOptions.length === 0 && (
+                  {shoppingPillLabels.length === 0 && (
                     <p className="text-[11px] text-gray-500">
-                      No menu ingredients parsed yet — you can still use <strong className="text-gray-400">Shopping</strong> and add
-                      ingredients under Menu Management later.
+                      No quick picks available — use <strong className="text-gray-400">Shopping</strong> and type a name, or add
+                      menu items under Menu Management.
                     </p>
                   )}
                 </div>
@@ -1369,7 +1371,7 @@ export default function ShoppingList() {
                           aria-label="Choose purchase date"
                         >
                           <span className="tabular-nums text-gray-100">
-                            {formatMexicoDateShort(quickPurchaseDate)}
+                            {formatMexicoDateShortEn(quickPurchaseDate)}
                           </span>
                           <CalendarIcon className="h-4 w-4 shrink-0 text-yellow-400/85" aria-hidden />
                         </button>
@@ -1380,6 +1382,7 @@ export default function ShoppingList() {
                       >
                         <DayPickerCalendar
                           mode="single"
+                          locale={enUS}
                           selected={parseISO(`${quickPurchaseDate}T12:00:00`)}
                           onSelect={(d) => {
                             if (d) {
@@ -1700,7 +1703,7 @@ export default function ShoppingList() {
                                   onClick={() => startEditingRegisteredDate(r)}
                                   className="min-h-8 w-full min-w-[7.5rem] rounded border border-transparent px-2 py-1 text-left tabular-nums text-gray-300 transition-colors hover:border-yellow-500/35 hover:bg-yellow-500/10"
                                 >
-                                  {r.dateIso ? formatMexicoDateShort(r.dateIso) : "—"}
+                                  {r.dateIso ? formatMexicoDateShortEn(r.dateIso) : "—"}
                                 </button>
                               )}
                             </td>

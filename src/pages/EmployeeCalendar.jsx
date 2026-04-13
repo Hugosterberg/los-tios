@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,15 +19,21 @@ import {
   DollarSign,
   Sparkles,
   TrendingUp,
+  Calendar,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   format,
   addDays,
+  addMonths,
   startOfWeek,
   endOfWeek,
+  startOfMonth,
+  endOfMonth,
   eachDayOfInterval,
   isSameDay,
+  isSameMonth,
   parseISO,
   getISODay,
 } from "date-fns";
@@ -49,6 +55,22 @@ import {
   localDeleteShift,
   localCreateExpense,
 } from "@/lib/localDevFinance";
+import {
+  WORK_DAY_DEFS,
+  defaultWorkDayChecks,
+  isoDaysFromChecks,
+  anyActiveEmployeeWorksOnCalendarDate,
+  employeeWorksOnCalendarDate,
+  mergeNotesWithDefaultHours,
+  mergeNotesWithWorkDays,
+  parseDefaultWorkHoursFromEmployee,
+  parseWorkDaysFromEmployee,
+  shiftAmountForEmployee,
+  stripWorkDaysTag,
+  stripWorkHoursTag,
+  templateLaborAccrualForDate,
+  getAutoRegisterShifts,
+} from "@/lib/employeeLabor";
 
 const EMPLOYEE_WRITE_KEYS = [
   "name",
@@ -59,10 +81,18 @@ const EMPLOYEE_WRITE_KEYS = [
   "daily_rate",
   "payment_type",
   "is_active",
+  "auto_register_shifts",
   "notes",
+  "work_days",
 ];
 
 const VALID_EMPLOYEE_ROLES = new Set(["cook", "waiter", "cashier", "delivery", "manager", "cleaner", "other"]);
+
+const LAST_CALENDAR_EMPLOYEE_LS = "los_tios_employee_calendar_preferred_employee_id";
+
+/** Readable on dark panels; `color-scheme: dark` fixes native time picker contrast in Chromium. */
+const calendarFieldClass =
+  "border-yellow-500/35 bg-[#252014] text-yellow-50 placeholder:text-gray-500 [color-scheme:dark] focus-visible:ring-yellow-500/40";
 
 function formatMutationError(err) {
   const d = err?.response?.data;
@@ -74,92 +104,32 @@ function formatMutationError(err) {
   return fromApi || err?.message || String(err);
 }
 
-/** Persisted at end of notes: ISO weekdays 1=Mon … 7=Sun */
-const WORK_DAYS_NOTE_RE = /\[lt_work_days:([0-7,]+)\]\s*$/;
-
-const WORK_DAY_DEFS = [
-  { key: "mon", label: "Mon", iso: 1 },
-  { key: "tue", label: "Tue", iso: 2 },
-  { key: "wed", label: "Wed", iso: 3 },
-  { key: "thu", label: "Thu", iso: 4 },
-  { key: "fri", label: "Fri", iso: 5 },
-  { key: "sat", label: "Sat", iso: 6 },
-  { key: "sun", label: "Sun", iso: 7 },
-];
-
-function defaultWorkDayChecks() {
-  return { mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: false };
-}
-
-function checksFromIsoSet(set) {
-  const o = {};
-  for (const d of WORK_DAY_DEFS) {
-    o[d.key] = set.has(d.iso);
-  }
-  return o;
-}
-
-function isoDaysFromChecks(checks) {
-  return WORK_DAY_DEFS.filter((d) => checks[d.key]).map((d) => d.iso);
-}
-
-/** @param {Record<string, boolean>} checks */
-function parseWorkDaysFromEmployee(employee) {
-  if (!employee) return defaultWorkDayChecks();
-  const raw = employee.work_days;
-  if (typeof raw === "string" && raw.trim()) {
-    const set = new Set(
-      raw
-        .split(",")
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => n >= 1 && n <= 7)
-    );
-    if (set.size) return checksFromIsoSet(set);
-  }
-  const m = String(employee.notes || "").match(WORK_DAYS_NOTE_RE);
-  if (m) {
-    const set = new Set(
-      m[1]
-        .split(",")
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => n >= 1 && n <= 7)
-    );
-    if (set.size) return checksFromIsoSet(set);
-  }
-  return defaultWorkDayChecks();
-}
-
-function stripWorkDaysTag(notes) {
-  return String(notes || "")
-    .replace(WORK_DAYS_NOTE_RE, "")
-    .replace(/\s+$/, "");
-}
-
-function mergeNotesWithWorkDays(userNotes, checks) {
-  const base = stripWorkDaysTag(userNotes);
-  const days = isoDaysFromChecks(checks);
-  const tag = `[lt_work_days:${days.join(",")}]`;
-  if (!days.length) return base;
-  if (!base) return tag;
-  return `${base}\n\n${tag}`;
-}
-
 function buildEmployeePayload(form) {
-  const { workDays, ...raw } = form;
-  const mergedNotes = mergeNotesWithWorkDays(raw.notes ?? "", workDays);
+  const { workDays, defaultShiftStart, defaultShiftEnd, ...raw } = form;
+  const start = defaultShiftStart || "09:00";
+  const end = defaultShiftEnd || "17:00";
+  const mergedWorkDays = mergeNotesWithWorkDays(stripWorkHoursTag(raw.notes ?? ""), workDays);
+  const mergedNotes = mergeNotesWithDefaultHours(mergedWorkDays, start, end);
   const role = VALID_EMPLOYEE_ROLES.has(raw.role) ? raw.role : "waiter";
   const payment_type = raw.payment_type === "hourly" ? "hourly" : "daily";
+  const wd = isoDaysFromChecks(workDays);
+  const work_days = wd.length ? wd.join(",") : "";
   const out = {};
   for (const k of EMPLOYEE_WRITE_KEYS) {
     if (k === "notes") out.notes = mergedNotes;
     else if (k === "role") out.role = role;
     else if (k === "payment_type") out.payment_type = payment_type;
+    else if (k === "work_days") out.work_days = work_days;
     else if (k === "hourly_rate" || k === "daily_rate") {
       out[k] = Number(raw[k]) || 0;
     } else if (k === "is_active") {
       out[k] = Boolean(raw.is_active);
+    } else if (k === "auto_register_shifts") {
+      out[k] = raw.auto_register_shifts !== false;
     } else if (k === "name") {
       out[k] = String(raw.name ?? "").trim();
+    } else if (k === "email") {
+      out[k] = String(raw.email ?? "").trim();
     } else if (raw[k] !== undefined) out[k] = raw[k];
   }
   return out;
@@ -195,6 +165,11 @@ function formatWorkDaysSummary(employee) {
   return labels.length ? labels.join(" · ") : "—";
 }
 
+function formatDefaultShiftLine(employee) {
+  const { defaultShiftStart, defaultShiftEnd } = parseDefaultWorkHoursFromEmployee(employee);
+  return `${defaultShiftStart} – ${defaultShiftEnd}`;
+}
+
 function formatMx(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
   return new Intl.NumberFormat("en-US", {
@@ -204,17 +179,32 @@ function formatMx(value) {
   }).format(Number(value));
 }
 
-function shiftAmountForEmployee(employee, hoursWorked) {
-  if (!employee) return 0;
-  const h = Number(hoursWorked) || 0;
-  if (employee.payment_type === "daily") {
-    return Number(employee.daily_rate) || 0;
-  }
-  return h * (Number(employee.hourly_rate) || 0);
+function formatShiftClock(t) {
+  const s = String(t || "").trim();
+  if (s.length >= 5) return s.slice(0, 5);
+  return s || "—";
+}
+
+function buildMonthGrid(anchorInMonth) {
+  const monthStart = startOfMonth(anchorInMonth);
+  const monthEnd = endOfMonth(anchorInMonth);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  return eachDayOfInterval({ start: gridStart, end: gridEnd });
+}
+
+function dayShiftStats(date, shiftsList) {
+  const dateStr = format(date, "yyyy-MM-dd");
+  const list = shiftsList.filter((s) => s.date === dateStr && s.status !== "cancelled");
+  const count = list.length;
+  const total = list.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  return { count, total, list };
 }
 
 export default function EmployeeCalendar() {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [scheduleView, setScheduleView] = useState(/** @type {"week" | "month"} */ ("month"));
+  const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -236,8 +226,11 @@ export default function EmployeeCalendar() {
     daily_rate: 0,
     payment_type: "daily",
     is_active: true,
+    auto_register_shifts: true,
     notes: "",
     workDays: defaultWorkDayChecks(),
+    defaultShiftStart: "09:00",
+    defaultShiftEnd: "17:00",
   });
   /** String inputs so number fields stay editable (controlled `type="number"` fights partial input). */
   const [dailyRateText, setDailyRateText] = useState("");
@@ -264,6 +257,47 @@ export default function EmployeeCalendar() {
     queryKey: ["shifts", useLocalFinance ? "local" : "remote"],
     queryFn: () => (useLocalFinance ? localListShifts() : base44.entities.Shift.list("-date")),
   });
+
+  const persistPreferredEmployeeId = (employeeId) => {
+    if (!employeeId) return;
+    try {
+      localStorage.setItem(LAST_CALENDAR_EMPLOYEE_LS, employeeId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const activeEmployees = useMemo(() => employees.filter((e) => e.is_active), [employees]);
+
+  const templateEmployee = useMemo(
+    () => (templateEmployeeId ? activeEmployees.find((e) => e.id === templateEmployeeId) ?? null : null),
+    [activeEmployees, templateEmployeeId],
+  );
+  const templateAllowsBulkShifts = templateEmployee ? getAutoRegisterShifts(templateEmployee) : true;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAST_CALENDAR_EMPLOYEE_LS);
+      if (!raw || !activeEmployees.some((e) => e.id === raw)) return;
+      setTemplateEmployeeId((prev) => (prev ? prev : raw));
+    } catch {
+      /* ignore */
+    }
+  }, [activeEmployees]);
+
+  useEffect(() => {
+    if (activeEmployees.length !== 1) return;
+    setTemplateEmployeeId((prev) => prev || activeEmployees[0].id);
+  }, [activeEmployees]);
+
+  useEffect(() => {
+    if (!templateEmployeeId) return;
+    const emp = employees.find((e) => e.id === templateEmployeeId);
+    if (!emp) return;
+    const { defaultShiftStart, defaultShiftEnd } = parseDefaultWorkHoursFromEmployee(emp);
+    setTemplateStart(defaultShiftStart);
+    setTemplateEnd(defaultShiftEnd);
+  }, [templateEmployeeId, employees]);
 
   const createEmployee = useMutation({
     mutationFn: (data) => (useLocalFinance ? localCreateEmployee(data) : base44.entities.Employee.create(data)),
@@ -358,17 +392,45 @@ export default function EmployeeCalendar() {
   const weekForecast = useMemo(() => {
     const startStr = format(currentWeekStart, "yyyy-MM-dd");
     const endStr = format(weekEnd, "yyyy-MM-dd");
-    let total = 0;
+    let shiftTotal = 0;
     let count = 0;
     for (const s of shifts) {
       if (!s.date || s.status === "cancelled") continue;
       if (s.date >= startStr && s.date <= endStr) {
-        total += Number(s.amount || 0);
+        shiftTotal += Number(s.amount || 0);
         count += 1;
       }
     }
-    return { total, count };
-  }, [shifts, currentWeekStart, weekEnd]);
+    let templateTotal = 0;
+    for (const day of eachDayOfInterval({ start: currentWeekStart, end: weekEnd })) {
+      const ds = format(day, "yyyy-MM-dd");
+      templateTotal += templateLaborAccrualForDate(ds, employees, shifts);
+    }
+    return { total: shiftTotal + templateTotal, count };
+  }, [shifts, employees, currentWeekStart, weekEnd]);
+
+  const monthLaborSummary = useMemo(() => {
+    const start = startOfMonth(monthCursor);
+    const end = endOfMonth(monthCursor);
+    const startStr = format(start, "yyyy-MM-dd");
+    const endStr = format(end, "yyyy-MM-dd");
+    let shiftTotal = 0;
+    let count = 0;
+    for (const s of shifts) {
+      if (!s.date || s.status === "cancelled") continue;
+      if (s.date >= startStr && s.date <= endStr) {
+        shiftTotal += Number(s.amount || 0);
+        count += 1;
+      }
+    }
+    let templateTotal = 0;
+    for (const day of eachDayOfInterval({ start, end })) {
+      templateTotal += templateLaborAccrualForDate(format(day, "yyyy-MM-dd"), employees, shifts);
+    }
+    return { total: shiftTotal + templateTotal, count };
+  }, [shifts, employees, monthCursor]);
+
+  const monthGridDays = useMemo(() => buildMonthGrid(monthCursor), [monthCursor]);
 
   const getShiftsForDay = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -382,14 +444,34 @@ export default function EmployeeCalendar() {
       setShiftForm(shift);
     } else {
       setEditingShift(null);
+      let preferredId = "";
+      let preferredName = "";
+      try {
+        const raw = localStorage.getItem(LAST_CALENDAR_EMPLOYEE_LS);
+        const match = raw ? activeEmployees.find((e) => e.id === raw) : null;
+        if (match) {
+          preferredId = match.id;
+          preferredName = match.name;
+        }
+      } catch {
+        /* ignore */
+      }
+      const emp = employees.find((e) => e.id === preferredId);
+      const dh = emp
+        ? parseDefaultWorkHoursFromEmployee(emp)
+        : { defaultShiftStart: "09:00", defaultShiftEnd: "17:00" };
+      const startT = dh.defaultShiftStart;
+      const endT = dh.defaultShiftEnd;
+      const hours = calculateHours(startT, endT);
+      const hw = hours > 0 ? hours : 8;
       setShiftForm({
-        employee_id: "",
-        employee_name: "",
+        employee_id: preferredId,
+        employee_name: preferredName,
         date: format(date, "yyyy-MM-dd"),
-        start_time: "09:00",
-        end_time: "17:00",
-        hours_worked: 8,
-        amount: 0,
+        start_time: startT,
+        end_time: endT,
+        hours_worked: hw,
+        amount: emp ? shiftAmountForEmployee(emp, hw) || 0 : 0,
         status: "scheduled",
         notes: "",
       });
@@ -398,6 +480,7 @@ export default function EmployeeCalendar() {
   };
 
   const handleEmployeeSelect = (employeeId) => {
+    persistPreferredEmployeeId(employeeId);
     const employee = employees.find((e) => e.id === employeeId);
     if (employee) {
       const hours = shiftForm.hours_worked;
@@ -439,6 +522,7 @@ export default function EmployeeCalendar() {
 
   const handleShiftSubmit = (e) => {
     e.preventDefault();
+    persistPreferredEmployeeId(shiftForm.employee_id);
     const payload = sanitizeShiftPayload(shiftForm);
     if (editingShift) {
       updateShift.mutate({ id: editingShift.id, data: payload });
@@ -515,8 +599,11 @@ export default function EmployeeCalendar() {
     daily_rate: 0,
     payment_type: "daily",
     is_active: true,
+    auto_register_shifts: true,
     notes: "",
     workDays: defaultWorkDayChecks(),
+    defaultShiftStart: "09:00",
+    defaultShiftEnd: "17:00",
   });
 
   const openNewEmployeeForm = () => {
@@ -541,8 +628,10 @@ export default function EmployeeCalendar() {
       hourly_rate: Number(employee?.hourly_rate) || 0,
       daily_rate: Number(employee?.daily_rate) || 0,
       is_active: employee?.is_active !== false,
-      notes: stripWorkDaysTag(employee?.notes || ""),
+      auto_register_shifts: getAutoRegisterShifts(employee),
+      notes: stripWorkHoursTag(stripWorkDaysTag(employee?.notes || "")),
       workDays: parseWorkDaysFromEmployee(employee),
+      ...parseDefaultWorkHoursFromEmployee(employee),
     });
     setDailyRateText(
       employee?.daily_rate != null && String(employee.daily_rate).trim() !== ""
@@ -588,6 +677,13 @@ export default function EmployeeCalendar() {
     }
     const employee = employees.find((e) => e.id === templateEmployeeId);
     if (!employee || !employee.is_active) return;
+
+    if (!getAutoRegisterShifts(employee)) {
+      alert(
+        'This employee is set to manual shifts only. Open their profile and enable "Auto-register shifts" to use bulk create, or add shifts with + on each day.',
+      );
+      return;
+    }
 
     const allowedIso = new Set(isoDaysFromChecks(parseWorkDaysFromEmployee(employee)));
     if (allowedIso.size === 0) {
@@ -638,9 +734,6 @@ export default function EmployeeCalendar() {
     }
   };
 
-  const activeEmployees = employees.filter((e) => e.is_active);
-
-  const resolvedRole = VALID_EMPLOYEE_ROLES.has(employeeForm.role) ? employeeForm.role : "waiter";
   const resolvedPayType = employeeForm.payment_type === "hourly" ? "hourly" : "daily";
 
   const panelClass = "rounded-2xl border border-yellow-500/15 bg-[#141210] shadow-none";
@@ -707,32 +800,94 @@ export default function EmployeeCalendar() {
 
           <TabsContent value="calendar" className="space-y-5">
             <Card className={cn(panelClass)}>
-              <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardContent className="flex flex-col gap-4 p-4">
+                <div className="flex flex-wrap items-center justify-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}
-                    className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    size="sm"
+                    onClick={() => setScheduleView("week")}
+                    className={cn(
+                      "rounded-xl border font-semibold",
+                      scheduleView === "week"
+                        ? "border-yellow-400/60 bg-yellow-400 text-black hover:bg-yellow-300"
+                        : "border-yellow-500/30 bg-transparent text-gray-300 hover:bg-yellow-400/10 hover:text-yellow-100"
+                    )}
                   >
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous week
+                    Week
                   </Button>
-                  <div className="text-center">
-                    <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Displayed week</p>
-                    <h2 className="text-lg font-semibold text-gray-200">
-                      {format(currentWeekStart, "MMM d", { locale: dateLocale })} –{" "}
-                      {format(weekEnd, "MMM d, yyyy", { locale: dateLocale })}
-                    </h2>
-                  </div>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}
-                    className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    size="sm"
+                    onClick={() => {
+                      setMonthCursor(startOfMonth(currentWeekStart));
+                      setScheduleView("month");
+                    }}
+                    className={cn(
+                      "rounded-xl border font-semibold",
+                      scheduleView === "month"
+                        ? "border-yellow-400/60 bg-yellow-400 text-black hover:bg-yellow-300"
+                        : "border-yellow-500/30 bg-transparent text-gray-300 hover:bg-yellow-400/10 hover:text-yellow-100"
+                    )}
                   >
-                    Next week <ChevronRight className="ml-2 h-4 w-4" />
+                    <Calendar className="mr-1.5 h-4 w-4" />
+                    Month
                   </Button>
                 </div>
+
+                {scheduleView === "week" ? (
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}
+                      className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    >
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Previous week
+                    </Button>
+                    <div className="text-center">
+                      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Displayed week</p>
+                      <h2 className="text-lg font-semibold text-gray-100">
+                        {format(currentWeekStart, "MMM d", { locale: dateLocale })} –{" "}
+                        {format(weekEnd, "MMM d, yyyy", { locale: dateLocale })}
+                      </h2>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}
+                      className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    >
+                      Next week <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setMonthCursor((d) => addMonths(d, -1))}
+                      className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    >
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Previous month
+                    </Button>
+                    <div className="text-center">
+                      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Displayed month</p>
+                      <h2 className="text-lg font-semibold text-gray-100">
+                        {format(monthCursor, "MMMM yyyy", { locale: dateLocale })}
+                      </h2>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setMonthCursor((d) => addMonths(d, 1))}
+                      className="rounded-xl border-0 bg-white font-semibold text-black hover:bg-yellow-100"
+                    >
+                      Next month <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -741,21 +896,30 @@ export default function EmployeeCalendar() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-yellow-400" />
-                    <CardTitle className="text-base font-semibold text-gray-200">Weekly forecast (scheduled)</CardTitle>
+                    <CardTitle className="text-base font-semibold text-gray-100">
+                      {scheduleView === "week" ? "Weekly forecast (scheduled)" : "Monthly forecast (scheduled)"}
+                    </CardTitle>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Sums <span className="text-gray-400">amounts</span> for every shift in the displayed week (excludes
-                    cancelled).
+                  <p className="text-xs text-gray-400">
+                    {scheduleView === "week"
+                      ? "Sums amounts for every shift in the displayed week (excludes cancelled), plus template accrual for days without a shift row."
+                      : "Sums amounts for the whole displayed month the same way as the week view (excludes cancelled)."}
                   </p>
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-end gap-6 pt-0">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">Week total</p>
-                    <p className="text-2xl font-bold text-yellow-300">{formatMx(weekForecast.total)}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                      {scheduleView === "week" ? "Week total" : "Month total"}
+                    </p>
+                    <p className="text-2xl font-bold text-yellow-300">
+                      {formatMx(scheduleView === "week" ? weekForecast.total : monthLaborSummary.total)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">Shift count</p>
-                    <p className="text-xl font-semibold text-gray-200">{weekForecast.count}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Shift count</p>
+                    <p className="text-xl font-semibold text-gray-100">
+                      {scheduleView === "week" ? weekForecast.count : monthLaborSummary.count}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -766,16 +930,22 @@ export default function EmployeeCalendar() {
                     <Sparkles className="h-4 w-4 text-yellow-400" />
                     <CardTitle className="text-base font-semibold text-gray-200">Weekly template</CardTitle>
                   </div>
-                  <p className="text-xs leading-relaxed text-gray-500">
+                  <p className="text-xs leading-relaxed text-gray-400">
                     Creates one shift per selected workday for this employee (from their weekday checkboxes). Daily wage =
-                    same amount each day; hourly uses the time range.
+                    same amount each day; hourly uses the time range. Your last choice is remembered for new shifts.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-400">Employee</Label>
-                    <Select value={templateEmployeeId} onValueChange={setTemplateEmployeeId}>
-                      <SelectTrigger className="border-yellow-500/20 bg-black/30 text-left text-gray-100">
+                    <Label className="text-xs text-gray-300">Employee</Label>
+                    <Select
+                      value={templateEmployeeId}
+                      onValueChange={(id) => {
+                        setTemplateEmployeeId(id);
+                        persistPreferredEmployeeId(id);
+                      }}
+                    >
+                      <SelectTrigger className={cn("text-left", calendarFieldClass)}>
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
@@ -787,31 +957,38 @@ export default function EmployeeCalendar() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {templateEmployeeId && !templateAllowsBulkShifts ? (
+                    <p className="text-[11px] leading-snug text-amber-200/90">
+                      <span className="font-medium text-amber-100">Manual shifts only</span> for this person — turn on{" "}
+                      <strong className="font-medium text-amber-50">Auto-register shifts</strong> in their employee profile to use
+                      this button.
+                    </p>
+                  ) : null}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <Label className="text-xs text-gray-400">Start</Label>
+                      <Label className="text-xs text-gray-300">Start</Label>
                       <Input
                         type="time"
                         value={templateStart}
                         onChange={(ev) => setTemplateStart(ev.target.value)}
-                        className="border-yellow-500/20 bg-black/30"
+                        className={calendarFieldClass}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-gray-400">End</Label>
+                      <Label className="text-xs text-gray-300">End</Label>
                       <Input
                         type="time"
                         value={templateEnd}
                         onChange={(ev) => setTemplateEnd(ev.target.value)}
-                        className="border-yellow-500/20 bg-black/30"
+                        className={calendarFieldClass}
                       />
                     </div>
                   </div>
                   <Button
                     type="button"
-                    disabled={templateBusy || !templateEmployeeId}
+                    disabled={templateBusy || !templateEmployeeId || !templateAllowsBulkShifts}
                     onClick={applyWeekTemplate}
-                    className="w-full rounded-xl bg-yellow-400 font-semibold text-black hover:bg-yellow-300"
+                    className="w-full rounded-xl bg-yellow-400 font-semibold text-black hover:bg-yellow-300 disabled:opacity-40"
                   >
                     {templateBusy ? "Creating…" : "Create shifts for workdays"}
                   </Button>
@@ -819,73 +996,209 @@ export default function EmployeeCalendar() {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-              {weekDays.map((day) => {
-                const dayShifts = getShiftsForDay(day);
-                const isToday = isSameDay(day, new Date());
-                return (
-                  <Card
-                    key={day.toISOString()}
-                    className={cn(
-                      cardDayClass,
-                      isToday && "border-yellow-400/60 ring-1 ring-yellow-400/30"
-                    )}
-                  >
-                    <CardHeader className={cn("rounded-t-2xl pb-2", isToday ? "bg-yellow-400/10" : "bg-black/20")}>
-                      <CardTitle className="text-center">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                          {format(day, "EEE", { locale: dateLocale })}
-                        </div>
-                        <div
-                          className={cn(
-                            "text-2xl font-bold tabular-nums",
-                            isToday ? "text-yellow-300" : "text-gray-200"
-                          )}
-                        >
-                          {format(day, "d")}
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="min-h-[140px] space-y-2 p-2">
-                      <div className="space-y-2">
-                        {dayShifts.map((shift) => (
-                          <button
-                            key={shift.id}
-                            type="button"
-                            onClick={() => openShiftDialog(day, shift)}
+            {scheduleView === "week" ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+                {weekDays.map((day) => {
+                  const dayShifts = getShiftsForDay(day);
+                  const isToday = isSameDay(day, new Date());
+                  const isScheduledWeekday = anyActiveEmployeeWorksOnCalendarDate(activeEmployees, day);
+                  const hasTemplateEmployeeShift =
+                    templateEmployee &&
+                    dayShifts.some((s) => s.employee_id === templateEmployee.id && s.status !== "cancelled");
+                  const showTemplateRosterHint =
+                    Boolean(templateEmployee) &&
+                    employeeWorksOnCalendarDate(templateEmployee, day) &&
+                    !hasTemplateEmployeeShift;
+                  return (
+                    <Card
+                      key={day.toISOString()}
+                      className={cn(
+                        cardDayClass,
+                        isScheduledWeekday && !isToday && "border-yellow-500/40 bg-yellow-400/[0.07]",
+                        isToday && "border-yellow-400/60 ring-1 ring-yellow-400/30"
+                      )}
+                    >
+                      <CardHeader className={cn("rounded-t-2xl pb-2", isToday ? "bg-yellow-400/10" : "bg-black/20")}>
+                        <CardTitle className="text-center">
+                          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                            {format(day, "EEE", { locale: dateLocale })}
+                          </div>
+                          <div
                             className={cn(
-                              "w-full rounded-xl border p-2 text-left text-xs transition-all hover:brightness-110",
-                              shift.status === "paid" && "border-yellow-400/50 bg-yellow-400/20",
-                              shift.status === "completed" && "border-yellow-500/30 bg-yellow-400/10",
-                              shift.status === "cancelled" && "border-white/10 bg-black/30 opacity-50",
-                              shift.status === "scheduled" && "border-yellow-500/25 bg-yellow-400/10"
+                              "text-2xl font-bold tabular-nums",
+                              isToday ? "text-yellow-300" : "text-gray-100"
                             )}
                           >
-                            <div className="truncate font-semibold text-gray-100">{shift.employee_name}</div>
-                            <div className="text-[11px] text-gray-500">
-                              {shift.start_time} – {shift.end_time}
+                            {format(day, "d")}
+                          </div>
+                          {isScheduledWeekday && (
+                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-yellow-500/95">
+                              Workday
                             </div>
-                            <div className="font-bold text-yellow-300">{formatMx(shift.amount)}</div>
-                            {shift.status === "paid" && (
-                              <Badge className="mt-1 border-0 bg-yellow-400 text-[10px] text-black">Paid</Badge>
-                            )}
-                          </button>
-                        ))}
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="min-h-[140px] space-y-2 p-2">
+                        {showTemplateRosterHint && (
+                          <div
+                            className="rounded-lg border border-dashed border-yellow-500/30 bg-black/25 px-2 py-1.5 text-center"
+                            title="Workday for the employee selected in Weekly template — no shift row yet. Use Create shifts or + below."
+                          >
+                            <p className="truncate text-[11px] font-medium leading-tight text-gray-200">
+                              {templateEmployee.name}
+                            </p>
+                            <p className="text-[10px] tabular-nums text-gray-500">
+                              {formatShiftClock(templateStart)}–{formatShiftClock(templateEnd)}
+                            </p>
+                          </div>
+                        )}
+                        <div className="space-y-1.5">
+                          {dayShifts.map((shift) => (
+                            <button
+                              key={shift.id}
+                              type="button"
+                              onClick={() => openShiftDialog(day, shift)}
+                              className={cn(
+                                "w-full rounded-lg border px-2 py-1.5 text-left transition-all hover:brightness-110",
+                                shift.status === "paid" && "border-yellow-400/45 bg-yellow-400/15",
+                                shift.status === "completed" && "border-yellow-500/25 bg-yellow-400/8",
+                                shift.status === "cancelled" && "border-white/10 bg-black/30 opacity-50",
+                                shift.status === "scheduled" && "border-yellow-500/20 bg-yellow-400/8",
+                              )}
+                            >
+                              <div className="truncate text-[11px] leading-snug text-gray-100">
+                                <span className="font-medium">{shift.employee_name}</span>
+                                <span className="text-gray-600"> · </span>
+                                <span className="tabular-nums text-gray-400">
+                                  {formatShiftClock(shift.start_time)}–{formatShiftClock(shift.end_time)}
+                                </span>
+                              </div>
+                              <div className="mt-0.5 flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold tabular-nums text-yellow-500/80">
+                                  {formatMx(shift.amount)}
+                                </span>
+                                {shift.status === "paid" && (
+                                  <Badge className="h-4 shrink-0 border-0 bg-yellow-400 px-1 py-0 text-[9px] text-black">
+                                    Paid
+                                  </Badge>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openShiftDialog(day)}
+                          className="w-full border-yellow-500/35 bg-black/20 text-yellow-400 hover:border-yellow-400/50 hover:bg-yellow-400/15 hover:text-yellow-200"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card className={panelClass}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold text-gray-100">Month overview</CardTitle>
+                  <p className="text-xs text-gray-400">
+                    Days that match an active employee&apos;s saved workdays are tinted. When an employee is selected in{" "}
+                    <strong className="font-medium text-gray-300">Weekly template</strong>, their workdays show{" "}
+                    <strong className="font-medium text-gray-300">name + times</strong> from the template (same as week view)
+                    until a shift exists. Other workdays show &quot;Workday&quot;. Scheduled shifts show name, hours, and total.
+                    Click a day to open that week and add a shift.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2 pt-0">
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:text-xs">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((wd) => (
+                      <div key={wd} className="py-1">
+                        {wd}
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => openShiftDialog(day)}
-                        className="w-full text-gray-500 hover:bg-yellow-400/10 hover:text-yellow-200"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {monthGridDays.map((day) => {
+                      const inMonth = isSameMonth(day, monthCursor);
+                      const stats = dayShiftStats(day, shifts);
+                      const isToday = isSameDay(day, new Date());
+                      const isScheduledWeekday = anyActiveEmployeeWorksOnCalendarDate(activeEmployees, day);
+                      const dayStr = format(day, "yyyy-MM-dd");
+                      const hasTemplateEmployeeShift =
+                        templateEmployee &&
+                        shifts.some(
+                          (s) => s.date === dayStr && s.employee_id === templateEmployee.id && s.status !== "cancelled",
+                        );
+                      const showMonthTemplateRoster =
+                        Boolean(templateEmployee) &&
+                        employeeWorksOnCalendarDate(templateEmployee, day) &&
+                        !hasTemplateEmployeeShift;
+                      return (
+                        <button
+                          key={day.toISOString()}
+                          type="button"
+                          onClick={() => {
+                            setCurrentWeekStart(startOfWeek(day, { weekStartsOn: 1 }));
+                            setScheduleView("week");
+                            openShiftDialog(day);
+                          }}
+                          className={cn(
+                            "flex min-h-[4.5rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[5.25rem] sm:p-2",
+                            "border-yellow-500/15 bg-[#141210] hover:border-yellow-400/40 hover:bg-yellow-400/5",
+                            isScheduledWeekday && !isToday && "border-yellow-500/40 bg-yellow-400/[0.07]",
+                            !inMonth && "opacity-35",
+                            isToday && "border-yellow-400/55 ring-1 ring-yellow-400/25"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "text-sm font-bold tabular-nums sm:text-base",
+                              isToday ? "text-yellow-300" : inMonth ? "text-gray-100" : "text-gray-500"
+                            )}
+                          >
+                            {format(day, "d")}
+                          </span>
+                          {stats.count > 0 ? (
+                            <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight text-yellow-200/90 sm:text-[10px]">
+                              <span className="truncate font-medium text-gray-200">
+                                {stats.list[0].employee_name}
+                                <span className="font-normal text-gray-500"> · </span>
+                                <span className="tabular-nums text-gray-400">
+                                  {formatShiftClock(stats.list[0].start_time)}–
+                                  {formatShiftClock(stats.list[0].end_time)}
+                                </span>
+                              </span>
+                              {stats.count > 1 && (
+                                <span className="text-[9px] text-gray-500">+{stats.count - 1} more</span>
+                              )}
+                              <span className="tabular-nums text-yellow-500/85">{formatMx(stats.total)}</span>
+                            </span>
+                          ) : showMonthTemplateRoster ? (
+                            <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight sm:text-[10px]">
+                              <span className="truncate font-medium text-gray-200">{templateEmployee.name}</span>
+                              <span className="tabular-nums text-gray-500">
+                                {formatShiftClock(templateStart)}–{formatShiftClock(templateEnd)}
+                              </span>
+                            </span>
+                          ) : isScheduledWeekday ? (
+                            <span className="mt-auto text-[10px] font-semibold uppercase tracking-wide text-yellow-500/95 sm:text-[11px]">
+                              Workday
+                            </span>
+                          ) : (
+                            <span className="mt-auto text-[9px] text-gray-500 sm:text-[10px]">
+                              {inMonth ? "Off" : "—"}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className={panelClass}>
               <CardHeader>
@@ -987,8 +1300,20 @@ export default function EmployeeCalendar() {
                         <p className="mb-1 text-sm text-gray-500">{employee.phone}</p>
                       )}
                       {employee.email && <p className="mb-3 text-sm text-gray-500">{employee.email}</p>}
-                      <p className="mb-3 text-xs text-gray-500">
-                        <span className="text-gray-400">Workdays:</span> {formatWorkDaysSummary(employee)}
+                      <p className="mb-3 text-xs text-gray-400">
+                        <span className="font-medium text-gray-300">Workdays:</span> {formatWorkDaysSummary(employee)}
+                      </p>
+                      <p className="mb-3 text-xs text-gray-400">
+                        <span className="font-medium text-gray-300">Default shift:</span>{" "}
+                        {formatDefaultShiftLine(employee)}
+                      </p>
+                      <p className="mb-3 text-xs text-gray-400">
+                        <span className="font-medium text-gray-300">Weekly template:</span>{" "}
+                        {getAutoRegisterShifts(employee) ? (
+                          <span className="text-emerald-400/90">bulk create allowed</span>
+                        ) : (
+                          <span className="text-amber-400/90">manual shifts only</span>
+                        )}
                       </p>
                       <div className="border-t border-yellow-500/10 pt-4">
                         <div className="flex items-center gap-2">
@@ -1023,7 +1348,7 @@ export default function EmployeeCalendar() {
             <DialogTitle className="text-gray-100">
               {editingEmployee ? "Edit employee" : "New employee"}
             </DialogTitle>
-            <DialogDescription className="text-left text-sm text-gray-500">
+            <DialogDescription className="text-left text-sm text-gray-400">
               Name and phone are required for scheduling. Email is optional. Pick workdays and daily wage — amounts roll
               into the calendar, Daily Cash (when paid), and Dashboard labor totals.
             </DialogDescription>
@@ -1031,7 +1356,7 @@ export default function EmployeeCalendar() {
           <form onSubmit={handleEmployeeSubmit} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="employee-name" className="text-gray-300">
+                <Label htmlFor="employee-name" className="text-gray-200">
                   Name *
                 </Label>
                 <Input
@@ -1046,29 +1371,11 @@ export default function EmployeeCalendar() {
                   data-form-type="other"
                   value={employeeForm.name ?? ""}
                   onChange={(e) => setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Role</Label>
-                <Select
-                  value={resolvedRole}
-                  onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, role: v }))}
-                >
-                  <SelectTrigger className="border-yellow-500/20 bg-black/30">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
-                    {Object.entries(roleLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="employee-phone" className="text-gray-300">
+                <Label htmlFor="employee-phone" className="text-gray-200">
                   Phone *
                 </Label>
                 <Input
@@ -1077,12 +1384,12 @@ export default function EmployeeCalendar() {
                   autoComplete="tel"
                   value={employeeForm.phone ?? ""}
                   onChange={(e) => setEmployeeForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                   placeholder="+52 …"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="employee-email" className="text-gray-300">
+                <Label htmlFor="employee-email" className="text-gray-200">
                   Email (optional)
                 </Label>
                 <Input
@@ -1091,20 +1398,20 @@ export default function EmployeeCalendar() {
                   autoComplete="email"
                   value={employeeForm.email ?? ""}
                   onChange={(e) => setEmployeeForm((prev) => ({ ...prev, email: e.target.value }))}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
 
               <div className="space-y-3 md:col-span-2">
-                <Label className="text-gray-300">Workdays *</Label>
-                <p className="text-xs text-gray-500">
+                <Label className="text-gray-200">Workdays *</Label>
+                <p className="text-xs leading-relaxed text-gray-400">
                   Used for the weekly template and labor totals. Daily wage applies for each scheduled day.
                 </p>
-                <div className="flex flex-wrap gap-3 rounded-xl border border-yellow-500/15 bg-black/20 p-3">
+                <div className="flex flex-wrap gap-3 rounded-xl border border-yellow-500/30 bg-[#1c1914] p-3">
                   {WORK_DAY_DEFS.map((d) => (
                     <label
                       key={d.key}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-0.5 text-sm text-gray-200 hover:bg-white/5"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-0.5 text-sm text-gray-100 hover:bg-white/5"
                     >
                       <Checkbox
                         checked={employeeForm.workDays[d.key]}
@@ -1122,13 +1429,51 @@ export default function EmployeeCalendar() {
                 </div>
               </div>
 
+              <div className="space-y-3 md:col-span-2">
+                <Label className="text-gray-200">Default working hours</Label>
+                <p className="text-xs leading-relaxed text-gray-400">
+                  Default start and end for the calendar weekly template, labor estimates without a shift row, and
+                  quick-add when this person is pre-selected.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="employee-default-start" className="text-xs text-gray-300">
+                      Start
+                    </Label>
+                    <Input
+                      id="employee-default-start"
+                      type="time"
+                      value={employeeForm.defaultShiftStart ?? "09:00"}
+                      onChange={(e) =>
+                        setEmployeeForm((prev) => ({ ...prev, defaultShiftStart: e.target.value }))
+                      }
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="employee-default-end" className="text-xs text-gray-300">
+                      End
+                    </Label>
+                    <Input
+                      id="employee-default-end"
+                      type="time"
+                      value={employeeForm.defaultShiftEnd ?? "17:00"}
+                      onChange={(e) =>
+                        setEmployeeForm((prev) => ({ ...prev, defaultShiftEnd: e.target.value }))
+                      }
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label className="text-gray-300">Pay type</Label>
+                <Label className="text-gray-200">Pay type</Label>
                 <Select
                   value={resolvedPayType}
                   onValueChange={(v) => setEmployeeForm((prev) => ({ ...prev, payment_type: v }))}
                 >
-                  <SelectTrigger className="border-yellow-500/20 bg-black/30">
+                  <SelectTrigger className={calendarFieldClass}>
                     <SelectValue placeholder="Pay type" />
                   </SelectTrigger>
                   <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
@@ -1139,37 +1484,63 @@ export default function EmployeeCalendar() {
               </div>
               {resolvedPayType === "daily" ? (
                 <div className="space-y-2">
-                  <Label className="text-gray-300">Daily wage (MXN) *</Label>
+                  <Label className="text-gray-200">Daily wage (MXN) *</Label>
                   <Input
                     inputMode="decimal"
                     value={dailyRateText}
                     onChange={(e) => setDailyRateText(e.target.value)}
-                    className="border-yellow-500/20 bg-black/30"
+                    className={calendarFieldClass}
                     placeholder="0.00"
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs leading-relaxed text-gray-400">
                     One shift on the calendar = this amount until you mark the shift paid from cash/bank.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label className="text-gray-300">Hourly rate (MXN)</Label>
+                  <Label className="text-gray-200">Hourly rate (MXN)</Label>
                   <Input
                     inputMode="decimal"
                     value={hourlyRateText}
                     onChange={(e) => setHourlyRateText(e.target.value)}
-                    className="border-yellow-500/20 bg-black/30"
+                    className={calendarFieldClass}
                     placeholder="0.00"
                   />
                 </div>
               )}
+              <div className="flex flex-col gap-2 rounded-xl border border-yellow-500/25 bg-[#1c1914] p-3 md:col-span-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label htmlFor="employee-auto-shifts" className="text-gray-200">
+                      Auto-register shifts
+                    </Label>
+                    <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                      When off, only <strong className="font-medium text-gray-400">manual</strong> shift rows are used. Weekly
+                      template &quot;Create shifts for workdays&quot; stays disabled for this person. Workdays and default hours
+                      still drive forecasts and Daily Cash labor.
+                    </p>
+                  </div>
+                  <Switch
+                    id="employee-auto-shifts"
+                    checked={employeeForm.auto_register_shifts !== false}
+                    onCheckedChange={(checked) =>
+                      setEmployeeForm((prev) => ({ ...prev, auto_register_shifts: checked === true }))
+                    }
+                    className="shrink-0 data-[state=checked]:bg-yellow-400"
+                  />
+                </div>
+              </div>
               <div className="space-y-2 md:col-span-2">
-                <Label className="text-gray-300">Notes (optional)</Label>
+                <Label className="text-gray-200">Notes (optional)</Label>
+                <p className="text-xs text-gray-500">
+                  Free text only — workdays and hours are saved from the fields above (you don&apos;t need tags like{" "}
+                  <code className="rounded bg-black/40 px-1 text-[10px] text-gray-400">[lt_work_days:…]</code> here).
+                </p>
                 <Textarea
                   value={employeeForm.notes}
                   onChange={(e) => setEmployeeForm((prev) => ({ ...prev, notes: e.target.value }))}
                   rows={2}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={cn(calendarFieldClass, "min-h-[72px]")}
                 />
               </div>
               <div className="flex items-center gap-2 md:col-span-2">
@@ -1178,15 +1549,20 @@ export default function EmployeeCalendar() {
                   id="is_active"
                   checked={employeeForm.is_active}
                   onChange={(e) => setEmployeeForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                  className="rounded border-yellow-500/40"
+                  className="h-4 w-4 rounded border-yellow-500/50 bg-[#252014] text-yellow-400 accent-yellow-400"
                 />
-                <Label htmlFor="is_active" className="text-gray-300">
+                <Label htmlFor="is_active" className="text-gray-200">
                   Active (can be scheduled)
                 </Label>
               </div>
             </div>
             <div className="flex flex-col gap-3 border-t border-yellow-500/20 pt-4 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={resetEmployeeForm} className="border-yellow-500/30">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetEmployeeForm}
+                className="border-yellow-500/40 bg-[#1a1810] text-yellow-50 hover:bg-yellow-400/10 hover:text-yellow-100"
+              >
                 Cancel
               </Button>
               <Button
@@ -1217,7 +1593,7 @@ export default function EmployeeCalendar() {
             <div className="space-y-2">
               <Label className="text-gray-300">Employee *</Label>
               <Select value={shiftForm.employee_id} onValueChange={handleEmployeeSelect}>
-                <SelectTrigger className="border-yellow-500/20 bg-black/30">
+                <SelectTrigger className={calendarFieldClass}>
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
                 <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
@@ -1236,7 +1612,7 @@ export default function EmployeeCalendar() {
                   type="time"
                   value={shiftForm.start_time}
                   onChange={(e) => handleTimeChange("start_time", e.target.value)}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
               <div className="space-y-2">
@@ -1245,7 +1621,7 @@ export default function EmployeeCalendar() {
                   type="time"
                   value={shiftForm.end_time}
                   onChange={(e) => handleTimeChange("end_time", e.target.value)}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
             </div>
@@ -1265,7 +1641,7 @@ export default function EmployeeCalendar() {
                       return next;
                     });
                   }}
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
               <div className="space-y-2">
@@ -1277,7 +1653,7 @@ export default function EmployeeCalendar() {
                   onChange={(e) =>
                     setShiftForm({ ...shiftForm, amount: parseFloat(e.target.value) || 0 })
                   }
-                  className="border-yellow-500/20 bg-black/30"
+                  className={calendarFieldClass}
                 />
               </div>
             </div>
@@ -1296,7 +1672,7 @@ export default function EmployeeCalendar() {
                 value={shiftForm.notes}
                 onChange={(e) => setShiftForm({ ...shiftForm, notes: e.target.value })}
                 rows={2}
-                className="border-yellow-500/20 bg-black/30"
+                className={cn(calendarFieldClass, "min-h-[72px]")}
               />
             </div>
             <div className="flex gap-2 pt-2">

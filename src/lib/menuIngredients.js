@@ -12,7 +12,7 @@ const MAX_WORDS = 12;
 /** Broken UTF-8 / copy-paste fragments → lowercase English-ish token before lexicon */
 const MALFORMED_EXACT = {
   "calabac n": "zucchini",
-  "carne a la bolo esa": "meat bolognese",
+  "carne a la bolo esa": "meat",
   "jalape o": "jalapeño",
   "jam n": "ham",
   "pi a": "pineapple",
@@ -53,8 +53,15 @@ const EN_CANONICAL = {
   "tomato sauce": "Tomato sauce",
   "crema de queso azul": "Blue cheese cream",
   "blue cheese cream": "Blue cheese cream",
-  "carne a la bolonesa": "Meat bolognese",
-  "meat bolognese": "Meat bolognese",
+  "carne a la bolonesa": "Meat",
+  "meat bolognese": "Meat",
+  meat: "Meat",
+  "+ coca cola 1": "Coca cola",
+  "+coca cola 1": "Coca cola",
+  "coca cola 1": "Coca cola",
+  "coca cola": "Coca cola",
+  "coca-cola": "Coca cola",
+  cocacola: "Coca cola",
   "ralladura de limón": "Lemon zest",
   "lemon zest": "Lemon zest",
   jalapeño: "Jalapeño",
@@ -255,6 +262,16 @@ function dedupePreferSingular(labels) {
   return Array.from(stemToLabel.values());
 }
 
+/** Menu parsing noise — hide from shopping / purchase pills (English display). */
+function isBlockedIngredientEnglishLabel(label) {
+  const s = String(label || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return true;
+  return /^l\s*\+\s*3\s*sauces?$/.test(s);
+}
+
 /**
  * @param {Array<{ ingredients?: unknown, description?: string, description_en?: string }>} items
  * @returns {string[]} Unique English ingredient labels, sorted for display.
@@ -270,6 +287,7 @@ export function collectMenuIngredientOptionsFromItems(items) {
     if (!n) return;
     const label = toEnglishIngredientLabel(n);
     if (!label) return;
+    if (isBlockedIngredientEnglishLabel(label)) return;
     const key = label.toLowerCase();
     if (!byKey.has(key)) {
       byKey.set(key, label);
@@ -287,4 +305,33 @@ export function collectMenuIngredientOptionsFromItems(items) {
 
   const merged = dedupePreferSingular(Array.from(byKey.values()));
   return merged.sort((a, b) => a.localeCompare(b, "en"));
+}
+
+/** English quick picks for kitchen / supplies (Register purchase + Shopping list pills). */
+export const KITCHEN_QUICK_PICK_LABELS = [
+  "Dish soap",
+  "Dishcloth",
+  "Trash bags",
+  "Ice",
+  "Paper towels",
+  "Sponges",
+];
+
+/**
+ * Menu-derived ingredient pills plus {@link KITCHEN_QUICK_PICK_LABELS}, de-duped, en sorted.
+ * @param {Array<{ ingredients?: unknown, description?: string, description_en?: string }>} items
+ */
+export function collectShoppingIngredientPillLabels(items) {
+  const fromMenu = collectMenuIngredientOptionsFromItems(items);
+  const byStem = new Map();
+  const put = (label) => {
+    const display = String(label || "").trim();
+    if (!display || isBlockedIngredientEnglishLabel(display)) return;
+    const stem = ingredientMatchKey(display);
+    if (!stem) return;
+    if (!byStem.has(stem)) byStem.set(stem, display);
+  };
+  for (const label of KITCHEN_QUICK_PICK_LABELS) put(label);
+  for (const label of fromMenu) put(label);
+  return dedupePreferSingular(Array.from(byStem.values())).sort((a, b) => a.localeCompare(b, "en"));
 }

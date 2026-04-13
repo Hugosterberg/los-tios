@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, endOfDay, isSameDay, startOfDay, subDays } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  isSameMonth,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
+import { enUS } from "date-fns/locale";
 import {
   Banknote,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Plus,
   Trash2,
   Undo2,
@@ -14,7 +26,7 @@ import { base44 } from "@/api/base44Client";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
-import { buildMergedCanonicalEvents, filterCanonicalEventsByDateRange } from "@/lib/mergedSales";
+import { getRecordDate, getReceiptPaymentMethod, getReceiptTotal } from "@/lib/mergedSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,27 +40,39 @@ import {
   localDeleteCompanyTransaction,
   localListCompanyTransactions,
   localListExpenses,
+  localListEmployees,
   localListShifts,
   localUpdateCompanyTransaction,
   localUpdateExpense,
 } from "@/lib/localDevFinance";
+import { expectedLaborEntriesForDate, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import {
   addManualLine,
   getDetailOverrides,
+  getEarliestOpeningInMexicoMonth,
   getManualLines,
   getOpeningBalance,
+  listOpeningCountDiffs,
+  recordOpeningCountDiff,
   removeManualLine,
   setDetailOverride,
   setOpeningBalance,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
 import {
+  AppOrderLedgerDetailPanel,
+  LoyverseLedgerDetailPanel,
+} from "@/components/daily-cash/LedgerRowExpandPanels";
+import {
   dateFromMexicoDateKey,
+  formatMexicoDateShort,
   formatMexicoLongDateEn,
+  formatMexicoMonthShortDayYearEn,
   formatMexicoTime,
   formatMexicoWeekdayLongEn,
   getMexicoDateKey,
   getMexicoNowDateKey,
+  getMexicoYearMonthKey,
   matchesMexicoCalendarDay,
 } from "@/lib/mexicoTime";
 
@@ -57,6 +81,10 @@ const DAILY_CASH_TX_MARKER = "los_tios:daily_cash";
 
 function dayKey(d) {
   return getMexicoDateKey(d);
+}
+
+function offsetMexicoDateKey(dateKey, deltaDays) {
+  return dayKey(addDays(dateFromMexicoDateKey(dateKey), deltaDays));
 }
 
 function formatMx(value) {
@@ -74,6 +102,14 @@ function rowTimeLabel(iso) {
 
 function matchesDay(isoDate, key) {
   return matchesMexicoCalendarDay(isoDate, key);
+}
+
+function expensePaymentSourceLabel(paymentSource) {
+  const ps = String(paymentSource || "company_cash");
+  if (ps === "company_cash") return "Cash drawer";
+  if (ps === "company_account") return "Company account / card";
+  if (ps === "individual") return "Individual";
+  return ps;
 }
 
 /** Map edited ledger detail back to Order.customer_name (display is `Order · ${name}`). */
@@ -155,19 +191,332 @@ function isLoyverseReceiptCompleted(receipt) {
   return !String(status).toLowerCase().includes("cancel");
 }
 
+function orderCashPaymentSettled(order) {
+  const ps = order.payment_status;
+  if (ps == null || ps === "") return true;
+  return ps === "paid" || ps === "confirmed";
+}
+
+/** @param {string} dayStr YYYY-MM-DD */
+function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRows, manualLines }) {
+  const rows = [];
+
+  for (const o of orders) {
+    const orderWhen = o.updated_date || o.created_date;
+    if (!matchesDay(orderWhen, dayStr)) continue;
+    if (String(o.payment_method || "").toLowerCase() !== "cash" || o.status !== "delivered") continue;
+    if (!orderCashPaymentSettled(o)) continue;
+    const amt = Number(o.total_amount || 0);
+    rows.push({
+      _ledgerDay: dayStr,
+      id: `order-${o.id}`,
+      sortTime: new Date(orderWhen || 0).getTime(),
+      timeLabel: rowTimeLabel(orderWhen),
+      source: "Customer order",
+      detail: o.customer_name ? `Order · ${o.customer_name}` : "Order (cash)",
+      inAmount: amt,
+      outAmount: null,
+      order: o,
+    });
+  }
+
+  for (const lv of loyverseRows) {
+    rows.push({ ...lv, _ledgerDay: dayStr });
+  }
+
+  for (const t of transactions) {
+    if (!matchesDay(t.date, dayStr)) continue;
+    if (t.payment_method !== "cash") continue;
+    const amt = Number(t.amount || 0);
+    const isDailyCashRegistered =
+      String(t.notes || "") === DAILY_CASH_TX_MARKER || String(t.notes || "").includes(DAILY_CASH_TX_MARKER);
+    const whenIso = t.created_date || `${String(t.date).slice(0, 10)}T12:00:00`;
+    if (t.type === "contribution") {
+      rows.push({
+        _ledgerDay: dayStr,
+        id: `tx-in-${t.id}`,
+        sortTime: new Date(whenIso).getTime(),
+        timeLabel: rowTimeLabel(whenIso),
+        source: isDailyCashRegistered ? "Manual cash" : "Company transaction",
+        detail: t.description || t.contributor_name || "Cash contribution",
+        inAmount: amt,
+        outAmount: null,
+        isRegisteredManual: isDailyCashRegistered,
+        transactionId: t.id,
+      });
+    } else if (t.type === "withdrawal") {
+      rows.push({
+        _ledgerDay: dayStr,
+        id: `tx-out-${t.id}`,
+        sortTime: new Date(whenIso).getTime(),
+        timeLabel: rowTimeLabel(whenIso),
+        source: isDailyCashRegistered ? "Manual cash" : "Company transaction",
+        detail: t.description || t.contributor_name || "Cash withdrawal",
+        inAmount: null,
+        outAmount: amt,
+        isRegisteredManual: isDailyCashRegistered,
+        transactionId: t.id,
+      });
+    }
+  }
+
+  for (const e of expenses) {
+    if (!matchesDay(e.date, dayStr)) continue;
+    const amt = Number(e.amount || 0);
+    const fromShopping = Boolean(e.from_shopping_list);
+    const ps = String(e.payment_source || "company_cash");
+    const fromCashDrawer = ps === "company_cash";
+    const whenIso =
+      e.created_date ||
+      (e.date ? `${String(e.date).slice(0, 10)}T12:00:00` : `${dayStr}T12:00:00`);
+    let sourceLabel;
+    if (fromCashDrawer) {
+      sourceLabel = fromShopping ? "Register purchase" : "Expense (cash drawer)";
+    } else if (fromShopping) {
+      sourceLabel = `Shopping → ${expensePaymentSourceLabel(ps)}`;
+    } else {
+      sourceLabel = `Expense (${expensePaymentSourceLabel(ps)})`;
+    }
+    rows.push({
+      _ledgerDay: dayStr,
+      id: `exp-${e.id}`,
+      sortTime: new Date(whenIso).getTime(),
+      timeLabel: rowTimeLabel(whenIso),
+      source: sourceLabel,
+      detail: e.name || e.category || (fromShopping ? "Purchase" : "Expense"),
+      inAmount: null,
+      outAmount: fromCashDrawer ? amt : null,
+      ledgerOutAmount: fromCashDrawer ? null : amt,
+    });
+  }
+
+  for (const m of manualLines) {
+    const amt = Number(m.amount || 0);
+    const isIn = m.direction === "in";
+    rows.push({
+      _ledgerDay: dayStr,
+      id: `man-${m.id}`,
+      sortTime: new Date(m.createdAt || `${dayStr}T12:00:00`).getTime(),
+      timeLabel: rowTimeLabel(m.createdAt),
+      source: "Manual adjustment",
+      detail: m.note || "Adjustment",
+      inAmount: isIn ? amt : null,
+      outAmount: isIn ? null : amt,
+      isManual: true,
+      manualId: m.id,
+    });
+  }
+
+  rows.sort((a, b) => b.sortTime - a.sortTime);
+  return rows;
+}
+
+/** Salary expenses already logged as paid from the cash drawer this calendar day (Finance). */
+function salaryCashDrawerTotalForDay(dayStr, expenses) {
+  let sum = 0;
+  for (const e of expenses) {
+    if (!matchesDay(e.date, dayStr)) continue;
+    if (String(e.category || "").toLowerCase() !== "salaries") continue;
+    if (String(e.payment_source || "company_cash") !== "company_cash") continue;
+    sum += Number(e.amount || 0);
+  }
+  return sum;
+}
+
+/**
+ * Append one synthetic OUT row for wages still expected from the drawer (unpaid shifts + template),
+ * net of Finance "salaries" already marked paid from cash that day — avoids double-counting.
+ */
+function formatLaborCashDetailFromEntries(entries) {
+  if (!entries.length) {
+    return "Expected cash wages from employee calendar";
+  }
+  const names = entries.map((e) => e.name).filter(Boolean);
+  const uniq = [...new Set(names)];
+  const list =
+    uniq.length <= 6 ? uniq.join(", ") : `${uniq.slice(0, 5).join(", ")} +${uniq.length - 5}`;
+  return `Expected cash wages from employee calendar (${list})`;
+}
+
+function mergeLaborCashLedgerRows(dayStr, baseRows, employees, shifts, expenses) {
+  const expected = totalExpectedLaborForDate(dayStr, employees, shifts);
+  const paidFromDrawer = salaryCashDrawerTotalForDay(dayStr, expenses);
+  const netOut = Math.max(0, expected - paidFromDrawer);
+  if (!Number.isFinite(netOut) || netOut < 0.005) {
+    return baseRows;
+  }
+  const laborEntries = expectedLaborEntriesForDate(dayStr, employees, shifts);
+  const laborRow = {
+    _ledgerDay: dayStr,
+    id: `labor-cash-${dayStr}`,
+    /** Sort last in "newest first" tables (early instant same calendar day). */
+    sortTime: new Date(`${dayStr}T00:00:00`).getTime() - 60_000,
+    timeLabel: "—",
+    source: "Labor (cash)",
+    detail: formatLaborCashDetailFromEntries(laborEntries),
+    inAmount: null,
+    outAmount: netOut,
+    isSyntheticLabor: true,
+  };
+  const merged = [...baseRows, laborRow];
+  merged.sort((a, b) => b.sortTime - a.sortTime);
+  return merged;
+}
+
+function sumDrawerCashTotals(rows) {
+  let cashIn = 0;
+  let cashOut = 0;
+  for (const r of rows) {
+    if (r.inAmount) cashIn += r.inAmount;
+    if (r.outAmount) cashOut += r.outAmount;
+  }
+  return { cashIn, cashOut, net: cashIn - cashOut };
+}
+
+function normalizeLedgerPayLabel(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/** Match Loyverse payment labels (Efectivo, Cash, etc.) — same idea as Orders POS rows. */
+function isCashLikeLedgerMethod(raw) {
+  const m = normalizeLedgerPayLabel(raw);
+  if (m === "cash" || m === "efectivo") return true;
+  if (m.includes("efectivo")) return true;
+  if (m.includes("cash") && !m.includes("cashback")) return true;
+  return false;
+}
+
+function paymentLineLabel(p) {
+  return String(p?.type ?? p?.name ?? p?.payment_type ?? "").trim();
+}
+
+function paymentLineMoney(p) {
+  const raw = p?.money_amount ?? p?.amount_money ?? p?.amount;
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string") return Number(raw) || 0;
+  if (raw && typeof raw === "object") return Number(raw.amount ?? raw.value) || 0;
+  return 0;
+}
+
+function isLoyverseRefundReceipt(receipt) {
+  const rt = String(receipt?.receipt_type || receipt?.type || "").toLowerCase();
+  if (rt.includes("refund") || rt.includes("return")) return true;
+  const t = getReceiptTotal(receipt);
+  if (t < -0.009) return true;
+  return false;
+}
+
+function buildLoyverseRowsForWindow(overview, rangeStart, rangeEnd) {
+  const byDay = new Map();
+  if (!overview?.receipts?.length) return byDay;
+  const receipts = overview.receipts.filter(isLoyverseReceiptCompleted);
+  if (!receipts.length) return byDay;
+  const storeMap = new Map((overview.stores || []).map((s) => [s.id, s.name || s.id]));
+
+  for (const receipt of receipts) {
+    const ts = getRecordDate(receipt);
+    if (ts < rangeStart || ts > rangeEnd) continue;
+
+    const rid = receipt?.id ?? receipt?.receipt_number ?? "unknown";
+    const dayStr = getMexicoDateKey(ts);
+    const branch = storeMap.get(receipt.store_id) || receipt.store_id || "";
+    const parts = [];
+    if (receipt?.receipt_number != null && String(receipt.receipt_number).trim() !== "") {
+      parts.push(`#${receipt.receipt_number}`);
+    }
+    if (branch) parts.push(branch);
+    const baseDetail = parts.length > 0 ? parts.join(" · ") : "Loyverse (cash)";
+    const isRefund = isLoyverseRefundReceipt(receipt);
+    const timeIso = receipt?.created_at ?? receipt?.receipt_date ?? ts.toISOString();
+
+    const payments = Array.isArray(receipt.payments) ? receipt.payments : [];
+
+    const pushRow = (suffix, cashAmount, detailNote) => {
+      const raw = Number(cashAmount);
+      if (!Number.isFinite(raw) || Math.abs(raw) < 0.0001) return;
+      const magnitude = Math.abs(raw);
+      const signed = isRefund ? -magnitude : magnitude;
+      const row = {
+        id: `loyverse-${rid}${suffix}`,
+        sortTime: ts.getTime(),
+        timeLabel: rowTimeLabel(timeIso),
+        source: isRefund ? "Loyverse refund" : "Loyverse POS",
+        detail: (() => {
+          const bits = [];
+          if (isRefund) bits.push("Refund");
+          if (detailNote) bits.push(detailNote);
+          bits.push(baseDetail);
+          return bits.join(" · ");
+        })(),
+        inAmount: signed > 0.009 ? signed : null,
+        outAmount: signed < -0.009 ? Math.abs(signed) : null,
+        receipt,
+      };
+      if (!byDay.has(dayStr)) byDay.set(dayStr, []);
+      byDay.get(dayStr).push(row);
+    };
+
+    if (payments.length === 0) {
+      const method = String(getReceiptPaymentMethod(receipt) || "");
+      if (!isCashLikeLedgerMethod(method)) continue;
+      pushRow("", Math.abs(getReceiptTotal(receipt)), null);
+      continue;
+    }
+
+    payments.forEach((p, i) => {
+      if (!isCashLikeLedgerMethod(paymentLineLabel(p))) return;
+      let amt = paymentLineMoney(p);
+      if (!Number.isFinite(amt) || Math.abs(amt) < 0.0001) {
+        if (payments.length === 1) amt = Math.abs(getReceiptTotal(receipt));
+        else return;
+      }
+      const note = payments.length > 1 ? `Cash ${i + 1}/${payments.length}` : null;
+      pushRow(`-p${i}`, Math.abs(amt), note);
+    });
+  }
+
+  return byDay;
+}
+
 export default function DailyCash() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(() => dateFromMexicoDateKey(getMexicoNowDateKey()));
-  const dayStr = dayKey(selectedDate);
+  const [periodMode, setPeriodMode] = useState(/** @type {"today" | "month"} */ ("today"));
+  const prevPeriodMode = useRef(periodMode);
+  /** Prevents re-filling start cash after user clears the field for the same day / same expected close. */
+  const openingAutoFillSigRef = useRef("");
+
+  useEffect(() => {
+    if (periodMode === "today" && prevPeriodMode.current !== "today") {
+      setSelectedDate(dateFromMexicoDateKey(getMexicoNowDateKey()));
+    }
+    prevPeriodMode.current = periodMode;
+  }, [periodMode]);
+
+  const mexicoToday = dateFromMexicoDateKey(getMexicoNowDateKey());
+  const todayStr = dayKey(mexicoToday);
+  const formDayStr = dayKey(selectedDate);
+  const heroDate = selectedDate;
+  const viewingToday = formDayStr === todayStr;
+
   const useLocalFinance = isLocalFinanceMode();
   const isLocalOnlyMode =
     import.meta.env.DEV &&
     (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
 
-  const dayWindow = useMemo(
-    () => ({ start: startOfDay(selectedDate), end: endOfDay(selectedDate) }),
+  /** Full calendar month so day-to-day navigation still has Loyverse rows + prior-close math. */
+  const loyverseWindow = useMemo(
+    () => ({
+      start: startOfMonth(selectedDate),
+      end: endOfMonth(selectedDate),
+    }),
     [selectedDate],
   );
+
+  const loyverseWindowKey = `${format(loyverseWindow.start, "yyyy-MM-dd")}_${format(loyverseWindow.end, "yyyy-MM-dd")}`;
 
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
@@ -177,16 +526,46 @@ export default function DailyCash() {
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const loyverseQuery = useQuery({
-    queryKey: ["dailyCashLoyverse", settings[0]?.id || "none", dayStr],
+    queryKey: ["dailyCashLoyverse", settings[0]?.id || "none", loyverseWindowKey],
     queryFn: () =>
       getLoyverseOverview(appSettings, {
-        start: dayWindow.start,
-        end: dayWindow.end,
+        start: loyverseWindow.start,
+        end: loyverseWindow.end,
       }),
     enabled: hasLoyverseApiConfig(appSettings),
     staleTime: 60_000,
   });
   const loyverseOverview = loyverseQuery.data;
+
+  const loyverseCustomerById = useMemo(() => {
+    const m = new Map();
+    for (const c of loyverseOverview?.customers || []) {
+      if (c?.id != null) m.set(c.id, c);
+    }
+    return m;
+  }, [loyverseOverview?.customers]);
+
+  const loyverseEmployeeById = useMemo(() => {
+    const m = new Map();
+    for (const e of loyverseOverview?.employees || []) {
+      if (e?.id != null) m.set(e.id, e);
+    }
+    return m;
+  }, [loyverseOverview?.employees]);
+
+  const loyverseStoreById = useMemo(() => {
+    const m = new Map();
+    for (const s of loyverseOverview?.stores || []) {
+      if (s?.id != null) m.set(s.id, s);
+    }
+    return m;
+  }, [loyverseOverview?.stores]);
+
+  const [expandedLedgerKey, setExpandedLedgerKey] = useState(/** @type {string | null} */ (null));
+
+  useEffect(() => {
+    setExpandedLedgerKey(null);
+  }, [formDayStr, periodMode, loyverseWindowKey]);
 
   const [openingInput, setOpeningInput] = useState("");
   const [storeTick, setStoreTick] = useState(0);
@@ -264,190 +643,234 @@ export default function DailyCash() {
     queryFn: () => (useLocalFinance ? localListShifts() : base44.entities.Shift.list("-date")),
   });
 
-  const unpaidShiftLaborDay = useMemo(() => {
-    return shifts
-      .filter((s) => matchesDay(s.date, dayStr) && s.status !== "cancelled" && s.status !== "paid")
-      .reduce((sum, s) => sum + Number(s.amount || 0), 0);
-  }, [shifts, dayStr]);
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListEmployees() : base44.entities.Employee.list("name")),
+  });
+
+  const expectedLaborDay = useMemo(
+    () => totalExpectedLaborForDate(formDayStr, employees, shifts),
+    [formDayStr, employees, shifts],
+  );
+
+  /** Hero “Sunday box”: names in extralight white, caption in gold — same hierarchy as weekday / long date. */
+  const laborCalendarHeroTitle = useMemo(() => {
+    if (periodMode !== "today") return null;
+    if (!Number.isFinite(expectedLaborDay) || expectedLaborDay < 0.005) return null;
+    const entries = expectedLaborEntriesForDate(formDayStr, employees, shifts);
+    const uniq = [...new Set(entries.map((e) => e.name).filter(Boolean))];
+    if (!uniq.length) return "Staff";
+    return uniq.length <= 5 ? uniq.join(", ") : `${uniq.slice(0, 4).join(", ")} +${uniq.length - 4}`;
+  }, [periodMode, formDayStr, employees, shifts, expectedLaborDay]);
+
+  const monthEarliestOpening = useMemo(() => {
+    if (periodMode !== "month") return null;
+    return getEarliestOpeningInMexicoMonth(getMexicoYearMonthKey(selectedDate));
+  }, [periodMode, selectedDate, storeTick]);
+
+  const manualLines = useMemo(() => getManualLines(formDayStr), [formDayStr, storeTick]);
+
+  const loyverseByDay = useMemo(
+    () => buildLoyverseRowsForWindow(loyverseOverview, loyverseWindow.start, loyverseWindow.end),
+    [loyverseOverview, loyverseWindow.start, loyverseWindow.end],
+  );
+
+  /** Most recent day before `formDayStr` with a saved opening — its drawer end is the implied prior close. */
+  const priorDrawerClose = useMemo(() => {
+    if (periodMode !== "today") return null;
+    let d = offsetMexicoDateKey(formDayStr, -1);
+    for (let i = 0; i < 120; i++) {
+      const opening = getOpeningBalance(d);
+      if (opening === null) {
+        d = offsetMexicoDateKey(d, -1);
+        continue;
+      }
+      const lv = loyverseByDay.get(d) || [];
+      const rows = mergeLaborCashLedgerRows(
+        d,
+        buildDayTableRows(d, {
+          orders,
+          transactions,
+          expenses,
+          loyverseRows: lv,
+          manualLines: getManualLines(d),
+        }),
+        employees,
+        shifts,
+        expenses,
+      );
+      const t = sumDrawerCashTotals(rows);
+      return { closeDayStr: d, priorOpening: opening, net: t.net, end: opening + t.net };
+    }
+    return null;
+  }, [periodMode, formDayStr, loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick]);
 
   useEffect(() => {
-    const v = getOpeningBalance(dayStr);
-    setOpeningInput(v === null ? "" : String(v));
-  }, [dayStr, storeTick]);
+    if (periodMode === "month") {
+      setOpeningInput(monthEarliestOpening === null ? "" : String(monthEarliestOpening.value));
+      return;
+    }
+    const v = getOpeningBalance(formDayStr);
+    if (v !== null) {
+      setOpeningInput(String(v));
+    } else {
+      setOpeningInput("");
+    }
+  }, [formDayStr, storeTick, periodMode, monthEarliestOpening]);
+
+  /** No saved opening: pre-fill from prior drawer close; allow user to clear without immediate re-fill for same expected amount. */
+  useEffect(() => {
+    if (periodMode !== "today") return;
+    if (getOpeningBalance(formDayStr) !== null) return;
+    if (!priorDrawerClose || !Number.isFinite(priorDrawerClose.end)) return;
+    const sig = `${formDayStr}|${priorDrawerClose.closeDayStr}|${priorDrawerClose.end}`;
+    setOpeningInput((prev) => {
+      const p = String(prev).trim();
+      if (p !== "") return prev;
+      if (openingAutoFillSigRef.current === sig) return prev;
+      openingAutoFillSigRef.current = sig;
+      return String(priorDrawerClose.end);
+    });
+  }, [periodMode, formDayStr, priorDrawerClose?.end, priorDrawerClose?.closeDayStr]);
+
+  const openingCountDiffHistory = useMemo(() => listOpeningCountDiffs(), [storeTick]);
 
   const persistOpening = useCallback(() => {
     const trimmed = openingInput.trim();
+    const oldPersisted = getOpeningBalance(formDayStr);
+    let newPersisted = oldPersisted;
     if (trimmed === "") {
-      setOpeningBalance(dayStr, null);
+      setOpeningBalance(formDayStr, null);
+      newPersisted = null;
     } else {
       const n = parseFloat(trimmed.replace(",", "."));
       if (Number.isFinite(n)) {
-        setOpeningBalance(dayStr, n);
+        setOpeningBalance(formDayStr, n);
+        newPersisted = n;
+      }
+    }
+    if (
+      periodMode === "today" &&
+      priorDrawerClose != null &&
+      newPersisted != null &&
+      Number.isFinite(newPersisted) &&
+      Number.isFinite(priorDrawerClose.end) &&
+      oldPersisted !== newPersisted
+    ) {
+      const diff = newPersisted - priorDrawerClose.end;
+      if (Math.abs(diff) >= 0.005) {
+        recordOpeningCountDiff({
+          dateKey: formDayStr,
+          priorCloseDayStr: priorDrawerClose.closeDayStr,
+          expectedEnd: priorDrawerClose.end,
+          enteredOpening: newPersisted,
+          diff,
+        });
       }
     }
     setStoreTick((t) => t + 1);
-  }, [dayStr, openingInput]);
+  }, [formDayStr, openingInput, periodMode, priorDrawerClose]);
 
-  const manualLines = useMemo(() => getManualLines(dayStr), [dayStr, storeTick]);
+  const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
 
-  const detailOverrides = useMemo(() => getDetailOverrides(dayStr), [dayStr, storeTick]);
-
-  const loyverseCashRows = useMemo(() => {
-    if (!loyverseOverview?.receipts?.length) return [];
-    const receipts = loyverseOverview.receipts.filter(isLoyverseReceiptCompleted);
-    if (!receipts.length) return [];
-    const { canonicalEvents } = buildMergedCanonicalEvents({
-      receipts,
-      clipPayments: [],
-      contributionTransactions: [],
-      stores: loyverseOverview.stores || [],
-      paymentSource: "Cash",
-      branch: "All branches",
-      channel: "All channels",
-    });
-    const inRange = filterCanonicalEventsByDateRange(
-      canonicalEvents,
-      dayWindow.start,
-      dayWindow.end,
-    );
-    return inRange
-      .filter((e) => e.source === "loyverse")
-      .map((event) => {
-        const receipt = event.payload;
-        const rid = receipt?.id ?? event.id;
-        const parts = [];
-        if (receipt?.receipt_number != null && String(receipt.receipt_number).trim() !== "") {
-          parts.push(`#${receipt.receipt_number}`);
-        }
-        if (event.branch) {
-          parts.push(event.branch);
-        }
-        const detail = parts.length > 0 ? parts.join(" · ") : "Sale (cash)";
-        const timeIso = receipt?.created_at ?? receipt?.receipt_date ?? event.timestamp;
-        return {
-          id: `loyverse-${rid}`,
-          sortTime: event.timestamp.getTime(),
-          timeLabel: rowTimeLabel(timeIso),
-          source: "Loyverse POS",
-          detail,
-          inAmount: event.amount,
-          outAmount: null,
-        };
-      });
-  }, [loyverseOverview, dayWindow.start, dayWindow.end]);
+  const openingDiffVsPriorClose = useMemo(() => {
+    if (periodMode !== "today" || priorDrawerClose == null || persistedOpening === null) return null;
+    const diff = persistedOpening - priorDrawerClose.end;
+    if (!Number.isFinite(diff) || Math.abs(diff) < 0.005) return null;
+    return diff;
+  }, [periodMode, priorDrawerClose, persistedOpening]);
 
   const tableRows = useMemo(() => {
-    const rows = [];
+    if (periodMode === "month") return [];
+    const lv = loyverseByDay.get(formDayStr) || [];
+    return mergeLaborCashLedgerRows(
+      formDayStr,
+      buildDayTableRows(formDayStr, {
+        orders,
+        transactions,
+        expenses,
+        loyverseRows: lv,
+        manualLines: getManualLines(formDayStr),
+      }),
+      employees,
+      shifts,
+      expenses,
+    );
+  }, [periodMode, formDayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick]);
 
-    for (const o of orders) {
-      if (!matchesDay(o.created_date, dayStr)) continue;
-      if (o.payment_method !== "cash" || o.status !== "delivered") continue;
-      const amt = Number(o.total_amount || 0);
-      rows.push({
-        id: `order-${o.id}`,
-        sortTime: new Date(o.created_date || 0).getTime(),
-        timeLabel: rowTimeLabel(o.created_date),
-        source: "Customer order",
-        detail: o.customer_name ? `Order · ${o.customer_name}` : "Order (cash)",
-        inAmount: amt,
-        outAmount: null,
-      });
-    }
+  const monthLedgerSections = useMemo(() => {
+    if (periodMode !== "month") return [];
+    const start = startOfMonth(selectedDate);
+    const end = endOfMonth(selectedDate);
+    return eachDayOfInterval({ start, end })
+      .map((d) => {
+        const ds = dayKey(d);
+        const lv = loyverseByDay.get(ds) || [];
+        const rows = mergeLaborCashLedgerRows(
+          ds,
+          buildDayTableRows(ds, {
+            orders,
+            transactions,
+            expenses,
+            loyverseRows: lv,
+            manualLines: getManualLines(ds),
+          }),
+          employees,
+          shifts,
+          expenses,
+        );
+        const t = sumDrawerCashTotals(rows);
+        const labor = totalExpectedLaborForDate(ds, employees, shifts);
+        return {
+          dateStr: ds,
+          label: format(d, "EEE d MMM yyyy", { locale: enUS }),
+          rows,
+          totals: t,
+          labor,
+        };
+      })
+      .filter((s) => s.dateStr <= todayStr)
+      .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  }, [periodMode, selectedDate, todayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick]);
 
-    for (const lv of loyverseCashRows) {
-      rows.push(lv);
-    }
-
-    for (const t of transactions) {
-      if (!matchesDay(t.date, dayStr)) continue;
-      if (t.payment_method !== "cash") continue;
-      const amt = Number(t.amount || 0);
-      const isDailyCashRegistered =
-        String(t.notes || "") === DAILY_CASH_TX_MARKER || String(t.notes || "").includes(DAILY_CASH_TX_MARKER);
-      const whenIso = t.created_date || `${String(t.date).slice(0, 10)}T12:00:00`;
-      if (t.type === "contribution") {
-        rows.push({
-          id: `tx-in-${t.id}`,
-          sortTime: new Date(whenIso).getTime(),
-          timeLabel: rowTimeLabel(whenIso),
-          source: isDailyCashRegistered ? "Manual cash" : "Company transaction",
-          detail: t.description || t.contributor_name || "Cash contribution",
-          inAmount: amt,
-          outAmount: null,
-          isRegisteredManual: isDailyCashRegistered,
-          transactionId: t.id,
-        });
-      } else if (t.type === "withdrawal") {
-        rows.push({
-          id: `tx-out-${t.id}`,
-          sortTime: new Date(whenIso).getTime(),
-          timeLabel: rowTimeLabel(whenIso),
-          source: isDailyCashRegistered ? "Manual cash" : "Company transaction",
-          detail: t.description || t.contributor_name || "Cash withdrawal",
-          inAmount: null,
-          outAmount: amt,
-          isRegisteredManual: isDailyCashRegistered,
-          transactionId: t.id,
-        });
-      }
-    }
-
-    for (const e of expenses) {
-      if (!matchesDay(e.date, dayStr)) continue;
-      if (e.payment_source !== "company_cash") continue;
-      const amt = Number(e.amount || 0);
-      const fromShopping = Boolean(e.from_shopping_list);
-      const whenIso =
-        e.created_date ||
-        (e.date ? `${String(e.date).slice(0, 10)}T12:00:00` : `${dayStr}T12:00:00`);
-      rows.push({
-        id: `exp-${e.id}`,
-        sortTime: new Date(whenIso).getTime(),
-        timeLabel: rowTimeLabel(whenIso),
-        source: fromShopping ? "Register purchase" : "Expense (cash)",
-        detail: e.name || e.category || (fromShopping ? "Purchase" : "Expense"),
-        inAmount: null,
-        outAmount: amt,
-      });
-    }
-
-    for (const m of manualLines) {
-      const amt = Number(m.amount || 0);
-      const isIn = m.direction === "in";
-      rows.push({
-        id: `man-${m.id}`,
-        sortTime: new Date(m.createdAt || `${dayStr}T12:00:00`).getTime(),
-        timeLabel: rowTimeLabel(m.createdAt),
-        source: "Manual adjustment",
-        detail: m.note || "Adjustment",
-        inAmount: isIn ? amt : null,
-        outAmount: isIn ? null : amt,
-        isManual: true,
-        manualId: m.id,
-      });
-    }
-
-    rows.sort((a, b) => a.sortTime - b.sortTime);
-    return rows;
-  }, [orders, loyverseCashRows, transactions, expenses, manualLines, dayStr]);
+  const monthDrawerTotals = useMemo(() => {
+    if (periodMode !== "month") return null;
+    return monthLedgerSections.reduce(
+      (acc, s) => ({
+        cashIn: acc.cashIn + s.totals.cashIn,
+        cashOut: acc.cashOut + s.totals.cashOut,
+      }),
+      { cashIn: 0, cashOut: 0 },
+    );
+  }, [periodMode, monthLedgerSections]);
 
   const totals = useMemo(() => {
-    let cashIn = 0;
-    let cashOut = 0;
-    for (const r of tableRows) {
-      if (r.inAmount) cashIn += r.inAmount;
-      if (r.outAmount) cashOut += r.outAmount;
+    if (periodMode === "month" && monthDrawerTotals) {
+      const net = monthDrawerTotals.cashIn - monthDrawerTotals.cashOut;
+      return {
+        cashIn: monthDrawerTotals.cashIn,
+        cashOut: monthDrawerTotals.cashOut,
+        net,
+        opening: null,
+        end: null,
+      };
     }
-    const net = cashIn - cashOut;
-    const opening = getOpeningBalance(dayStr);
-    const end =
-      opening !== null && Number.isFinite(opening) ? opening + net : null;
-    return { cashIn, cashOut, net, opening, end };
-  }, [tableRows, dayStr, storeTick]);
+    const t = sumDrawerCashTotals(tableRows);
+    const opening = getOpeningBalance(formDayStr);
+    const end = opening !== null && Number.isFinite(opening) ? opening + t.net : null;
+    return { ...t, opening, end };
+  }, [periodMode, monthDrawerTotals, tableRows, formDayStr, storeTick]);
 
-  const goPrev = () => setSelectedDate((d) => subDays(d, 1));
-  const goNext = () => setSelectedDate((d) => addDays(d, 1));
-  const isToday = isSameDay(selectedDate, new Date());
+  const goPrevMonth = () => setSelectedDate((d) => subMonths(d, 1));
+  const goNextMonth = () => setSelectedDate((d) => addMonths(d, 1));
+  const goPrevDay = () => setSelectedDate((d) => addDays(d, -1));
+  const goNextDay = () =>
+    setSelectedDate((d) => {
+      const next = addDays(d, 1);
+      if (dayKey(next) > todayStr) return d;
+      return next;
+    });
+  const isCalendarMonthCurrent = isSameMonth(selectedDate, new Date());
 
   const handleRegisterManualCash = async () => {
     const n = parseFloat(String(manualAmount).replace(",", "."));
@@ -456,7 +879,7 @@ export default function DailyCash() {
       type: manualDir === "in" ? "contribution" : "withdrawal",
       contributor_name: "Manual cash",
       amount: n,
-      date: dayStr,
+      date: formDayStr,
       payment_method: "cash",
       description:
         manualNote.trim() || (manualDir === "in" ? "Cash in (manual)" : "Cash out (manual)"),
@@ -476,9 +899,10 @@ export default function DailyCash() {
 
   const handleRemoveRow = (row) => {
     if (row.isManual && row.manualId) {
-      const full = manualLines.find((m) => m.id === row.manualId);
-      removeManualLine(dayStr, row.manualId);
-      setLastRemovedManual(full ? { kind: "legacy", dayStr, line: full } : null);
+      const ledgerDay = row._ledgerDay || formDayStr;
+      const full = getManualLines(ledgerDay).find((m) => m.id === row.manualId);
+      removeManualLine(ledgerDay, row.manualId);
+      setLastRemovedManual(full ? { kind: "legacy", dayStr: ledgerDay, line: full } : null);
       setStoreTick((t) => t + 1);
       return;
     }
@@ -496,8 +920,7 @@ export default function DailyCash() {
   const handleUndoManual = async () => {
     if (!lastRemovedManual) return;
     if (lastRemovedManual.kind === "legacy") {
-      if (lastRemovedManual.dayStr !== dayStr) return;
-      addManualLine(dayStr, lastRemovedManual.line);
+      addManualLine(lastRemovedManual.dayStr, lastRemovedManual.line);
       setLastRemovedManual(null);
       setStoreTick((t) => t + 1);
       return;
@@ -520,11 +943,22 @@ export default function DailyCash() {
       const baseDetail = row.detail;
 
       try {
+        const ledgerDay = row._ledgerDay || formDayStr;
         if (row.id.startsWith("loyverse-")) {
           if (trimmed === baseDetail) {
-            setDetailOverride(dayStr, row.id, null);
+            setDetailOverride(ledgerDay, row.id, null);
           } else {
-            setDetailOverride(dayStr, row.id, trimmed);
+            setDetailOverride(ledgerDay, row.id, trimmed);
+          }
+          setStoreTick((t) => t + 1);
+          return;
+        }
+
+        if (row.id.startsWith("labor-cash-")) {
+          if (trimmed === baseDetail) {
+            setDetailOverride(ledgerDay, row.id, null);
+          } else {
+            setDetailOverride(ledgerDay, row.id, trimmed);
           }
           setStoreTick((t) => t + 1);
           return;
@@ -558,7 +992,7 @@ export default function DailyCash() {
         }
 
         if (row.isManual && row.manualId) {
-          updateManualLine(dayStr, row.manualId, { note: trimmed || "Adjustment" });
+          updateManualLine(ledgerDay, row.manualId, { note: trimmed || "Adjustment" });
           setStoreTick((t) => t + 1);
         }
       } catch (e) {
@@ -566,11 +1000,117 @@ export default function DailyCash() {
         alert("Could not save detail. Try again.");
       }
     },
-    [dayStr, saveOrderDetail, saveTransactionDescription, saveExpenseDetail],
+    [formDayStr, saveOrderDetail, saveTransactionDescription, saveExpenseDetail],
   );
 
-  const weekday = formatMexicoWeekdayLongEn(selectedDate);
-  const longDate = formatMexicoLongDateEn(selectedDate);
+  const weekday = formatMexicoWeekdayLongEn(heroDate);
+  const longDate = formatMexicoLongDateEn(heroDate);
+
+  const renderLedgerTableRows = (rows, sectionDayStr) => {
+    const ov = getDetailOverrides(sectionDayStr);
+    return rows.flatMap((r, i) => {
+      const expandKey = `${sectionDayStr}::${r.id}`;
+      const isExpanded = expandedLedgerKey === expandKey;
+      const canExpand = Boolean(r.receipt || r.order);
+      const rowStripe = i % 2 === 1 ? "bg-black/20" : "bg-transparent";
+
+      const mainTr = (
+        <tr
+          key={`${sectionDayStr}-${r.id}`}
+          className={cn(
+            "border-b border-yellow-500/10 transition-colors hover:bg-yellow-500/[0.03]",
+            rowStripe,
+          )}
+        >
+          <td className="w-10 px-1 py-1 align-middle">
+            {canExpand ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 shrink-0 text-gray-500 hover:bg-yellow-500/10 hover:text-yellow-200"
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? "Hide details" : "Show details"}
+                onClick={() => setExpandedLedgerKey((prev) => (prev === expandKey ? null : expandKey))}
+              >
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            ) : (
+              <span className="inline-block w-8" />
+            )}
+          </td>
+          <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-500">{r.timeLabel}</td>
+          <td className="px-3 py-2 text-gray-300">{r.source}</td>
+          <td className="px-2 py-1 align-middle text-gray-400">
+            <LedgerDetailCell
+              displayDetail={ov[r.id] ?? r.detail}
+              onCommit={(value) => handleDetailCommit(r, value)}
+            />
+          </td>
+          <td className="px-3 py-2 text-right font-medium tabular-nums text-emerald-300/90">
+            {r.inAmount != null ? formatMx(r.inAmount) : "—"}
+          </td>
+          <td
+            className={cn(
+              "px-3 py-2 text-right font-medium tabular-nums",
+              r.outAmount != null ? "text-rose-300/85" : r.ledgerOutAmount != null ? "text-gray-500" : "",
+            )}
+            title={
+              r.isSyntheticLabor
+                ? "Out amount is net of Finance salaries already paid from cash today."
+                : r.ledgerOutAmount != null
+                  ? "Not deducted from drawer — expense paid from account, card, or individual"
+                  : undefined
+            }
+          >
+            {r.outAmount != null
+              ? formatMx(r.outAmount)
+              : r.ledgerOutAmount != null
+                ? formatMx(r.ledgerOutAmount)
+                : "—"}
+          </td>
+          <td className="px-1 py-1 text-right">
+            {r.isManual || r.isRegisteredManual ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={deleteCompanyTx.isPending}
+                className="h-8 w-8 text-gray-500 hover:bg-rose-950/40 hover:text-rose-400 disabled:opacity-40"
+                onClick={() => handleRemoveRow(r)}
+                aria-label={r.isRegisteredManual ? "Remove registered cash entry" : "Remove manual line"}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <span className="inline-block w-8" />
+            )}
+          </td>
+        </tr>
+      );
+
+      if (!canExpand || !isExpanded) return [mainTr];
+
+      const detailTr = (
+        <tr key={`${sectionDayStr}-${r.id}-detail`} className={rowStripe}>
+          <td colSpan={7} className="border-b border-yellow-500/10 px-3 pb-3 pt-0">
+            {r.receipt ? (
+              <LoyverseLedgerDetailPanel
+                receipt={r.receipt}
+                customerById={loyverseCustomerById}
+                employeeById={loyverseEmployeeById}
+                storeById={loyverseStoreById}
+              />
+            ) : (
+              <AppOrderLedgerDetailPanel order={r.order} />
+            )}
+          </td>
+        </tr>
+      );
+
+      return [mainTr, detailTr];
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#0f0f0c] text-white">
@@ -589,82 +1129,198 @@ export default function DailyCash() {
                 <h1 className="mt-1 text-2xl font-bold tracking-tight text-yellow-100 sm:text-3xl">
                   Register & movement
                 </h1>
-                <p className="mt-1 max-w-xl text-sm text-gray-500">
-                  Cash sales, drawer movements, and cash-paid expenses for one calendar day. Purchases logged as{" "}
-                  <strong className="font-medium text-gray-400">Cash</strong> under Shopping → Register purchase appear here as{" "}
-                  <strong className="font-medium text-gray-400">Register purchase</strong> (out). Start balance is saved in this
-                  browser only.
+                <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-400 sm:text-[0.9375rem] sm:leading-relaxed">
+                  <strong className="font-medium text-gray-200">Cash in/out</strong> follows the physical drawer (Loyverse cash,
+                  cash orders, manual cash, and Finance expenses paid from <strong className="font-medium text-gray-200">Cash</strong>
+                  ). <strong className="font-medium text-gray-200">All other expenses</strong> for the same day (account, card,
+                  individual) also appear in muted amounts so nothing is hidden — they do not change drawer math.{" "}
+                  <strong className="font-medium text-gray-200">Today</strong> is one day at a time — use the arrows (Mexico
+                  dates, not past today). <strong className="font-medium text-gray-200">Month</strong> lists every day in the month
+                  with the same rows. Start balance is stored in this browser only.
                 </p>
+                <div
+                  className="mt-4 inline-flex rounded-xl border border-yellow-500/40 bg-[#0c0c0a]/90 p-1 shadow-inner shadow-black/40"
+                  role="group"
+                  aria-label="Ledger period"
+                >
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPeriodMode("today")}
+                    className={cn(
+                      "h-9 rounded-lg px-4 text-sm font-semibold transition-all",
+                      periodMode === "today"
+                        ? "bg-yellow-400 text-black shadow-sm hover:bg-yellow-300"
+                        : "text-gray-200 hover:bg-yellow-500/15 hover:text-yellow-50"
+                    )}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPeriodMode("month")}
+                    className={cn(
+                      "h-9 rounded-lg px-4 text-sm font-semibold transition-all",
+                      periodMode === "month"
+                        ? "bg-yellow-400 text-black shadow-sm hover:bg-yellow-300"
+                        : "text-gray-200 hover:bg-yellow-500/15 hover:text-yellow-50"
+                    )}
+                  >
+                    Month
+                  </Button>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 sm:pb-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={goPrev}
-                className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-200 hover:bg-yellow-500/10"
-                aria-label="Previous day"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
+            <div className="flex items-center gap-0.5 sm:pb-1">
+              {periodMode === "month" ? (
+                <>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-300 hover:bg-yellow-500/10"
-                    aria-label="Pick date"
+                    onClick={goPrevMonth}
+                    className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-200 hover:bg-yellow-500/10"
+                    aria-label="Previous month"
                   >
-                    <CalendarDays className="h-5 w-5" />
+                    <ChevronLeft className="h-5 w-5" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto border border-yellow-500/30 bg-[#1a1810] p-2 text-gray-100 shadow-xl"
-                  align="end"
-                >
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(d) => {
-                      if (d) {
-                        setSelectedDate(d);
-                        setCalendarOpen(false);
-                      }
-                    }}
-                    initialFocus
-                    className="rounded-lg [--cell-size:2.25rem]"
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={goNext}
-                className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-200 hover:bg-yellow-500/10"
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-300 hover:bg-yellow-500/10"
+                        aria-label="Pick date in month"
+                      >
+                        <CalendarDays className="h-5 w-5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto border border-yellow-500/30 bg-[#1a1810] p-2 text-gray-100 shadow-xl"
+                      align="end"
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(d) => {
+                          if (d) {
+                            setSelectedDate(d);
+                            setCalendarOpen(false);
+                          }
+                        }}
+                        initialFocus
+                        className="rounded-lg [--cell-size:2.25rem]"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={goNextMonth}
+                    className="h-11 w-11 rounded-xl border-yellow-500/25 bg-black/20 text-yellow-200 hover:bg-yellow-500/10"
+                    aria-label="Next month"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={goPrevDay}
+                    className="h-9 w-9 rounded-lg text-yellow-200/80 hover:bg-yellow-500/10 hover:text-yellow-100"
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-lg text-yellow-200/70 hover:bg-yellow-500/10 hover:text-yellow-100"
+                        aria-label="Pick day"
+                      >
+                        <CalendarDays className="h-4 w-4 opacity-80" strokeWidth={1.5} />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto border border-yellow-500/30 bg-[#1a1810] p-2 text-gray-100 shadow-xl"
+                      align="end"
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(d) => {
+                          if (d) {
+                            setSelectedDate(d);
+                            setCalendarOpen(false);
+                          }
+                        }}
+                        disabled={(d) => dayKey(d) > todayStr}
+                        initialFocus
+                        className="rounded-lg [--cell-size:2.25rem]"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={goNextDay}
+                    disabled={formDayStr >= todayStr}
+                    className="h-9 w-9 rounded-lg text-yellow-200/80 hover:bg-yellow-500/10 hover:text-yellow-100 disabled:opacity-25"
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
           <div className="relative rounded-2xl border border-yellow-500/20 bg-black/25 px-6 py-8 shadow-[inset_0_1px_0_rgba(250,204,21,0.06)] sm:px-10 sm:py-10">
-            {isToday && (
+            {periodMode === "today" && viewingToday && (
               <span className="absolute right-6 top-6 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-yellow-300">
                 Today
+              </span>
+            )}
+            {periodMode === "month" && isCalendarMonthCurrent && (
+              <span className="absolute right-6 top-6 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-yellow-400/90">
+                This month
               </span>
             )}
             <p
               className="text-4xl font-extralight tracking-[-0.04em] text-yellow-50 sm:text-5xl md:text-6xl"
               style={{ fontFeatureSettings: '"ss01", "cv02"' }}
             >
-              {weekday}
+              {periodMode === "month" ? format(selectedDate, "MMMM yyyy", { locale: enUS }) : weekday}
             </p>
-            <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">{longDate}</p>
+            <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">
+              {periodMode === "month" ? "All days · incomes & expenses in the list below" : longDate}
+            </p>
+            {laborCalendarHeroTitle != null && (
+              <div className="mt-6 border-t border-yellow-500/15 pt-6 sm:mt-8 sm:pt-8">
+                <p
+                  className="text-3xl font-extralight tracking-[-0.04em] text-yellow-50 sm:text-4xl md:text-5xl"
+                  style={{ fontFeatureSettings: '"ss01", "cv02"' }}
+                >
+                  {laborCalendarHeroTitle}
+                </p>
+                <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">
+                  Expected cash wages from employee calendar
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -672,7 +1328,9 @@ export default function DailyCash() {
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-yellow-500/15 bg-[#161612] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Start cash</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+              {periodMode === "month" ? "Start cash (month)" : "Start cash"}
+            </p>
             <div className="mt-2 flex items-end gap-2">
               <span className="pb-2 text-sm text-gray-500">MXN</span>
               <Input
@@ -682,13 +1340,60 @@ export default function DailyCash() {
                 onChange={(e) => setOpeningInput(e.target.value)}
                 onBlur={persistOpening}
                 placeholder="Count at open"
-                className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600"
+                readOnly={periodMode === "month"}
+                className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600 read-only:cursor-default read-only:opacity-90"
               />
             </div>
-            <p className="mt-2 text-[11px] text-gray-600">Saved locally for this date. Blur field to save.</p>
+            <div className="mt-2 space-y-2 text-[11px] text-gray-600">
+              {periodMode === "month" ? (
+                <p>
+                  {monthEarliestOpening ? (
+                    <>
+                      Earliest opening saved this month:{" "}
+                      <span className="tabular-nums text-gray-400">{formatMexicoDateShort(monthEarliestOpening.dateKey)}</span>
+                      . Use Today to edit a specific day.
+                    </>
+                  ) : (
+                    "No opening balance saved for any day in this month (Mexico calendar). Use Today to add one."
+                  )}
+                </p>
+              ) : (
+                <>
+                  <p>
+                    Saved locally for {formDayStr}. With no saved count, the field pre-fills from{" "}
+                    <strong className="font-medium text-gray-400">latest calculated</strong> prior close — edit to match your
+                    physical count, then blur to save. End cash = start + net for the day.
+                  </p>
+                  {persistedOpening === null && priorDrawerClose ? (
+                    <div className="border-t border-yellow-500/10 pt-2">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">Latest calculated</p>
+                      <p className="mt-1 text-sm font-semibold tabular-nums text-yellow-100/90">{formatMx(priorDrawerClose.end)}</p>
+                      <p className="mt-0.5 text-[10px] text-gray-500">
+                        Prior drawer close ·{" "}
+                        {formatMexicoMonthShortDayYearEn(`${priorDrawerClose.closeDayStr}T12:00:00`)}
+                      </p>
+                    </div>
+                  ) : null}
+                  {openingDiffVsPriorClose != null && priorDrawerClose ? (
+                    <p
+                      className={cn(
+                        "text-[11px] tabular-nums",
+                        openingDiffVsPriorClose > 0 ? "text-emerald-400/85" : "text-rose-400/85",
+                      )}
+                    >
+                      vs prior close ({formatMexicoMonthShortDayYearEn(`${priorDrawerClose.closeDayStr}T12:00:00`)}):{" "}
+                      {openingDiffVsPriorClose > 0 ? "+" : ""}
+                      {formatMx(openingDiffVsPriorClose)}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
           <div className="rounded-xl border border-yellow-500/15 bg-[#161612] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Net cash (day)</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+              {periodMode === "month" ? "Net cash drawer (month)" : "Net cash (day)"}
+            </p>
             <p
               className={cn(
                 "mt-1 text-2xl font-semibold tabular-nums",
@@ -699,30 +1404,96 @@ export default function DailyCash() {
             </p>
             <p className="mt-2 text-[11px] text-gray-600">
               In {formatMx(totals.cashIn)} · Out {formatMx(totals.cashOut)}
+              {periodMode === "month" ? " · drawer only" : ""}
             </p>
           </div>
           <div className="rounded-xl border border-yellow-500/20 bg-gradient-to-br from-[#1f1c12] to-[#14120c] p-4 shadow-[0_0_40px_rgba(250,204,21,0.06)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-600/90">End cash</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-600/90">
+              {periodMode === "month" ? "End cash (use Today)" : "End cash"}
+            </p>
             <p className="mt-1 text-2xl font-bold tabular-nums text-yellow-200">
               {totals.end !== null ? formatMx(totals.end) : "—"}
             </p>
             <p className="mt-2 text-[11px] text-yellow-700/80">
-              {totals.opening !== null ? "Start + net for the day" : "Set start cash to calculate"}
+              {periodMode === "month"
+                ? "Opening/end apply per day in Today view"
+                : totals.opening !== null
+                  ? "Start + net for the day"
+                  : "Set start cash to calculate"}
             </p>
           </div>
         </div>
+
+        {openingCountDiffHistory.length > 0 && (
+          <div className="rounded-xl border border-amber-500/20 bg-[#14120c] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">
+              Opening count vs ledger (history)
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Each row is a time you saved a <strong className="font-medium text-gray-400">start cash</strong> that did not match
+              the books-expected amount from the last day we had an opening + that day&apos;s drawer net (same anchor as &quot;vs
+              prior close&quot;). Positive = you counted more cash than expected; negative = less. Stored in this browser only.
+            </p>
+            <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-yellow-500/15">
+              <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
+                <thead>
+                  <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
+                    <th className="px-2 py-2">Logged</th>
+                    <th className="px-2 py-2">Opening day</th>
+                    <th className="px-2 py-2">Prior ledger day</th>
+                    <th className="px-2 py-2 text-right">Expected</th>
+                    <th className="px-2 py-2 text-right">You counted</th>
+                    <th className="px-2 py-2 text-right">Diff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openingCountDiffHistory.map((ev) => (
+                    <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
+                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-500">
+                        {formatMexicoDateShort(ev.ts?.slice(0, 10) || "")}{" "}
+                        <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">{ev.priorCloseDayStr}</td>
+                      <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
+                        {formatMx(ev.expectedEnd)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
+                        {formatMx(ev.enteredOpening)}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-2 py-1.5 text-right font-mono font-medium tabular-nums",
+                          ev.diff > 0 ? "text-emerald-400/90" : "text-rose-400/90",
+                        )}
+                      >
+                        {ev.diff > 0 ? "+" : ""}
+                        {formatMx(ev.diff)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-xl border border-sky-500/25 bg-[#101820] p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-500/90">Labor (employees)</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs text-gray-500">Scheduled shifts not yet paid from cash</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-sky-200">{formatMx(unpaidShiftLaborDay)}</p>
+              <p className="text-xs text-gray-500">
+                {periodMode === "month"
+                  ? `Expected labor for ${formDayStr} (calendar) — each day in the list shows its own total`
+                  : "Expected labor (unpaid shifts + workdays without a shift row)"}
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-sky-200">{formatMx(expectedLaborDay)}</p>
             </div>
             <p className="max-w-xl text-[11px] leading-relaxed text-gray-500 sm:text-right">
-              Same amounts as on the Employees calendar for this date. Salary paid from the cash drawer appears in the register
-              as an expense row when you complete a shift with &quot;Complete &amp; pay&quot; (company cash). Dashboard labor
-              includes both booked salary expenses and unpaid scheduled shifts.
+              Matches Dashboard logic for this date: shift amounts until paid, plus daily wage (or 8h × hourly) for active
+              staff on their workdays when no calendar shift exists. The ledger adds a <strong className="text-gray-400">Labor (cash)</strong>{" "}
+              row for the drawer impact (net of salaries already logged from cash that day); paid salaries also appear as Finance
+              expenses.
             </p>
           </div>
         </div>
@@ -732,19 +1503,18 @@ export default function DailyCash() {
             <div>
               <h2 className="text-sm font-semibold text-yellow-200">Register manual cash</h2>
               <p className="text-[11px] text-gray-500">
-                Creates a <strong className="text-gray-400">company cash transaction</strong> for this date (visible under Finance /
-                Company account). In local dev, rows are stored in this browser.
+                Creates a <strong className="text-gray-400">company cash transaction</strong> for{" "}
+                <strong className="text-yellow-200/80">{formDayStr}</strong>
+                {periodMode === "month"
+                  ? " (pick the day with the calendar in the header). Visible under Finance / Company account."
+                  : " (visible under Finance / Company account). In local dev, rows are stored in this browser."}
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={
-                !lastRemovedManual ||
-                (lastRemovedManual.kind === "legacy" && lastRemovedManual.dayStr !== dayStr) ||
-                createCompanyTx.isPending
-              }
+              disabled={!lastRemovedManual || createCompanyTx.isPending}
               onClick={() => void handleUndoManual()}
               className="h-8 gap-1.5 border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10 disabled:opacity-30"
             >
@@ -809,19 +1579,28 @@ export default function DailyCash() {
 
         <div className="overflow-hidden rounded-xl border border-yellow-500/20 bg-[#10100c]">
           <div className="border-b border-yellow-500/15 bg-[#1a1810] px-4 py-2.5">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-600/90">Cash ledger</h2>
-            <p className="text-[11px] text-gray-600">
-              Includes <strong className="font-medium text-gray-500">Loyverse POS</strong> cash receipts, customer cash orders,
-              Shopping <strong className="font-medium text-gray-500">Register purchase</strong> lines paid with{" "}
-              <strong className="font-medium text-gray-500">Cash</strong>, other cash expenses, and manual rows above. Card-paid
-              shopping purchases go to the bank account, not this drawer. Click a detail cell to edit (saved on blur or Enter);
-              Loyverse labels are stored in this browser only.
+            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-600/90">
+              {periodMode === "month" ? "Month ledger (day by day)" : "Day ledger"}
+            </h2>
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              Every <strong className="font-medium text-gray-300">Finance expense</strong> is listed.{" "}
+              <strong className="font-medium text-rose-300/80">Out</strong> in full color hits the cash drawer;{" "}
+              <strong className="font-medium text-gray-400">muted Out</strong> is non-drawer (card/account/individual). Includes
+              Loyverse <strong className="text-gray-300">cash / Efectivo</strong> (each tender line),{" "}
+              <strong className="text-gray-300">cash refunds</strong>, delivered cash orders, company transactions, and manual
+              lines. Expected <strong className="text-gray-300">staff wages paid from cash</strong> appear as{" "}
+              <strong className="text-gray-300">Labor (cash)</strong> OUT when not already covered by a Finance salary expense from
+              the drawer that day. Rows are <strong className="text-gray-300">newest first</strong>. Use{" "}
+              <strong className="text-gray-300">▾</strong> on Loyverse and app cash orders for ticket notes, channel, table, and
+              line items. In <strong className="text-gray-300">Month</strong>, each date is a section (newest day first; future
+              days hidden) with subtotals + labor (header). Click detail to edit (blur or Enter).
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-yellow-500/20 bg-[#14120c] text-left text-[10px] font-semibold uppercase tracking-wider text-yellow-600/90">
+                  <th className="w-10 px-1 py-2.5" aria-label="Expand" />
                   <th className="whitespace-nowrap px-3 py-2.5">Time</th>
                   <th className="px-3 py-2.5">Source</th>
                   <th className="min-w-[12rem] px-3 py-2.5">Detail</th>
@@ -831,54 +1610,38 @@ export default function DailyCash() {
                 </tr>
               </thead>
               <tbody>
-                {tableRows.length === 0 ? (
+                {periodMode === "month" ? (
+                  monthLedgerSections.map((section) => (
+                    <Fragment key={section.dateStr}>
+                      <tr className="border-b border-yellow-500/30 bg-yellow-500/10">
+                        <td colSpan={7} className="px-3 py-2.5 text-xs font-semibold leading-relaxed text-yellow-100">
+                          <span className="text-yellow-200">{section.label}</span>
+                          <span className="ml-2 font-normal text-gray-400">
+                            Drawer: In {formatMx(section.totals.cashIn)} · Out {formatMx(section.totals.cashOut)} · Net{" "}
+                            {formatMx(section.totals.net)}
+                          </span>
+                          <span className="ml-2 font-normal text-sky-300/90">Labor {formatMx(section.labor)}</span>
+                        </td>
+                      </tr>
+                      {section.rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="border-b border-yellow-500/10 px-4 py-4 text-center text-sm text-gray-600">
+                            No movements or expenses this day.
+                          </td>
+                        </tr>
+                      ) : (
+                        renderLedgerTableRows(section.rows, section.dateStr)
+                      )}
+                    </Fragment>
+                  ))
+                ) : tableRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-gray-500">
-                      No cash movements for this day.
+                    <td colSpan={7} className="px-4 py-16 text-center text-gray-500">
+                      No cash movements or expenses for this day.
                     </td>
                   </tr>
                 ) : (
-                  tableRows.map((r, i) => (
-                    <tr
-                      key={r.id}
-                      className={cn(
-                        "border-b border-yellow-500/10 transition-colors hover:bg-yellow-500/[0.03]",
-                        i % 2 === 1 ? "bg-black/20" : "bg-transparent",
-                      )}
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-500">{r.timeLabel}</td>
-                      <td className="px-3 py-2 text-gray-300">{r.source}</td>
-                      <td className="px-2 py-1 align-middle text-gray-400">
-                        <LedgerDetailCell
-                          displayDetail={detailOverrides[r.id] ?? r.detail}
-                          onCommit={(value) => handleDetailCommit(r, value)}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums text-emerald-300/90">
-                        {r.inAmount != null ? formatMx(r.inAmount) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums text-rose-300/85">
-                        {r.outAmount != null ? formatMx(r.outAmount) : "—"}
-                      </td>
-                      <td className="px-1 py-1 text-right">
-                        {r.isManual || r.isRegisteredManual ? (
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            disabled={deleteCompanyTx.isPending}
-                            className="h-8 w-8 text-gray-500 hover:bg-rose-950/40 hover:text-rose-400 disabled:opacity-40"
-                            onClick={() => handleRemoveRow(r)}
-                            aria-label={r.isRegisteredManual ? "Remove registered cash entry" : "Remove manual line"}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <span className="inline-block w-8" />
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  renderLedgerTableRows(tableRows, formDayStr)
                 )}
               </tbody>
             </table>

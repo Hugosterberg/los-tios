@@ -35,9 +35,14 @@ function recordInWindow(iso, start, end) {
   return d >= start && d <= end;
 }
 
+function isPaymentSettled(order) {
+  const ps = order.payment_status;
+  return ps === "paid" || ps === "confirmed";
+}
+
 function isPaidDeliveredOrder(order) {
   if (order.status !== "delivered") return false;
-  if (order.payment_status && order.payment_status !== "paid") return false;
+  if (order.payment_status && !isPaymentSettled(order)) return false;
   return true;
 }
 
@@ -200,7 +205,33 @@ export default function PaidOrdersReceiptsFeed({
   loyverseFetching = false,
   hasLoyverseConfig = false,
   onPrintReceipt,
+  loyverseCustomers,
+  loyverseEmployees,
+  loyverseStores,
 }) {
+  const customerById = useMemo(() => {
+    const m = new Map();
+    for (const c of loyverseCustomers || []) {
+      if (c?.id != null) m.set(c.id, c);
+    }
+    return m;
+  }, [loyverseCustomers]);
+
+  const employeeById = useMemo(() => {
+    const m = new Map();
+    for (const e of loyverseEmployees || []) {
+      if (e?.id != null) m.set(e.id, e);
+    }
+    return m;
+  }, [loyverseEmployees]);
+
+  const storeById = useMemo(() => {
+    const m = new Map();
+    for (const s of loyverseStores || []) {
+      if (s?.id != null) m.set(s.id, s);
+    }
+    return m;
+  }, [loyverseStores]);
   const paidAppOrders = useMemo(() => {
     if (!dateWindow?.start || !dateWindow?.end) return [];
     return orders.filter((o) => {
@@ -278,9 +309,10 @@ export default function PaidOrdersReceiptsFeed({
             </div>
           </div>
         )}
-        <p className="text-[11px] leading-snug text-gray-600">
-          Web orders marked delivered and paid, plus Loyverse POS receipts (non-cancelled) in the selected period. Payment
-          type shows cash vs card where the data exists.
+        <p className="text-[11px] leading-snug text-gray-400">
+          Web orders marked delivered and paid (or card confirmed), plus Loyverse POS receipts (non-cancelled), including
+          refunds/returns when the API returns them. For POS, we show dine-in / take-out / delivery, ticket notes, table,
+          and customer names when Loyverse sends them (or when we can match a customer ID).
         </p>
       </div>
 
@@ -311,6 +343,9 @@ export default function PaidOrdersReceiptsFeed({
               <LoyverseReceiptRow
                 key={`lv-${entry.receipt.id || entry.receipt.receipt_number || idx}`}
                 receipt={entry.receipt}
+                customerById={customerById}
+                employeeById={employeeById}
+                storeById={storeById}
                 leadBadge={
                   <Badge className="border-blue-500/30 bg-blue-500/15 text-[9px] uppercase tracking-wide text-blue-200">
                     POS

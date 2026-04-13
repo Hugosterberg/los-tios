@@ -9,14 +9,25 @@ import {
   TrendingUp,
   TrendingDown,
   Package,
-  Printer,
   FileSpreadsheet,
   ShoppingCart,
   ChefHat,
   Users,
   Info,
 } from "lucide-react";
-import { format, endOfMonth, eachDayOfInterval, subMonths, startOfMonth, startOfDay, endOfDay, parseISO } from "date-fns";
+import {
+  format,
+  endOfMonth,
+  eachDayOfInterval,
+  subMonths,
+  subYears,
+  startOfMonth,
+  startOfDay,
+  endOfDay,
+  parseISO,
+  startOfYear,
+  endOfYear,
+} from "date-fns";
 import {
   LineChart,
   Line,
@@ -32,7 +43,7 @@ import {
   Cell,
 } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { enUS, es } from "date-fns/locale";
+import { es } from "date-fns/locale";
 import { listOrders } from "@/lib/local-dev-orders";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
@@ -46,15 +57,24 @@ import {
   countByChannel,
   getRecordDate,
 } from "@/lib/mergedSales";
-import { isLocalFinanceMode, localListExpenses, localListCompanyTransactions } from "@/lib/localDevFinance";
+import {
+  isLocalFinanceMode,
+  localListExpenses,
+  localListCompanyTransactions,
+  localListEmployees,
+  localListShifts,
+} from "@/lib/localDevFinance";
+import { sumTemplateLaborBetween, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import {
   dateFromMexicoDateKey,
-  formatMexicoGeneratedTimestamp,
   formatMexicoLongDateEs,
+  formatMexicoWeekdayShortFromDateKey,
   getMexicoDateKey,
+  getMexicoHourFromInstant,
   getMexicoNowDateKey,
   getMexicoNowYearMonth,
   getMexicoYearMonthKey,
+  MEXICO_DISPLAY_TIMEZONE,
 } from "@/lib/mexicoTime";
 
 /** Calendar day for Expense.date (YYYY-MM-DD strings avoid timezone shifts). Falls back to created_* so rows still count. */
@@ -136,6 +156,14 @@ function scrollToStatsSection(elementId) {
 const statsShortcutLinkClass =
   "rounded px-0.5 text-[11px] text-yellow-300/90 transition-colors hover:text-yellow-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-yellow-400/60";
 
+/** Summary strips (top sold, best days, rhythm) — same shell as Period card. */
+const STATS_STRIP_CLASS =
+  "no-print rounded-xl border border-yellow-500/20 bg-[#242424] px-4 py-3 shadow-none";
+
+/** Ledger is the primary data table; slightly stronger frame, same radius family. */
+const STATS_LEDGER_CARD_CLASS =
+  "no-print rounded-xl border-2 border-yellow-500/30 bg-[#242424] text-gray-200 shadow-none";
+
 function StatsDetailShortcuts({ channelId, topItemsId }) {
   return (
     <nav aria-label="Section shortcuts" className="mb-4 flex flex-wrap items-center gap-x-0.5 gap-y-1">
@@ -153,18 +181,18 @@ function StatsDetailShortcuts({ channelId, topItemsId }) {
   );
 }
 
-function pctChangeLabel(current, previous) {
+function pctChangeLabel(current, previous, vsLabel = "previous month") {
   if (previous == null || previous === 0) {
     return null;
   }
   const pct = ((current - previous) / Math.abs(previous)) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% vs previous month`;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% vs ${vsLabel}`;
 }
 
 export default function Statistics() {
   const [selectedMonth, setSelectedMonth] = useState(() => getMexicoNowYearMonth());
+  const [selectedYear, setSelectedYear] = useState(() => getMexicoNowYearMonth().slice(0, 4));
   const [selectedDay, setSelectedDay] = useState(() => getMexicoNowDateKey());
-  const [printMode, setPrintMode] = useState(null);
   const [statsView, setStatsView] = useState("monthly");
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -177,13 +205,28 @@ export default function Statistics() {
     queryFn: () => (useLocalFinance ? localListExpenses() : base44.entities.Expense.list("-date")),
   });
 
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListEmployees() : base44.entities.Employee.list("name")),
+  });
+
+  const { data: shifts = [] } = useQuery({
+    queryKey: ["shifts", useLocalFinance ? "local" : "remote"],
+    queryFn: () => (useLocalFinance ? localListShifts() : base44.entities.Shift.list("-date")),
+  });
+
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
   });
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
-  const statisticsMonth = statsView === "daily" ? format(parseISO(`${selectedDay}T12:00:00`), "yyyy-MM") : selectedMonth;
+  const statisticsMonth =
+    statsView === "daily"
+      ? format(parseISO(`${selectedDay}T12:00:00`), "yyyy-MM")
+      : statsView === "yearly"
+        ? `${selectedYear}-01`
+        : selectedMonth;
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["companyTransactions", useLocalFinance ? "local" : "remote"],
@@ -192,22 +235,44 @@ export default function Statistics() {
   });
 
   const monthAnchor = useMemo(() => parseISO(`${statisticsMonth}-01`), [statisticsMonth]);
-  const fetchStart = useMemo(() => startOfMonth(subMonths(monthAnchor, 1)), [monthAnchor]);
-  const rangeStart = useMemo(() => startOfMonth(monthAnchor), [monthAnchor]);
+  const rangeStart = useMemo(() => {
+    if (statsView === "yearly") {
+      return startOfYear(parseISO(`${selectedYear}-01-01`));
+    }
+    return startOfMonth(monthAnchor);
+  }, [statsView, selectedYear, monthAnchor]);
   const rangeEnd = useMemo(() => {
+    if (statsView === "yearly") {
+      const end = endOfYear(parseISO(`${selectedYear}-01-01`));
+      end.setHours(23, 59, 59, 999);
+      return end;
+    }
     const end = endOfMonth(monthAnchor);
     end.setHours(23, 59, 59, 999);
     return end;
-  }, [monthAnchor]);
-  const prevRangeStart = useMemo(() => startOfMonth(subMonths(monthAnchor, 1)), [monthAnchor]);
+  }, [statsView, selectedYear, monthAnchor]);
+  const fetchStart = useMemo(() => startOfMonth(subMonths(rangeStart, 1)), [rangeStart]);
+  const prevRangeStart = useMemo(() => {
+    if (statsView === "yearly") {
+      return startOfYear(subYears(parseISO(`${selectedYear}-01-01`), 1));
+    }
+    return startOfMonth(subMonths(monthAnchor, 1));
+  }, [statsView, selectedYear, monthAnchor]);
   const prevRangeEnd = useMemo(() => {
+    if (statsView === "yearly") {
+      const end = endOfYear(subYears(parseISO(`${selectedYear}-01-01`), 1));
+      end.setHours(23, 59, 59, 999);
+      return end;
+    }
     const end = endOfMonth(subMonths(monthAnchor, 1));
     end.setHours(23, 59, 59, 999);
     return end;
-  }, [monthAnchor]);
+  }, [statsView, selectedYear, monthAnchor]);
+
+  const statsDataKey = statsView === "yearly" ? `year:${selectedYear}` : statisticsMonth;
 
   const { data: loyverseOverview } = useQuery({
-    queryKey: ["statisticsLoyverse", settings[0]?.id || "none", statisticsMonth],
+    queryKey: ["statisticsLoyverse", settings[0]?.id || "none", statsDataKey],
     queryFn: () =>
       getLoyverseOverview(appSettings, {
         start: fetchStart,
@@ -218,7 +283,7 @@ export default function Statistics() {
   });
 
   const { data: clipOverview } = useQuery({
-    queryKey: ["statisticsClip", settings[0]?.id || "none", statisticsMonth],
+    queryKey: ["statisticsClip", settings[0]?.id || "none", statsDataKey],
     queryFn: () =>
       getClipOverview(appSettings, {
         start: fetchStart,
@@ -237,8 +302,22 @@ export default function Statistics() {
     };
   });
 
-  const monthOrders = orders.filter((o) => getMexicoYearMonthKey(o.created_date) === statisticsMonth);
-  const monthExpenses = expenses.filter((e) => expenseCalendarMonthKey(e) === statisticsMonth);
+  const currentCalendarYear = Number(getMexicoNowYearMonth().slice(0, 4));
+  const yearOptions = Array.from({ length: 8 }, (_, i) => {
+    const y = String(currentCalendarYear - i);
+    return { value: y, label: y };
+  });
+
+  const monthOrders = orders.filter((o) =>
+    statsView === "yearly"
+      ? getMexicoDateKey(o.created_date).startsWith(selectedYear)
+      : getMexicoYearMonthKey(o.created_date) === statisticsMonth,
+  );
+  const monthExpenses = expenses.filter((e) =>
+    statsView === "yearly"
+      ? expenseCalendarDayKey(e).startsWith(selectedYear)
+      : expenseCalendarMonthKey(e) === statisticsMonth,
+  );
 
   const dayOrders = orders.filter((o) => getMexicoDateKey(o.created_date) === selectedDay);
   const dayExpenses = expenses.filter((e) => expenseCalendarDayKey(e) === selectedDay);
@@ -279,11 +358,54 @@ export default function Statistics() {
     [canonicalFull, prevRangeStart, prevRangeEnd],
   );
 
+  const prevMonthStr = format(subMonths(monthAnchor, 1), "yyyy-MM");
+  const prevYearStr = String(Number(selectedYear) - 1);
+
+  const monthShiftLaborAccrued = useMemo(
+    () =>
+      shifts
+        .filter((s) => {
+          if (typeof s.date !== "string") return false;
+          const inPeriod =
+            statsView === "yearly" ? s.date.startsWith(selectedYear) : s.date.slice(0, 7) === statisticsMonth;
+          return inPeriod && s.status !== "cancelled" && s.status !== "paid";
+        })
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0),
+    [shifts, statsView, selectedYear, statisticsMonth],
+  );
+
+  const monthTemplateLabor = useMemo(
+    () => sumTemplateLaborBetween(rangeStart, rangeEnd, employees, shifts),
+    [rangeStart, rangeEnd, employees, shifts],
+  );
+
+  const monthLaborAccrual = monthShiftLaborAccrued + monthTemplateLabor;
+
+  const prevMonthShiftLaborAccrued = useMemo(
+    () =>
+      shifts
+        .filter((s) => {
+          if (typeof s.date !== "string") return false;
+          const inPrev =
+            statsView === "yearly" ? s.date.startsWith(prevYearStr) : s.date.slice(0, 7) === prevMonthStr;
+          return inPrev && s.status !== "cancelled" && s.status !== "paid";
+        })
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0),
+    [shifts, statsView, prevMonthStr, prevYearStr],
+  );
+
+  const prevMonthTemplateLabor = useMemo(
+    () => sumTemplateLaborBetween(prevRangeStart, prevRangeEnd, employees, shifts),
+    [prevRangeStart, prevRangeEnd, employees, shifts],
+  );
+
+  const prevMonthLaborAccrual = prevMonthShiftLaborAccrued + prevMonthTemplateLabor;
+
   const mergedRevenue = sumEventAmounts(canonicalCurrent);
   const mergedTransactionCount = canonicalCurrent.length;
   const mergedAov = mergedTransactionCount ? mergedRevenue / mergedTransactionCount : 0;
   const monthExpensesTotal = monthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const mergedNet = mergedRevenue - monthExpensesTotal;
+  const mergedNet = mergedRevenue - monthExpensesTotal - monthLaborAccrual;
 
   const orderModuleRevenue = monthOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
   const orderModuleCount = monthOrders.length;
@@ -298,22 +420,27 @@ export default function Statistics() {
 
   const PIZZA_COST_ESTIMATE = 80;
   const ingredientExpenses = monthExpenses.filter((e) => e.category === "ingredients").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const laborExpenses = monthExpenses.filter((e) => e.category === "salaries").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthSalaryLedger = monthExpenses.filter((e) => e.category === "salaries").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const laborExpenses = monthSalaryLedger + monthLaborAccrual;
   const estimatedIngredientCost = ingredientExpenses || orderModuleCount * PIZZA_COST_ESTIMATE;
   const grossProfit = mergedRevenue - estimatedIngredientCost;
   const foodCostPct = mergedRevenue > 0 ? (estimatedIngredientCost / mergedRevenue) * 100 : 0;
   const laborCostPct = mergedRevenue > 0 ? (laborExpenses / mergedRevenue) * 100 : 0;
 
-  const prevMonthStr = format(subMonths(monthAnchor, 1), "yyyy-MM");
-  const prevMonthExpenses = expenses.filter((e) => expenseCalendarMonthKey(e) === prevMonthStr);
+  const prevMonthExpenses = expenses.filter((e) =>
+    statsView === "yearly"
+      ? expenseCalendarDayKey(e).startsWith(prevYearStr)
+      : expenseCalendarMonthKey(e) === prevMonthStr,
+  );
   const prevMonthExpenseTotal = prevMonthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const prevMergedRevenue = sumEventAmounts(canonicalPrev);
-  const prevMergedNet = prevMergedRevenue - prevMonthExpenseTotal;
+  const prevMergedNet = prevMergedRevenue - prevMonthExpenseTotal - prevMonthLaborAccrual;
 
-  const revenueChangeLabel = pctChangeLabel(mergedRevenue, prevMergedRevenue);
-  const ordersChangeLabel = pctChangeLabel(mergedTransactionCount, canonicalPrev.length);
-  const expensesChangeLabel = pctChangeLabel(monthExpensesTotal, prevMonthExpenseTotal);
-  const profitChangeLabel = pctChangeLabel(mergedNet, prevMergedNet);
+  const vsPriorLabel = statsView === "yearly" ? "previous year" : "previous month";
+  const revenueChangeLabel = pctChangeLabel(mergedRevenue, prevMergedRevenue, vsPriorLabel);
+  const ordersChangeLabel = pctChangeLabel(mergedTransactionCount, canonicalPrev.length, vsPriorLabel);
+  const expensesChangeLabel = pctChangeLabel(monthExpensesTotal, prevMonthExpenseTotal, vsPriorLabel);
+  const profitChangeLabel = pctChangeLabel(mergedNet, prevMergedNet, vsPriorLabel);
 
   const PIE_COLORS = ["#facc15", "#a16207", "#fef08a", "#84cc16", "#22d3ee", "#a78bfa", "#fb7185"];
 
@@ -324,10 +451,11 @@ export default function Statistics() {
   const dayMergedRevenue = sumEventAmounts(dayCanonical);
   const dayMergedCount = dayCanonical.length;
   const dayExpensesTotal = dayExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const dayNet = dayMergedRevenue - dayExpensesTotal;
+  const dayLaborAccrued = totalExpectedLaborForDate(selectedDay, employees, shifts);
+  const dayNet = dayMergedRevenue - dayExpensesTotal - dayLaborAccrued;
   const dayStats = {
     totalRevenue: dayMergedRevenue,
-    totalExpenses: dayExpensesTotal,
+    totalExpenses: dayExpensesTotal + dayLaborAccrued,
     totalProfit: dayNet,
     totalOrders: dayMergedCount,
     avgOrderValue: dayMergedCount ? dayMergedRevenue / dayMergedCount : 0,
@@ -356,9 +484,10 @@ export default function Statistics() {
   const dayIngredientExpenses = dayExpenses
     .filter((e) => e.category === "ingredients")
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const dayLaborExpenses = dayExpenses
+  const daySalaryLedger = dayExpenses
     .filter((e) => e.category === "salaries")
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const dayLaborExpenses = daySalaryLedger + dayLaborAccrued;
   const dayEstimatedIngredient = dayIngredientExpenses || dayOrders.length * PIZZA_COST_ESTIMATE;
   const dayGrossProfit = dayMergedRevenue - dayEstimatedIngredient;
   const dayFoodCostPct = dayMergedRevenue > 0 ? (dayEstimatedIngredient / dayMergedRevenue) * 100 : 0;
@@ -388,43 +517,55 @@ export default function Statistics() {
 
   const daySnapshotBars = [
     { name: "Merged POS", value: dayMergedRevenue },
-    { name: "Expenses", value: dayExpensesTotal },
+    { name: "Expenses + labor", value: dayExpensesTotal + dayLaborAccrued },
     { name: "Net", value: dayNet },
   ];
 
+  const statisticsTodayStr = getMexicoNowDateKey();
+
   const dailyLedgerRows = useMemo(() => {
-    const days = eachDayOfInterval({ start: rangeStart, end: endOfMonth(monthAnchor) });
-    return days.map((day) => {
-      const ds = startOfDay(day);
-      const de = endOfDay(day);
-      const ev = filterCanonicalEventsByDateRange(canonicalFull, ds, de);
-      const mergedPosNet = sumEventAmounts(ev);
-      const dayStr = format(day, "yyyy-MM-dd");
-      const dExp = expenses.filter((e) => expenseCalendarDayKey(e) === dayStr);
-      const expensesSpent = dExp.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-      const sourceTotals = ev.reduce(
-        (acc, e) => {
-          acc[e.source] = (acc[e.source] || 0) + e.amount;
-          return acc;
-        },
-        { loyverse: 0, clip: 0, manual: 0 },
-      );
-      const dOrders = orders.filter((o) => getMexicoDateKey(o.created_date) === dayStr);
-      const orderModuleRevenue = dOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      return {
-        dateIso: dayStr,
-        dayEnglish: format(day, "EEEE", { locale: enUS }),
-        mergedPosNet,
-        expensesSpent,
-        net: mergedPosNet - expensesSpent,
-        mergedEvents: ev.length,
-        loyverse: sourceTotals.loyverse,
-        clip: sourceTotals.clip,
-        manual: sourceTotals.manual,
-        orderModuleRevenue,
-      };
-    });
-  }, [rangeStart, monthAnchor, canonicalFull, expenses, orders]);
+    const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+    return days
+      .map((day) => {
+        const ds = startOfDay(day);
+        const de = endOfDay(day);
+        const ev = filterCanonicalEventsByDateRange(canonicalFull, ds, de);
+        const mergedPosNet = sumEventAmounts(ev);
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dExp = expenses.filter((e) => expenseCalendarDayKey(e) === dayStr);
+        const expensesSpent = dExp.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+        const laborAccrued = totalExpectedLaborForDate(dayStr, employees, shifts);
+        const sourceTotals = ev.reduce(
+          (acc, e) => {
+            acc[e.source] = (acc[e.source] || 0) + e.amount;
+            return acc;
+          },
+          { loyverse: 0, clip: 0, manual: 0 },
+        );
+        const dOrders = orders.filter((o) => getMexicoDateKey(o.created_date) === dayStr);
+        const orderModuleRevenue = dOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+        return {
+          dateIso: dayStr,
+          weekdayLabel: format(day, "EEEE", { locale: es }),
+          mergedPosNet,
+          expensesSpent,
+          laborAccrued,
+          net: mergedPosNet - expensesSpent - laborAccrued,
+          mergedEvents: ev.length,
+          loyverse: sourceTotals.loyverse,
+          clip: sourceTotals.clip,
+          manual: sourceTotals.manual,
+          orderModuleRevenue,
+        };
+      })
+      .filter((r) => r.dateIso <= statisticsTodayStr);
+  }, [rangeStart, rangeEnd, canonicalFull, expenses, orders, employees, shifts, statisticsTodayStr]);
+
+  /** Table + Excel: newest calendar day first (chronological order kept in `dailyLedgerRows` for chart + totals). */
+  const dailyLedgerRowsNewestFirst = useMemo(
+    () => [...dailyLedgerRows].sort((a, b) => b.dateIso.localeCompare(a.dateIso)),
+    [dailyLedgerRows],
+  );
 
   const dailyLedgerTotals = useMemo(
     () =>
@@ -432,6 +573,7 @@ export default function Statistics() {
         (acc, r) => ({
           mergedPosNet: acc.mergedPosNet + r.mergedPosNet,
           expensesSpent: acc.expensesSpent + r.expensesSpent,
+          laborAccrued: acc.laborAccrued + r.laborAccrued,
           net: acc.net + r.net,
           mergedEvents: acc.mergedEvents + r.mergedEvents,
           loyverse: acc.loyverse + r.loyverse,
@@ -442,6 +584,7 @@ export default function Statistics() {
         {
           mergedPosNet: 0,
           expensesSpent: 0,
+          laborAccrued: 0,
           net: 0,
           mergedEvents: 0,
           loyverse: 0,
@@ -456,14 +599,71 @@ export default function Statistics() {
   const dailyRevenue = useMemo(
     () =>
       dailyLedgerRows.map((r) => ({
-        date: format(parseISO(`${r.dateIso}T12:00:00`), "MMM dd"),
+        date: format(parseISO(`${r.dateIso}T12:00:00`), "d MMM", { locale: es }),
         revenue: r.mergedPosNet,
-        expenses: r.expensesSpent,
+        expenses: r.expensesSpent + r.laborAccrued,
         profit: r.net,
         orders: r.mergedEvents,
       })),
     [dailyLedgerRows],
   );
+
+  const revenueChartData = useMemo(() => {
+    if (statsView !== "yearly") return dailyRevenue;
+    const map = new Map();
+    dailyLedgerRows.forEach((r) => {
+      const ym = r.dateIso.slice(0, 7);
+      const cur = map.get(ym) || { revenue: 0, expenses: 0, profit: 0, orders: 0 };
+      cur.revenue += r.mergedPosNet;
+      cur.expenses += r.expensesSpent + r.laborAccrued;
+      cur.profit += r.net;
+      cur.orders += r.mergedEvents;
+      map.set(ym, cur);
+    });
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ym, v]) => ({
+        date: format(parseISO(`${ym}-01T12:00:00`), "MMM", { locale: es }),
+        revenue: v.revenue,
+        expenses: v.expenses,
+        profit: v.profit,
+        orders: v.orders,
+      }));
+  }, [statsView, dailyLedgerRows, dailyRevenue]);
+
+  const topSellingDays = useMemo(() => {
+    const rows = dailyLedgerRows.filter((r) => r.mergedPosNet > 0);
+    return [...rows].sort((a, b) => b.mergedPosNet - a.mergedPosNet).slice(0, 10);
+  }, [dailyLedgerRows]);
+
+  const mergedSalesRhythm = useMemo(() => {
+    const events = statsView === "daily" ? dayCanonical : canonicalCurrent;
+    const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, revenue: 0, count: 0 }));
+    const byWeekday = new Map();
+    events.forEach((e) => {
+      const h = getMexicoHourFromInstant(e.timestamp);
+      if (h >= 0 && h <= 23) {
+        byHour[h].revenue += e.amount;
+        byHour[h].count += 1;
+      }
+      const wk = new Intl.DateTimeFormat("es-MX", {
+        timeZone: MEXICO_DISPLAY_TIMEZONE,
+        weekday: "long",
+      }).format(e.timestamp);
+      byWeekday.set(wk, (byWeekday.get(wk) || 0) + e.amount);
+    });
+    const topHours = [...byHour].filter((x) => x.revenue > 0).sort((a, b) => b.revenue - a.revenue);
+    const weekdayRows = Array.from(byWeekday.entries())
+      .map(([label, revenue]) => ({ label, revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
+    const maxHourRev = topHours[0]?.revenue ?? 0;
+    return { topHours, weekdayRows, maxHourRev, eventCount: events.length };
+  }, [statsView, dayCanonical, canonicalCurrent]);
+
+  const showSalesRhythmCard =
+    mergedSalesRhythm.eventCount > 0 &&
+    (mergedSalesRhythm.topHours.length > 0 ||
+      (statsView !== "daily" && mergedSalesRhythm.weekdayRows.length > 0));
 
   const channelPieData = countByChannel(canonicalCurrent).map((row, index) => ({
     ...row,
@@ -499,28 +699,19 @@ export default function Statistics() {
           .sort((a, b) => b.count - a.count)
           .slice(0, 10);
 
-  const handlePrintDaily = () => {
-    setPrintMode("daily");
-    setTimeout(() => {
-      window.print();
-      setPrintMode(null);
-    }, 100);
-  };
-
-  const handlePrintMonthly = () => {
-    setPrintMode("monthly");
-    setTimeout(() => {
-      window.print();
-      setPrintMode(null);
-    }, 100);
-  };
+  const minimalistTopSold = useMemo(() => {
+    if (statsView === "daily") return dayTopItems.slice(0, 5);
+    if (statsView === "monthly" || statsView === "yearly") return topItems.slice(0, 5);
+    return [];
+  }, [statsView, dayTopItems, topItems]);
 
   const handleOpenInExcel = () => {
     const headers = [
       "Date (ISO)",
-      "Weekday",
+      "Día (es-MX)",
       "Daily cash — merged POS net sales (MXN)",
       "Spent — Finance expenses incl. Shopping (MXN)",
+      "Labor accrual — unpaid shifts + workday template (MXN)",
       "Net (MXN)",
       "Merged sales events",
       "Loyverse (MXN)",
@@ -528,12 +719,13 @@ export default function Statistics() {
       "Manual (MXN)",
       "Order module revenue (MXN)",
     ];
-    const dataLines = dailyLedgerRows.map((r) =>
+    const dataLines = dailyLedgerRowsNewestFirst.map((r) =>
       [
         r.dateIso,
-        r.dayEnglish,
+        r.weekdayLabel,
         r.mergedPosNet.toFixed(2),
         r.expensesSpent.toFixed(2),
+        r.laborAccrued.toFixed(2),
         r.net.toFixed(2),
         String(r.mergedEvents),
         r.loyverse.toFixed(2),
@@ -549,6 +741,7 @@ export default function Statistics() {
       "TOTAL",
       dailyLedgerTotals.mergedPosNet.toFixed(2),
       dailyLedgerTotals.expensesSpent.toFixed(2),
+      dailyLedgerTotals.laborAccrued.toFixed(2),
       dailyLedgerTotals.net.toFixed(2),
       String(dailyLedgerTotals.mergedEvents),
       dailyLedgerTotals.loyverse.toFixed(2),
@@ -563,7 +756,7 @@ export default function Statistics() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `daily-ledger-${selectedMonth}.csv`;
+    a.download = `daily-ledger-${statsView === "yearly" ? selectedYear : selectedMonth}.csv`;
     a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
@@ -571,10 +764,13 @@ export default function Statistics() {
     URL.revokeObjectURL(url);
   };
 
-  const showDailyOnScreen = !printMode && statsView === "daily";
-  const showMonthlyOnScreen = !printMode && statsView === "monthly";
-  const showDailyPrint = printMode === "daily";
-  const showMonthlyPrint = printMode === "monthly";
+  const expenseLedgerPeriodPhrase =
+    statsView === "yearly" ? "calendar year" : statsView === "daily" ? "calendar day" : "calendar month";
+  const orderModulePeriodPhrase =
+    statsView === "yearly" ? "this year" : statsView === "daily" ? "this day" : "this month";
+
+  /** Wording inside the combined monthly + yearly stats block (not used on daily view). */
+  const periodStatsNoun = statsView === "yearly" ? "year" : "month";
 
   const chartAxisTick = { fill: "#e7e5e4", fontSize: 11 };
   const chartTooltipStyle = {
@@ -604,14 +800,16 @@ export default function Statistics() {
     {
       label: "Avg sale (merged)",
       value: formatCurrency(mergedAov),
-      sub: mergedTransactionCount ? "Mean transaction amount after deduplication" : "No merged sales in month",
+      sub: mergedTransactionCount
+        ? "Mean transaction amount after deduplication"
+        : `No merged sales in selected ${statsView === "yearly" ? "year" : "month"}`,
       subTone: "neutral",
       icon: TrendingUp,
     },
     {
       label: "Expenses (Finance ledger)",
       value: formatCurrency(monthExpensesTotal),
-      sub: expensesChangeLabel || "No comparison — Expense entity rows in this month",
+      sub: expensesChangeLabel || `No comparison — Expense entity rows in this ${expenseLedgerPeriodPhrase}`,
       subTone: "neutral",
       icon: TrendingDown,
     },
@@ -628,7 +826,7 @@ export default function Statistics() {
       sub:
         orderModuleCount > 0
           ? `${formatNumber(orderModuleCount)} Order module rows — not added to POS merge unless also in Loyverse/Clip/manual`
-          : "No orders in Order module this month",
+          : `No orders in Order module ${orderModulePeriodPhrase}`,
       subTone: "neutral",
       icon: Package,
     },
@@ -688,14 +886,6 @@ export default function Statistics() {
   return (
     <div className="statistics-page min-h-screen bg-[#1a1a1a] text-white">
       <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
-          .no-print { display: none !important; }
-          .print-break { page-break-after: always; }
-          @page { margin: 1cm; }
-        }
         .statistics-page .recharts-cartesian-axis-tick text { fill: #e7e5e4; }
         .statistics-page .recharts-cartesian-axis-line { stroke: #737373; }
         .statistics-page .recharts-cartesian-grid line { stroke: #404040; }
@@ -715,17 +905,34 @@ export default function Statistics() {
       </div>
 
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:space-y-7 lg:px-8 lg:py-7">
-        <div className="no-print flex flex-wrap gap-2 rounded-xl border border-yellow-500/20 bg-[#242424] p-1">
+        <div className="no-print grid grid-cols-3 gap-1 rounded-xl border border-yellow-500/20 bg-[#242424] p-1">
           {[
-            { id: "monthly", label: "Monthly overview" },
             { id: "daily", label: "Single day" },
+            { id: "monthly", label: "Monthly" },
+            { id: "yearly", label: "Yearly" },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setStatsView(tab.id)}
+              onClick={() => {
+                setStatsView(tab.id);
+                if (tab.id === "yearly") {
+                  setSelectedYear(
+                    statsView === "daily"
+                      ? format(parseISO(`${selectedDay}T12:00:00`), "yyyy")
+                      : selectedMonth.slice(0, 4),
+                  );
+                }
+                if (tab.id === "monthly") {
+                  if (statsView === "daily") {
+                    setSelectedMonth(format(parseISO(`${selectedDay}T12:00:00`), "yyyy-MM"));
+                  } else if (statsView === "yearly") {
+                    setSelectedMonth((m) => `${selectedYear}-${m.slice(5, 7)}`);
+                  }
+                }
+              }}
               className={cn(
-                "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                "rounded-lg px-2 py-2.5 text-center text-sm font-medium transition-colors sm:px-4",
                 statsView === tab.id ? "bg-yellow-400/20 text-yellow-200" : "text-gray-400 hover:text-white",
               )}
             >
@@ -734,22 +941,7 @@ export default function Statistics() {
           ))}
         </div>
 
-        <div className="no-print rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] p-4">
-          <div className="flex gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400/90" />
-            <div className="text-sm text-gray-300">
-              <p className="font-medium text-yellow-200">Where each number comes from</p>
-              <p className="mt-1 text-xs text-gray-400">
-                <strong className="text-gray-300">Net sales &amp; sales events</strong> use the same pipeline as Dashboard: Loyverse receipts + approved Clip payments + manual contribution transactions, then duplicate removal (10 min window, prefer Loyverse).
-                <strong className="text-gray-300"> Expenses</strong> are summed from Finance <strong>Expense</strong> rows
-                {statsView === "daily" ? " dated the selected calendar day." : " in the calendar month."}
-                <strong className="text-gray-300"> Order module</strong> shows in-app <strong>Order</strong> totals separately — those are not double-counted into net sales unless the same sale also appears in Loyverse/Clip/manual.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="no-print rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
+        <div className="no-print rounded-xl border border-yellow-500/20 bg-[#242424] p-4 shadow-none">
           <h3 className="mb-3 text-sm font-bold text-yellow-400">Period</h3>
           {statsView === "monthly" ? (
             <div className="max-w-md space-y-2">
@@ -760,6 +952,22 @@ export default function Statistics() {
                 </SelectTrigger>
                 <SelectContent>
                   {monthOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : statsView === "yearly" ? (
+            <div className="max-w-md space-y-2">
+              <label className="text-xs font-medium text-gray-400">Year</label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="border-yellow-500/20 bg-[#1a1a1a] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -780,41 +988,291 @@ export default function Statistics() {
           )}
         </div>
 
-        <div className="no-print flex flex-wrap gap-3">
-          <Button
-            onClick={handlePrintDaily}
-            className="h-8 gap-2 bg-yellow-400 text-xs text-black hover:bg-yellow-300"
-            variant="default"
-          >
-            <Printer className="h-4 w-4" />
-            Print daily report
-          </Button>
-          <Button
-            onClick={handlePrintMonthly}
-            className="h-8 gap-2 border border-yellow-500/20 bg-[#242424] text-xs text-gray-300 hover:text-white"
-            variant="outline"
-          >
-            <Printer className="h-4 w-4" />
-            Print monthly report
-          </Button>
+        {minimalistTopSold.length > 0 && (
+          <div className={STATS_STRIP_CLASS}>
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-yellow-500/55">Top sold</p>
+            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+              {minimalistTopSold.map((item, i) => (
+                <li key={item.name} className="flex min-w-0 items-baseline gap-1.5 text-gray-300">
+                  <span className="shrink-0 text-yellow-500/45">{i + 1}.</span>
+                  <span className="min-w-0 truncate text-gray-200">{item.name}</span>
+                  <span className="shrink-0 text-gray-600">·</span>
+                  <span className="shrink-0 tabular-nums text-yellow-200/85">{formatCurrency(item.revenue)}</span>
+                  <span className="shrink-0 text-xs text-gray-500">({formatNumber(item.count)})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {(statsView === "monthly" || statsView === "yearly") && topSellingDays.length > 0 && (
+          <div className={STATS_STRIP_CLASS}>
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-yellow-500/55">
+              Best calendar days (merged POS · up to 10)
+            </p>
+            <ol className="grid gap-2 sm:grid-cols-2">
+              {topSellingDays.map((row, i) => {
+                const wdShort = formatMexicoWeekdayShortFromDateKey(row.dateIso);
+                return (
+                  <li
+                    key={row.dateIso}
+                    className="flex items-center justify-between gap-3 border-b border-yellow-500/10 pb-2 text-sm last:border-0 last:pb-0 sm:last:border-b sm:last:pb-2"
+                  >
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="shrink-0 text-yellow-500/50">{i + 1}.</span>
+                      <time
+                        dateTime={row.dateIso}
+                        className="shrink-0 font-mono text-xs tabular-nums tracking-tight text-gray-400"
+                      >
+                        {row.dateIso}
+                      </time>
+                      {wdShort ? (
+                        <span className="rounded-md border border-yellow-400/35 bg-yellow-400/[0.09] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yellow-200/95">
+                          {wdShort}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 tabular-nums font-medium text-yellow-200/90">{formatCurrency(row.mergedPosNet)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
+
+        {(statsView === "monthly" || statsView === "yearly") && (
+          <Card className={STATS_LEDGER_CARD_CLASS}>
+            <CardHeader className="flex flex-col gap-3 border-b border-yellow-500/25 bg-yellow-500/[0.12] pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base text-yellow-100">Daily ledger</CardTitle>
+                <p className="mt-1 text-xs text-yellow-200/70">
+                  Daily cash = merged POS net sales; spent = Finance ledger for that day; labor accrual = unpaid shift payouts
+                  plus roster workdays without a shift (same logic as Dashboard). Net subtracts both spent and labor accrual (paid
+                  salaries stay inside spent). Rows are <strong className="font-medium text-yellow-100/90">newest day first</strong>
+                  ; future calendar days in the selected {periodStatsNoun} are omitted (Mexico date).
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={handleOpenInExcel}
+                disabled={dailyLedgerRowsNewestFirst.length === 0}
+                className="no-print h-9 shrink-0 gap-2 border border-yellow-400/40 bg-yellow-500/20 text-xs text-yellow-100 hover:bg-yellow-500/30 disabled:pointer-events-none disabled:opacity-40"
+                variant="outline"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Open in Excel
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                {dailyLedgerRowsNewestFirst.length === 0 ? (
+                  <p className="px-4 py-10 text-center text-sm text-gray-500">
+                    No ledger rows yet for this period (all days may be in the future in Mexico time, or the range is empty).
+                  </p>
+                ) : (
+                <table className="w-full min-w-[1000px] border-collapse text-left text-[11px] sm:text-xs">
+                  <thead>
+                    <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
+                      <th className="sticky left-0 z-10 border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5">Date</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5">Día</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Daily cash (POS)</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Spent</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Labor accr.</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Net</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Events</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Loyverse</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Clip</th>
+                      <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Manual</th>
+                      <th className="px-2 py-2.5 text-right">Order module</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyLedgerRowsNewestFirst.map((r, i) => (
+                      <tr
+                        key={r.dateIso}
+                        className={cn(
+                          "border-b border-yellow-500/20 transition-colors hover:bg-yellow-500/[0.06]",
+                          i % 2 === 1 && "bg-black/20",
+                        )}
+                      >
+                        <td
+                          className={cn(
+                            "sticky left-0 z-[1] border-r border-yellow-500/25 px-2 py-2 font-medium text-yellow-100/95 tabular-nums",
+                            i % 2 === 1 ? "bg-[#1a1a1a]" : "bg-[#242424]",
+                          )}
+                        >
+                          {r.dateIso}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 capitalize text-gray-300">{r.weekdayLabel}</td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-yellow-200">
+                          {formatCurrencyDetailed(r.mergedPosNet)}
+                        </td>
+                        <td
+                          className={cn(
+                            "border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums",
+                            r.expensesSpent < 0 ? "text-red-400" : "text-amber-200/90",
+                          )}
+                        >
+                          {r.expensesSpent < 0
+                            ? `-${formatCurrencyDetailed(Math.abs(r.expensesSpent))}`
+                            : formatCurrencyDetailed(r.expensesSpent)}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-sky-200/90">
+                          {formatCurrencyDetailed(r.laborAccrued)}
+                        </td>
+                        <td
+                          className={cn(
+                            "border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums",
+                            r.net >= 0 ? "text-emerald-300/90" : "text-red-300/90",
+                          )}
+                        >
+                          {formatCurrencyDetailed(r.net)}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-gray-200">
+                          {formatNumber(r.mergedEvents)}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                          {formatCurrencyDetailed(r.loyverse)}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                          {formatCurrencyDetailed(r.clip)}
+                        </td>
+                        <td className="border-r border-yellow-500/20 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                          {formatCurrencyDetailed(r.manual)}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono tabular-nums text-gray-300">
+                          {formatCurrencyDetailed(r.orderModuleRevenue)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-yellow-500/50 bg-yellow-500/15 font-semibold text-yellow-50">
+                      <td className="sticky left-0 z-[1] border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5" colSpan={2}>
+                        Total
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatCurrencyDetailed(dailyLedgerTotals.mergedPosNet)}
+                      </td>
+                      <td
+                        className={cn(
+                          "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
+                          dailyLedgerTotals.expensesSpent < 0 ? "text-red-400" : "",
+                        )}
+                      >
+                        {dailyLedgerTotals.expensesSpent < 0
+                          ? `-${formatCurrencyDetailed(Math.abs(dailyLedgerTotals.expensesSpent))}`
+                          : formatCurrencyDetailed(dailyLedgerTotals.expensesSpent)}
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums text-sky-200/90">
+                        {formatCurrencyDetailed(dailyLedgerTotals.laborAccrued)}
+                      </td>
+                      <td
+                        className={cn(
+                          "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
+                          dailyLedgerTotals.net >= 0 ? "text-emerald-200" : "text-red-200",
+                        )}
+                      >
+                        {formatCurrencyDetailed(dailyLedgerTotals.net)}
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatNumber(dailyLedgerTotals.mergedEvents)}
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatCurrencyDetailed(dailyLedgerTotals.loyverse)}
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatCurrencyDetailed(dailyLedgerTotals.clip)}
+                      </td>
+                      <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatCurrencyDetailed(dailyLedgerTotals.manual)}
+                      </td>
+                      <td className="px-2 py-2.5 text-right font-mono tabular-nums">
+                        {formatCurrencyDetailed(dailyLedgerTotals.orderModuleRevenue)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {showSalesRhythmCard && (
+          <div className={STATS_STRIP_CLASS}>
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-yellow-500/55">
+              {statsView === "daily" ? "Hours today" : "When sales happen"} (merged POS · {MEXICO_DISPLAY_TIMEZONE})
+            </p>
+            {statsView !== "daily" && mergedSalesRhythm.weekdayRows.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-1.5 text-xs text-gray-500">By weekday in this period</p>
+                <ul className="flex flex-wrap gap-2">
+                  {mergedSalesRhythm.weekdayRows.map(({ label, revenue }) => (
+                    <li
+                      key={label}
+                      className="rounded-md border border-yellow-500/25 bg-yellow-400/[0.06] px-2.5 py-1 text-xs"
+                    >
+                      <span className="font-medium capitalize text-yellow-200/95">{label}</span>
+                      <span className="ml-1.5 tabular-nums text-gray-300">{formatCurrency(revenue)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {mergedSalesRhythm.topHours.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">By hour (receipt / payment time)</p>
+                <ul className="space-y-2">
+                  {mergedSalesRhythm.topHours.slice(0, 10).map(({ hour, revenue, count }) => {
+                    const endHourLabel = hour === 23 ? "24" : String(hour + 1).padStart(2, "0");
+                    return (
+                      <li key={hour} className="flex items-center gap-2 text-xs">
+                        <span className="w-[108px] shrink-0 tabular-nums text-gray-400">
+                          {String(hour).padStart(2, "0")}:00–{endHourLabel}:00
+                        </span>
+                        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-black/40">
+                          <div
+                            className="h-full min-w-[6px] rounded-full bg-yellow-400/45"
+                            style={{
+                              width: mergedSalesRhythm.maxHourRev
+                                ? `${Math.max(6, (revenue / mergedSalesRhythm.maxHourRev) * 100)}%`
+                                : "6%",
+                            }}
+                          />
+                        </div>
+                        <span className="w-[4.5rem] shrink-0 text-right tabular-nums text-yellow-200/90">
+                          {formatCurrency(revenue)}
+                        </span>
+                        <span className="w-8 shrink-0 text-right text-[10px] text-gray-500">{count}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="no-print rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] p-4">
+          <div className="flex gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400/90" />
+            <div className="text-sm text-gray-300">
+              <p className="font-medium text-yellow-200">Where each number comes from</p>
+              <p className="mt-1 text-xs text-gray-400">
+                <strong className="text-gray-300">Net sales &amp; sales events</strong> use the same pipeline as Dashboard: Loyverse receipts + approved Clip payments + manual contribution transactions, then duplicate removal (10 min window, prefer Loyverse).
+                <strong className="text-gray-300"> Expenses</strong> are summed from Finance <strong>Expense</strong> rows
+                {statsView === "daily"
+                  ? " dated the selected calendar day."
+                  : statsView === "yearly"
+                    ? " in the selected calendar year."
+                    : " in the calendar month."}
+                <strong className="text-gray-300"> Order module</strong> shows in-app <strong>Order</strong> totals separately — those are not double-counted into net sales unless the same sale also appears in Loyverse/Clip/manual.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className={printMode ? "print-area" : ""}>
-          {printMode && (
-            <div className="mb-8 border-b-2 pb-6">
-              <div className="text-center">
-                <h1 className="mb-2 text-3xl font-bold">Los Tios Pizzeria</h1>
-                <h2 className="text-xl text-gray-700">
-                  {printMode === "daily"
-                    ? `Daily report — ${formatMexicoLongDateEs(dateFromMexicoDateKey(selectedDay))}`
-                    : `Monthly report — ${monthOptions.find((m) => m.value === selectedMonth)?.label}`}
-                </h2>
-                <p className="mt-2 text-sm text-gray-600">Generated {formatMexicoGeneratedTimestamp()}</p>
-              </div>
-            </div>
-          )}
-
-          {(showDailyOnScreen || showDailyPrint) && (
+        <div>
+          {statsView === "daily" && (
             <div className="mb-8">
               <h2 className="mb-4 text-xl font-bold sm:text-2xl">
                 Daily — {formatMexicoLongDateEs(dateFromMexicoDateKey(selectedDay))}
@@ -843,7 +1301,7 @@ export default function Statistics() {
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
                     Gross profit (rough)
@@ -853,7 +1311,7 @@ export default function Statistics() {
                     {dayIngredientExpenses ? "After ingredient expenses" : `Estimate ${PIZZA_COST_ESTIMATE} / order`}
                   </p>
                 </div>
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
                     Food cost %
@@ -861,18 +1319,20 @@ export default function Statistics() {
                   <p className="mt-2 text-2xl font-bold text-white">{dayFoodCostPct.toFixed(1)}%</p>
                   <p className="mt-1 text-xs text-gray-400">vs merged POS net sales</p>
                 </div>
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <Users className="h-3.5 w-3.5 text-yellow-400" />
                     Labor cost %
                   </div>
                   <p className="mt-2 text-2xl font-bold text-white">{dayLaborExpenses ? `${dayLaborCostPct.toFixed(1)}%` : "—"}</p>
-                  <p className="mt-1 text-xs text-gray-400">{dayLaborExpenses ? "Salary expenses" : "No salary expenses"}</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {dayLaborExpenses ? "Paid salaries + unpaid shifts / workday template" : "No labor cost signal for this day"}
+                  </p>
                 </div>
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                <Card className="border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                   <CardHeader>
                     <CardTitle className="text-base text-yellow-100">Costs by category</CardTitle>
                     <p className="text-xs text-gray-400">All expense rows on the selected day</p>
@@ -897,8 +1357,7 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                {!printMode && (
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                <Card className="border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                     <CardHeader>
                       <CardTitle className="text-base text-yellow-100">Day snapshot</CardTitle>
                       <p className="text-xs text-gray-400">Merged POS, expenses, and net for the selected date</p>
@@ -920,16 +1379,14 @@ export default function Statistics() {
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
-                )}
               </div>
 
-              {!printMode && (
                 <div className="mb-6 rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <h3 className="mb-1 text-sm font-medium text-yellow-200">Breakdown</h3>
                   <p className="mb-3 text-xs text-gray-400">Sales channel mix and top items for the selected day.</p>
                   <StatsDetailShortcuts channelId="stats-daily-channel" topItemsId="stats-daily-top-items" />
                   <div className="space-y-4">
-                    <Card id="stats-daily-channel" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <Card id="stats-daily-channel" className="scroll-mt-24 border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                       <CardHeader>
                         <CardTitle className="text-base text-yellow-100">Merged sales by channel</CardTitle>
                         <p className="text-xs text-gray-400">From Loyverse receipt routing (same as Dashboard)</p>
@@ -964,7 +1421,7 @@ export default function Statistics() {
                       </CardContent>
                     </Card>
 
-                    <Card id="stats-daily-top-items" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <Card id="stats-daily-top-items" className="scroll-mt-24 border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                       <CardHeader>
                         <CardTitle className="text-base text-yellow-100">Top items (Loyverse receipts, else Order module)</CardTitle>
                       </CardHeader>
@@ -993,79 +1450,15 @@ export default function Statistics() {
                     </Card>
                   </div>
                 </div>
-              )}
-
-              {printMode === "daily" && (
-                <div className="mt-6 space-y-6">
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
-                    <CardHeader>
-                      <CardTitle className="text-lg text-yellow-100">Merged sales by channel</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 text-left">Channel</th>
-                            <th className="py-2 text-center">Events</th>
-                            <th className="py-2 text-right">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dayChannelPieData.map((row) => (
-                            <tr key={row.name} className="border-b">
-                              <td className="py-2">{row.name}</td>
-                              <td className="py-2 text-center">{row.value}</td>
-                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(row.revenue)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold">
-                            <td className="py-2">Total (merged)</td>
-                            <td className="py-2 text-center">{formatNumber(dayMergedCount)}</td>
-                            <td className="py-2 text-right">{formatCurrencyDetailed(dayMergedRevenue)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
-                    <CardHeader>
-                      <CardTitle className="text-lg text-yellow-100">Expenses by category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 text-left">Category</th>
-                            <th className="py-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dayExpenseByCategory.map(({ category, total }) => (
-                            <tr key={category} className="border-b">
-                              <td className="py-2 capitalize">{category}</td>
-                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(total)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold">
-                            <td className="py-2">Total</td>
-                            <td className="py-2 text-right">{formatCurrencyDetailed(dayExpensesTotal)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
             </div>
           )}
 
-          {showDailyPrint && <div className="print-break" />}
-
-          {(showMonthlyOnScreen || showMonthlyPrint) && (
+          {(statsView === "monthly" || statsView === "yearly") && (
             <div>
               <h2 className="mb-4 text-xl font-bold sm:text-2xl">
-                Monthly — {monthOptions.find((m) => m.value === selectedMonth)?.label}
+                {statsView === "yearly"
+                  ? `Yearly — ${selectedYear}`
+                  : `Monthly — ${monthOptions.find((m) => m.value === selectedMonth)?.label}`}
               </h2>
 
               <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1091,7 +1484,7 @@ export default function Statistics() {
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
                     Gross profit (rough)
@@ -1101,7 +1494,7 @@ export default function Statistics() {
                     {ingredientExpenses ? "After ingredient expenses" : `Estimate ${PIZZA_COST_ESTIMATE} / order`}
                   </p>
                 </div>
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <ChefHat className="h-3.5 w-3.5 text-yellow-400" />
                     Food cost %
@@ -1109,21 +1502,25 @@ export default function Statistics() {
                   <p className="mt-2 text-2xl font-bold text-white">{foodCostPct.toFixed(1)}%</p>
                   <p className="mt-1 text-xs text-gray-400">vs merged POS net sales</p>
                 </div>
-                <div className="rounded-xl border border-yellow-500/15 bg-[#242424] p-4">
+                <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-yellow-200/70">
                     <Users className="h-3.5 w-3.5 text-yellow-400" />
                     Labor cost %
                   </div>
                   <p className="mt-2 text-2xl font-bold text-white">{laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—"}</p>
-                  <p className="mt-1 text-xs text-gray-400">{laborExpenses ? "Salary expenses" : "No salary expenses"}</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {laborExpenses
+                      ? "Ledger salaries + unpaid shifts + workday template"
+                      : `No labor cost signal this ${periodStatsNoun}`}
+                  </p>
                 </div>
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                <Card className="border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                   <CardHeader>
                     <CardTitle className="text-base text-yellow-100">Costs by category</CardTitle>
-                    <p className="text-xs text-gray-400">All expense rows in selected month</p>
+                    <p className="text-xs text-gray-400">All expense rows in selected {periodStatsNoun}</p>
                   </CardHeader>
                   <CardContent>
                     {expenseByCategory.length ? (
@@ -1140,19 +1537,22 @@ export default function Statistics() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-300">No expenses this month.</p>
+                      <p className="text-sm text-gray-300">No expenses this {periodStatsNoun}.</p>
                     )}
                   </CardContent>
                 </Card>
 
-                {!printMode && (
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                <Card className="border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                     <CardHeader>
-                      <CardTitle className="text-base text-yellow-100">Revenue, expenses &amp; net by day</CardTitle>
+                      <CardTitle className="text-base text-yellow-100">
+                        {statsView === "yearly"
+                          ? "Revenue, expenses & net by month"
+                          : "Revenue, expenses & net by day"}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={280}>
-                        <LineChart data={dailyRevenue}>
+                        <LineChart data={statsView === "yearly" ? revenueChartData : dailyRevenue}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
                           <XAxis dataKey="date" tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} />
                           <YAxis tick={chartAxisTick} tickLine={{ stroke: "#737373" }} axisLine={{ stroke: "#737373" }} width={48} />
@@ -1169,150 +1569,16 @@ export default function Statistics() {
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
-                )}
               </div>
 
-              <Card className="mb-6 border-2 border-yellow-500/35 bg-[#1c1c14] text-gray-200 shadow-none">
-                <CardHeader className="flex flex-col gap-3 border-b border-yellow-500/25 bg-yellow-500/[0.12] pb-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="text-base text-yellow-100">Daily ledger</CardTitle>
-                    <p className="mt-1 text-xs text-yellow-200/70">
-                      Spreadsheet-style view (English). Daily cash = merged POS net sales; spent = all Finance expenses for that
-                      calendar day (including purchases registered from Shopping).
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleOpenInExcel}
-                    className="no-print h-9 shrink-0 gap-2 border border-yellow-400/40 bg-yellow-500/20 text-xs text-yellow-100 hover:bg-yellow-500/30"
-                    variant="outline"
-                  >
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Open in Excel
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] border-collapse text-left text-[11px] sm:text-xs">
-                      <thead>
-                        <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
-                          <th className="sticky left-0 z-10 border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5">Date</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5">Weekday</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Daily cash (POS)</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Spent</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Net</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Events</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Loyverse</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Clip</th>
-                          <th className="border-r border-yellow-500/20 px-2 py-2.5 text-right">Manual</th>
-                          <th className="px-2 py-2.5 text-right">Order module</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dailyLedgerRows.map((r, i) => (
-                          <tr
-                            key={r.dateIso}
-                            className={cn(
-                              "border-b border-yellow-500/15 transition-colors hover:bg-yellow-500/[0.06]",
-                              i % 2 === 1 && "bg-black/20",
-                            )}
-                          >
-                            <td className="sticky left-0 z-[1] border-r border-yellow-500/25 bg-[#1c1c14] px-2 py-2 font-medium text-yellow-100/95 tabular-nums">
-                              {r.dateIso}
-                            </td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-gray-300">{r.dayEnglish}</td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-yellow-200">
-                              {formatCurrencyDetailed(r.mergedPosNet)}
-                            </td>
-                            <td
-                              className={cn(
-                                "border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums",
-                                r.expensesSpent < 0 ? "text-red-400" : "text-amber-200/90",
-                              )}
-                            >
-                              {r.expensesSpent < 0
-                                ? `-${formatCurrencyDetailed(Math.abs(r.expensesSpent))}`
-                                : formatCurrencyDetailed(r.expensesSpent)}
-                            </td>
-                            <td
-                              className={cn(
-                                "border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums",
-                                r.net >= 0 ? "text-emerald-300/90" : "text-red-300/90",
-                              )}
-                            >
-                              {formatCurrencyDetailed(r.net)}
-                            </td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-200">
-                              {formatNumber(r.mergedEvents)}
-                            </td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
-                              {formatCurrencyDetailed(r.loyverse)}
-                            </td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
-                              {formatCurrencyDetailed(r.clip)}
-                            </td>
-                            <td className="border-r border-yellow-500/15 px-2 py-2 text-right font-mono tabular-nums text-gray-300">
-                              {formatCurrencyDetailed(r.manual)}
-                            </td>
-                            <td className="px-2 py-2 text-right font-mono tabular-nums text-gray-300">
-                              {formatCurrencyDetailed(r.orderModuleRevenue)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="border-t-2 border-yellow-500/50 bg-yellow-500/15 font-semibold text-yellow-50">
-                          <td className="sticky left-0 z-[1] border-r border-yellow-500/30 bg-[#2a2610] px-2 py-2.5" colSpan={2}>
-                            Total
-                          </td>
-                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatCurrencyDetailed(dailyLedgerTotals.mergedPosNet)}
-                          </td>
-                          <td
-                            className={cn(
-                              "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
-                              dailyLedgerTotals.expensesSpent < 0 ? "text-red-400" : "",
-                            )}
-                          >
-                            {dailyLedgerTotals.expensesSpent < 0
-                              ? `-${formatCurrencyDetailed(Math.abs(dailyLedgerTotals.expensesSpent))}`
-                              : formatCurrencyDetailed(dailyLedgerTotals.expensesSpent)}
-                          </td>
-                          <td
-                            className={cn(
-                              "border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums",
-                              dailyLedgerTotals.net >= 0 ? "text-emerald-200" : "text-red-200",
-                            )}
-                          >
-                            {formatCurrencyDetailed(dailyLedgerTotals.net)}
-                          </td>
-                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatNumber(dailyLedgerTotals.mergedEvents)}
-                          </td>
-                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatCurrencyDetailed(dailyLedgerTotals.loyverse)}
-                          </td>
-                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatCurrencyDetailed(dailyLedgerTotals.clip)}
-                          </td>
-                          <td className="border-r border-yellow-500/20 px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatCurrencyDetailed(dailyLedgerTotals.manual)}
-                          </td>
-                          <td className="px-2 py-2.5 text-right font-mono tabular-nums">
-                            {formatCurrencyDetailed(dailyLedgerTotals.orderModuleRevenue)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {!printMode && (
                 <div className="mb-6 rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                   <h3 className="mb-1 text-sm font-medium text-yellow-200">Breakdown</h3>
-                  <p className="mb-3 text-xs text-gray-400">Sales channel mix and top items for the selected month.</p>
+                  <p className="mb-3 text-xs text-gray-400">
+                    Sales channel mix and top items for the selected {periodStatsNoun}.
+                  </p>
                   <StatsDetailShortcuts channelId="stats-month-channel" topItemsId="stats-month-top-items" />
                   <div className="space-y-4">
-                    <Card id="stats-month-channel" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <Card id="stats-month-channel" className="scroll-mt-24 border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                       <CardHeader>
                         <CardTitle className="text-base text-yellow-100">Merged sales by channel</CardTitle>
                         <p className="text-xs text-gray-400">From Loyverse receipt routing (same as Dashboard)</p>
@@ -1342,12 +1608,14 @@ export default function Statistics() {
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
-                          <p className="py-12 text-center text-sm text-gray-300">No merged sales with channel labels this month.</p>
+                          <p className="py-12 text-center text-sm text-gray-300">
+                            No merged sales with channel labels this {periodStatsNoun}.
+                          </p>
                         )}
                       </CardContent>
                     </Card>
 
-                    <Card id="stats-month-top-items" className="scroll-mt-24 border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
+                    <Card id="stats-month-top-items" className="scroll-mt-24 border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
                       <CardHeader>
                         <CardTitle className="text-base text-yellow-100">Top items (Loyverse receipts, else Order module)</CardTitle>
                       </CardHeader>
@@ -1370,76 +1638,12 @@ export default function Statistics() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-center text-sm text-gray-300">No line items for this month.</p>
+                          <p className="text-center text-sm text-gray-300">No line items for this {periodStatsNoun}.</p>
                         )}
                       </CardContent>
                     </Card>
                   </div>
                 </div>
-              )}
-
-              {printMode === "monthly" && (
-                <div className="mt-6 space-y-6">
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
-                    <CardHeader>
-                      <CardTitle className="text-lg text-yellow-100">Merged sales by channel</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 text-left">Channel</th>
-                            <th className="py-2 text-center">Events</th>
-                            <th className="py-2 text-right">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {channelPieData.map((row) => (
-                            <tr key={row.name} className="border-b">
-                              <td className="py-2">{row.name}</td>
-                              <td className="py-2 text-center">{row.value}</td>
-                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(row.revenue)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold">
-                            <td className="py-2">Total (merged)</td>
-                            <td className="py-2 text-center">{formatNumber(mergedTransactionCount)}</td>
-                            <td className="py-2 text-right">{formatCurrencyDetailed(mergedRevenue)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
-                    <CardHeader>
-                      <CardTitle className="text-lg text-yellow-100">Expenses by category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 text-left">Category</th>
-                            <th className="py-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {expenseByCategory.map(({ category, total }) => (
-                            <tr key={category} className="border-b">
-                              <td className="py-2 capitalize">{category}</td>
-                              <td className="py-2 text-right font-semibold">{formatCurrencyDetailed(total)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold">
-                            <td className="py-2">Total</td>
-                            <td className="py-2 text-right">{formatCurrencyDetailed(monthExpensesTotal)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
             </div>
           )}
         </div>

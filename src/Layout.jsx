@@ -14,8 +14,7 @@ ShoppingCart,
   Wallet,
   DollarSign,
   Users,
-KeyRound,
-BookOpen,
+  BookOpen,
 Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -111,13 +110,13 @@ export default function Layout({ children, currentPageName }) {
               </Link>
             </div>
 
-            <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex">
+            <nav className="hidden min-w-0 flex-1 items-center justify-center gap-2 xl:flex">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.url}
                   title={item.name}
-                  className={`flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium transition-all 2xl:px-2 ${
+                  className={`flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-all 2xl:px-2.5 ${
                     item.highlight
                       ? "bg-yellow-400 text-black hover:bg-yellow-300"
                       : location.pathname === item.url

@@ -6,7 +6,12 @@
 const isBrowser = typeof window !== "undefined";
 const STORAGE_KEY = "los_tios_daily_cash_store_v1";
 
-const defaultStore = () => ({ openings: {}, manualLines: {}, detailOverrides: {} });
+const defaultStore = () => ({
+  openings: {},
+  manualLines: {},
+  detailOverrides: {},
+  openingDiffEvents: [],
+});
 
 function readRaw() {
   if (!isBrowser) return defaultStore();
@@ -19,6 +24,7 @@ function readRaw() {
       manualLines: typeof p.manualLines === "object" && p.manualLines !== null ? p.manualLines : {},
       detailOverrides:
         typeof p.detailOverrides === "object" && p.detailOverrides !== null ? p.detailOverrides : {},
+      openingDiffEvents: Array.isArray(p.openingDiffEvents) ? p.openingDiffEvents : [],
     };
   } catch {
     return defaultStore();
@@ -34,6 +40,32 @@ export function getOpeningBalance(dateKey) {
   const v = readRaw().openings[dateKey];
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Earliest day in a Mexico `yyyy-MM` month that has a saved opening balance.
+ * Keys in storage match {@link getMexicoDateKey} (America/Mexico_City).
+ * @param {string} yearMonthKey
+ * @returns {{ dateKey: string, value: number } | null}
+ */
+export function getEarliestOpeningInMexicoMonth(yearMonthKey) {
+  const prefix = String(yearMonthKey || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(prefix)) return null;
+  const { openings } = readRaw();
+  let bestKey = null;
+  let bestVal = null;
+  for (const [k, v] of Object.entries(openings)) {
+    if (typeof k !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+    if (k.slice(0, 7) !== prefix) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    if (bestKey === null || k < bestKey) {
+      bestKey = k;
+      bestVal = n;
+    }
+  }
+  if (bestKey === null || bestVal === null) return null;
+  return { dateKey: bestKey, value: bestVal };
 }
 
 export function setOpeningBalance(dateKey, value) {
@@ -110,4 +142,40 @@ export function updateManualLine(dateKey, lineId, patch) {
   list[idx] = { ...list[idx], ...patch };
   store.manualLines[dateKey] = list;
   writeRaw(store);
+}
+
+const OPENING_DIFF_CAP = 250;
+
+/**
+ * When the counted opening for `dateKey` differs from the ledger-implied prior drawer close.
+ * @param {{ dateKey: string, priorCloseDayStr: string, expectedEnd: number, enteredOpening: number, diff: number }} payload
+ */
+export function recordOpeningCountDiff(payload) {
+  const { dateKey, priorCloseDayStr, expectedEnd, enteredOpening, diff } = payload;
+  if (!dateKey || !priorCloseDayStr) return;
+  if (![expectedEnd, enteredOpening, diff].every((x) => typeof x === "number" && Number.isFinite(x))) return;
+  const store = readRaw();
+  if (!Array.isArray(store.openingDiffEvents)) {
+    store.openingDiffEvents = [];
+  }
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  store.openingDiffEvents.unshift({
+    id,
+    ts: new Date().toISOString(),
+    dateKey,
+    priorCloseDayStr,
+    expectedEnd,
+    enteredOpening,
+    diff,
+  });
+  if (store.openingDiffEvents.length > OPENING_DIFF_CAP) {
+    store.openingDiffEvents.length = OPENING_DIFF_CAP;
+  }
+  writeRaw(store);
+}
+
+/** Newest first */
+export function listOpeningCountDiffs() {
+  const ev = readRaw().openingDiffEvents;
+  return Array.isArray(ev) ? [...ev] : [];
 }

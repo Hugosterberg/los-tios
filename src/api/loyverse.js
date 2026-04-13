@@ -287,6 +287,10 @@ function normalizeDay(value) {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Receipts: include if any of the common timestamps fall in [start, end].
+ * Open tickets are often saved with an older receipt_date but updated_at when edited today; a single-field rule hid them from “Day”.
+ */
 function filterRecordsByDateRange(records, options = {}) {
   if (!options.start && !options.end) {
     return records;
@@ -296,23 +300,30 @@ function filterRecordsByDateRange(records, options = {}) {
   const end = options.end ? new Date(options.end) : null;
 
   return records.filter((record) => {
-    const date = new Date(
-      record?.receipt_date ||
-      record?.created_at ||
-      record?.updated_at ||
-      record?.date ||
-      0,
-    );
+    const candidates = [
+      record?.receipt_date,
+      record?.created_at,
+      record?.updated_at,
+      record?.date,
+    ].filter(Boolean);
 
-    if (start && date < start) {
+    if (candidates.length === 0) {
       return false;
     }
 
-    if (end && date > end) {
-      return false;
-    }
-
-    return true;
+    return candidates.some((raw) => {
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) {
+        return false;
+      }
+      if (start && date < start) {
+        return false;
+      }
+      if (end && date > end) {
+        return false;
+      }
+      return true;
+    });
   });
 }
 

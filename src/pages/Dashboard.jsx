@@ -12,6 +12,8 @@ import {
   PackageSearch,
   Pizza,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
   Store,
   Users,
 } from "lucide-react";
@@ -31,7 +33,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { subDays, format, isValid } from "date-fns";
+import { subDays, format, isValid, addDays, eachDayOfInterval } from "date-fns";
 import {
   formatMexicoDateTimeNumeric,
   formatMexicoTime,
@@ -53,8 +55,10 @@ import {
   localListEmployees,
   localListShifts,
 } from "@/lib/localDevFinance";
+import { sumTemplateLaborBetween, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiBreakdownDialog from "@/components/dashboard/KpiBreakdownDialog";
 import InsightTable from "@/components/dashboard/InsightTable";
 import AlertFeed from "@/components/dashboard/AlertFeed";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +79,10 @@ import {
   inventoryInsights as mockInventoryInsights,
   laborEfficiencyTrend as mockLaborEfficiencyTrend,
 } from "@/features/dashboard/mockData";
+import { createPageUrl } from "@/utils";
+
+const managementInsightView = (view) =>
+  `${createPageUrl("ManagementInsight")}?view=${view}`;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("es-MX", {
@@ -263,21 +271,49 @@ function getDateRangeStart(range) {
   }
 }
 
-function filterByRange(records, range) {
-  const start = getDateRangeStart(range);
-  if (!start) {
-    return records;
-  }
+/** @typedef {{ mode: "calendar", start: Date, end: Date, label: string } | { mode: "rolling", start: Date | null, end: Date, label: string }} DashboardFilterWindow */
 
-  return records.filter((record) => getRecordDate(record) >= start);
+/**
+ * @param {null | { y: number, m: number }} calendarMonth — `m` is 0–11
+ * @param {string} selectedDateRange
+ */
+function buildDashboardFilterWindow(calendarMonth, selectedDateRange) {
+  if (calendarMonth) {
+    const start = new Date(calendarMonth.y, calendarMonth.m, 1);
+    const end = new Date(calendarMonth.y, calendarMonth.m + 1, 0, 23, 59, 59, 999);
+    return {
+      mode: "calendar",
+      start,
+      end,
+      label: format(start, "MMMM yyyy"),
+    };
+  }
+  return {
+    mode: "rolling",
+    start: getDateRangeStart(selectedDateRange),
+    end: getEndOfToday(),
+    label: selectedDateRange,
+  };
 }
 
-function getDateRangeWindow(range) {
-  const start = getDateRangeStart(range);
-  return {
-    start,
-    end: getEndOfToday(),
-  };
+/**
+ * @param {unknown[]} records
+ * @param {DashboardFilterWindow} window
+ */
+function filterByDashboardWindow(records, window) {
+  if (!window.start) {
+    return records;
+  }
+  return records.filter((record) => {
+    const d = getRecordDate(record);
+    if (d < window.start) {
+      return false;
+    }
+    if (window.mode === "calendar") {
+      return d <= window.end;
+    }
+    return true;
+  });
 }
 
 function getDashboardQueryStart(range) {
@@ -554,6 +590,14 @@ function getExpenseCategory(expense) {
   return String(expense?.category || "").toLowerCase();
 }
 
+function formatExpensePaymentSource(paymentSource) {
+  const ps = String(paymentSource || "company_cash");
+  if (ps === "company_cash") return "Cash drawer";
+  if (ps === "company_account") return "Company account / card";
+  if (ps === "individual") return "Individual";
+  return ps;
+}
+
 function buildOrdersByHourFromEvents(events) {
   return Array.from({ length: 12 }, (_, index) => {
     const hour = index + 10;
@@ -735,7 +779,7 @@ function buildReceiptProductPerformance(receipts, direction = "top") {
     units: values.units,
     revenue: formatCurrency(values.revenue),
     margin: direction === "bottom" ? "Live low-volume proxy" : "Live from Loyverse receipts",
-    href: "/managementinsight?view=products",
+    href: managementInsightView("products"),
   }));
 }
 
@@ -824,7 +868,7 @@ function buildCatalogProductCards(items, direction = "top", clipPayments = []) {
       units: Number(item.variantsCount || item.variants?.length || 0),
       revenue: formatCurrency(getLoyverseItemPrice(item)),
       margin: "Catalog item",
-      href: "/managementinsight?view=products",
+      href: managementInsightView("products"),
       _sortPrice: getLoyverseItemPrice(item),
     }))
     .sort((left, right) => {
@@ -865,7 +909,7 @@ function buildHighestMarginProductsFromReceipts(receipts) {
         units: values.units,
         revenue: formatCurrency(values.revenue),
         margin: marginPct === null ? "No cost data" : `${marginPct.toFixed(1)}% margin`,
-        href: "/managementinsight?view=products",
+        href: managementInsightView("products"),
         _sortMargin: marginAmount,
       };
     })
@@ -874,26 +918,39 @@ function buildHighestMarginProductsFromReceipts(receipts) {
     .map(({ _sortMargin, ...row }) => row);
 }
 
+const CALENDAR_MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [selectedDateRange, setSelectedDateRange] = React.useState(filterOptions.dateRanges[0]);
+  const [calendarMonth, setCalendarMonth] = React.useState(/** @type {null | { y: number, m: number }} */ (null));
+  const [calendarBrowseYear, setCalendarBrowseYear] = React.useState(() => new Date().getFullYear());
   const [selectedBranch, setSelectedBranch] = React.useState(filterOptions.branches[0]);
   const [selectedChannel, setSelectedChannel] = React.useState(filterOptions.salesChannels[0]);
   const [selectedPaymentSource, setSelectedPaymentSource] = React.useState(filterOptions.paymentSources[0]);
   const [selectedShift, setSelectedShift] = React.useState(filterOptions.shifts[0]);
   const [selectedDedupeWindow, setSelectedDedupeWindow] = React.useState(DEDUPE_WINDOW_OPTIONS[2]);
   const [selectedDedupePriority, setSelectedDedupePriority] = React.useState(DEDUPE_PRIORITY_OPTIONS[0]);
+  const [kpiDetailItem, setKpiDetailItem] = React.useState(null);
   const isLocalOnlyMode =
     import.meta.env.DEV &&
     (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
-  const queryWindowStart = React.useMemo(
-    () => getDashboardQueryStart(selectedDateRange),
-    [selectedDateRange],
+  const dashboardFilterWindow = React.useMemo(
+    () => buildDashboardFilterWindow(calendarMonth, selectedDateRange),
+    [calendarMonth, selectedDateRange],
   );
-  const selectedRangeWindow = React.useMemo(
-    () => getDateRangeWindow(selectedDateRange),
-    [selectedDateRange],
-  );
+  const queryWindowStart = React.useMemo(() => {
+    if (calendarMonth) {
+      return new Date(calendarMonth.y, calendarMonth.m, 1);
+    }
+    return getDashboardQueryStart(selectedDateRange);
+  }, [calendarMonth, selectedDateRange]);
+  const queryWindowEnd = React.useMemo(() => {
+    if (calendarMonth) {
+      return new Date(calendarMonth.y, calendarMonth.m + 1, 0, 23, 59, 59, 999);
+    }
+    return getEndOfToday();
+  }, [calendarMonth]);
   const dedupeWindowMs = React.useMemo(
     () => parseDedupeWindowMinutes(selectedDedupeWindow) * 60 * 1000,
     [selectedDedupeWindow],
@@ -935,20 +992,20 @@ export default function Dashboard() {
   });
 
   const loyverseQuery = useQuery({
-    queryKey: ["loyverseOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", selectedRangeWindow.end.toISOString()],
+    queryKey: ["loyverseOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", queryWindowEnd.toISOString()],
     queryFn: () => getLoyverseOverview(appSettings, {
       start: queryWindowStart,
-      end: selectedRangeWindow.end,
+      end: queryWindowEnd,
     }),
     enabled: hasLoyverseApiConfig(appSettings),
     staleTime: 60_000,
   });
 
   const clipQuery = useQuery({
-    queryKey: ["clipOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", selectedRangeWindow.end.toISOString()],
+    queryKey: ["clipOverview", settings[0]?.id || "none", queryWindowStart?.toISOString() || "all", queryWindowEnd.toISOString()],
     queryFn: () => getClipOverview(appSettings, {
       start: queryWindowStart,
-      end: selectedRangeWindow.end,
+      end: queryWindowEnd,
     }),
     enabled: hasClipApiConfig(appSettings),
     staleTime: 60_000,
@@ -978,14 +1035,32 @@ export default function Dashboard() {
   const clipSettlements = clipOverview?.settlements || [];
   const clipPaymentsPayload = clipOverview?.raw?.paymentsPayload || null;
   const clipSettlementsPayload = clipOverview?.raw?.settlementsPayload || null;
-  const filteredOrders = filterByRange(orders, selectedDateRange);
-  const filteredExpenses = filterByRange(expenses, selectedDateRange);
-  const filteredTransactions = filterByRange(transactions, selectedDateRange);
-  const filteredShifts = filterByRange(shifts, selectedDateRange);
-  const filteredReceipts = filterByRange(receipts, selectedDateRange);
-  const filteredClipPayments = filterByRange(clipPayments, selectedDateRange);
-  const filteredClipSettlements = filterByRange(clipSettlements, selectedDateRange);
-  const selectedRangeLabelLower = selectedDateRange.toLowerCase();
+  const filteredOrders = filterByDashboardWindow(orders, dashboardFilterWindow);
+  const filteredExpenses = filterByDashboardWindow(expenses, dashboardFilterWindow);
+  const expenseLedgerRows = React.useMemo(
+    () =>
+      [...filteredExpenses]
+        .sort((a, b) => getRecordDate(b).getTime() - getRecordDate(a).getTime())
+        .map((expense) => ({
+          id: expense.id,
+          date: formatDateSafe(expense.date, "yyyy-MM-dd", "—"),
+          name: expense.name || "—",
+          category: getExpenseCategory(expense) || "other",
+          amount: getExpenseAmount(expense),
+          payment: formatExpensePaymentSource(expense.payment_source),
+          origin: expense.from_shopping_list ? "Shopping" : "Finance",
+        })),
+    [filteredExpenses],
+  );
+  const filteredTransactions = filterByDashboardWindow(transactions, dashboardFilterWindow);
+  const filteredShifts = filterByDashboardWindow(shifts, dashboardFilterWindow);
+  const filteredReceipts = filterByDashboardWindow(receipts, dashboardFilterWindow);
+  const filteredClipPayments = filterByDashboardWindow(clipPayments, dashboardFilterWindow);
+  const filteredClipSettlements = filterByDashboardWindow(clipSettlements, dashboardFilterWindow);
+  const displayPeriodLabel = dashboardFilterWindow.mode === "calendar" ? dashboardFilterWindow.label : selectedDateRange;
+  const selectedRangeLabelLower = displayPeriodLabel.toLowerCase();
+  /** Rolling "1 day" only — vecko-/månadsvy (eller kalendermånad) döljer rena "idag"-ytor. */
+  const isDayOnlyDashboardContext = !calendarMonth && selectedDateRange === "1 day";
 
   const deliveredOrders = filteredOrders.filter((order) => order.status === "delivered");
   const activeOrders = filteredOrders.filter((order) => ["pending", "preparing", "ready", "out_for_delivery"].includes(order.status)).length;
@@ -1032,7 +1107,14 @@ export default function Dashboard() {
   const unpaidShiftLaborAccrued = filteredShifts
     .filter((s) => s.status !== "cancelled" && s.status !== "paid")
     .reduce((sum, s) => sum + Number(s.amount || 0), 0);
-  const laborExpenses = salaryLedgerInRange + unpaidShiftLaborAccrued;
+  const templateLaborAccrued = React.useMemo(() => {
+    if (!dashboardFilterWindow.start) {
+      return 0;
+    }
+    const laborEnd = dashboardFilterWindow.mode === "calendar" ? dashboardFilterWindow.end : getEndOfToday();
+    return sumTemplateLaborBetween(dashboardFilterWindow.start, laborEnd, employees, shifts);
+  }, [dashboardFilterWindow, employees, shifts]);
+  const laborExpenses = salaryLedgerInRange + unpaidShiftLaborAccrued + templateLaborAccrued;
   const recurringExpenses = recurringExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const otherOperatingExpenses = otherOperatingExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const ingredientExpensesInRange = ingredientExpenseRows.reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
@@ -1108,15 +1190,23 @@ export default function Dashboard() {
   const previousMonthSalesEvents = filteredCanonicalSalesEvents.filter((event) => {
     return event.timestamp >= previousMonthStart && event.timestamp < previousMonthEnd;
   });
-  const selectedRangeStart = getDateRangeStart(selectedDateRange);
-  const previousSelectedSalesEvents = selectedRangeStart
-    ? filteredCanonicalSalesEvents.filter((event) => {
-        const diff = todayStart.getTime() - selectedRangeStart.getTime();
-        const previousStart = new Date(selectedRangeStart.getTime() - diff - 86400000);
-        const previousEnd = new Date(todayStart.getTime() - diff - 86400000);
-        return event.timestamp >= previousStart && event.timestamp < previousEnd;
-      })
-    : [];
+  const previousSelectedSalesEvents = (() => {
+    if (!dashboardFilterWindow.start) {
+      return [];
+    }
+    if (dashboardFilterWindow.mode === "calendar") {
+      const ms = dashboardFilterWindow.start.getMonth();
+      const ys = dashboardFilterWindow.start.getFullYear();
+      const prevStart = new Date(ys, ms - 1, 1);
+      const prevEnd = new Date(ys, ms, 0, 23, 59, 59, 999);
+      return filteredCanonicalSalesEvents.filter((event) => event.timestamp >= prevStart && event.timestamp <= prevEnd);
+    }
+    const selectedRangeStart = dashboardFilterWindow.start;
+    const diff = todayStart.getTime() - selectedRangeStart.getTime();
+    const previousStart = new Date(selectedRangeStart.getTime() - diff - 86400000);
+    const previousEnd = new Date(todayStart.getTime() - diff - 86400000);
+    return filteredCanonicalSalesEvents.filter((event) => event.timestamp >= previousStart && event.timestamp < previousEnd);
+  })();
   const filteredDuplicateRowsRaw = mergedSaleDuplicates.filter(({ duplicate, canonical }) =>
     (
       matchesPaymentSourceFilter(duplicate, selectedPaymentSource)
@@ -1207,7 +1297,9 @@ export default function Dashboard() {
       current: filteredSalesTotal,
       previous: previousSelectedSalesEvents.reduce((sum, event) => sum + event.amount, 0),
     },
-  ].map((item) => {
+  ]
+    .filter((item) => isDayOnlyDashboardContext || item.id !== "day-compare")
+    .map((item) => {
     const difference = calculateDifference(item.current, item.previous);
     return {
       ...item,
@@ -1256,6 +1348,24 @@ export default function Dashboard() {
   const inventoryRows = buildInventoryRows(loyverseOverview);
   const recentPurchases = buildRecentPurchases(filteredExpenses);
   const inventoryForecast = buildInventoryForecast(inventoryRows);
+  const laborCostForecastItems = React.useMemo(() => {
+    const items = [];
+    const today = getStartOfToday();
+    const horizonStart = addDays(today, 1);
+    const horizonEnd = addDays(today, 14);
+    for (const day of eachDayOfInterval({ start: horizonStart, end: horizonEnd })) {
+      const ds = format(day, "yyyy-MM-dd");
+      const t = totalExpectedLaborForDate(ds, employees, shifts);
+      if (t <= 0) continue;
+      items.push({
+        id: `labor-forecast-${ds}`,
+        ingredient: `Labor · ${format(day, "EEE, MMM d")}`,
+        risk: `Expected cost about ${formatCurrency(t)} (unpaid shifts + workday template)`,
+        action: "Confirm shifts in Employee Calendar; payouts appear as salary expenses when marked paid.",
+      });
+    }
+    return items.slice(0, 7);
+  }, [employees, shifts]);
   const laborEfficiencyTrend = buildLaborEfficiencyTrend(filteredShifts, filteredOrders);
   const costTrendData = buildCostTrendVsBudget(filteredOrders, filteredExpenses);
   const todayShifts = filteredShifts;
@@ -1279,7 +1389,7 @@ export default function Dashboard() {
       timestamp: "Now",
       status: "new",
       owner: "Admin",
-      href: "/integrations",
+      href: createPageUrl("IntegrationsHub"),
       dataSource: "loyverse",
     });
   }
@@ -1292,7 +1402,7 @@ export default function Dashboard() {
       timestamp: "Now",
       status: "new",
       owner: "Admin",
-      href: "/integrations",
+      href: createPageUrl("IntegrationsHub"),
       dataSource: "clip",
     });
   }
@@ -1342,7 +1452,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "new",
       owner: "Finance manager",
-      href: "/managementinsight?view=payments-reconciliation",
+      href: managementInsightView("payments-reconciliation"),
       dataSource: hasClipApiConfig(appSettings) && hasLoyverseApiConfig(appSettings) ? "both" : hasClipApiConfig(appSettings) ? "clip" : "order_records",
     });
   }
@@ -1355,7 +1465,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "acknowledged",
       owner: "Operations",
-      href: "/managementinsight?view=alerts-exceptions",
+      href: managementInsightView("alerts-exceptions"),
       dataSource: "clip",
     });
   }
@@ -1368,7 +1478,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "new",
       owner: "Operations",
-      href: "/managementinsight?view=costs",
+      href: managementInsightView("costs"),
       dataSource: "finance_ledger",
     });
   }
@@ -1381,7 +1491,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "acknowledged",
       owner: "Management",
-      href: "/managementinsight?view=staff",
+      href: managementInsightView("staff"),
       dataSource: "finance_ledger",
     });
   }
@@ -1394,7 +1504,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "new",
       owner: "Supply chain",
-      href: "/managementinsight?view=inventory",
+      href: managementInsightView("inventory"),
       dataSource: "loyverse",
     });
   }
@@ -1407,7 +1517,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "new",
       owner: "Finance manager",
-      href: "/managementinsight?view=payments-reconciliation",
+      href: managementInsightView("payments-reconciliation"),
       dataSource: "clip",
     });
   }
@@ -1420,7 +1530,7 @@ export default function Dashboard() {
       timestamp: "Live",
       status: "new",
       owner: "Operations",
-      href: "/managementinsight?view=alerts-exceptions",
+      href: managementInsightView("alerts-exceptions"),
       dataSource: "order_records",
     });
   }
@@ -1441,6 +1551,84 @@ export default function Dashboard() {
           ? "order_records"
           : "mock";
 
+  const kpiFilterSummary = `${displayPeriodLabel} · ${selectedBranch} · ${selectedChannel} · ${selectedPaymentSource} · Dedupe ${selectedDedupeWindow} / ${selectedDedupePriority}`;
+
+  const canonicalSourceStats = React.useMemo(() => {
+    const count = { loyverse: 0, clip: 0, manual: 0 };
+    const sum = { loyverse: 0, clip: 0, manual: 0 };
+    for (const e of filteredCanonicalSalesEvents) {
+      if (e.source === "loyverse") {
+        count.loyverse += 1;
+        sum.loyverse += e.amount;
+      } else if (e.source === "clip") {
+        count.clip += 1;
+        sum.clip += e.amount;
+      } else if (e.source === "manual") {
+        count.manual += 1;
+        sum.manual += e.amount;
+      }
+    }
+    return {
+      count,
+      avg: {
+        loyverse: count.loyverse ? sum.loyverse / count.loyverse : null,
+        clip: count.clip ? sum.clip / count.clip : null,
+        manual: count.manual ? sum.manual / count.manual : null,
+      },
+    };
+  }, [filteredCanonicalSalesEvents]);
+
+  const kpiEventDebugRows = React.useMemo(
+    () =>
+      [...filteredCanonicalSalesEvents]
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        .slice(0, 250)
+        .map((e) => ({
+          id: String(e.id),
+          time: formatDateSafe(e.timestamp, "yyyy-MM-dd HH:mm"),
+          source: e.source,
+          amount: formatCurrency(e.amount),
+          payment: String(e.paymentMethod || "—"),
+        })),
+    [filteredCanonicalSalesEvents],
+  );
+
+  const grossProfitIngredientLines = React.useMemo(() => {
+    const lines = [];
+    if (shoppingIngredientExpenses > 0) {
+      lines.push({
+        label: "Shopping list → ingredient expenses",
+        value: formatCurrency(shoppingIngredientExpenses),
+      });
+    }
+    if (manualIngredientExpenses > 0) {
+      lines.push({
+        label: "Manual ingredient expenses (Finance)",
+        value: formatCurrency(manualIngredientExpenses),
+      });
+    }
+    if (isIngredientCostEstimated) {
+      lines.push({
+        label: `Estimate MXN ${PIZZA_COST_ESTIMATE} × ${filteredOrders.length} orders (window)`,
+        value: formatCurrency(estimatedIngredientCost),
+      });
+    } else if (rawIngredientExpenses && lines.length > 1) {
+      lines.push({
+        label: "Ingredient cost total",
+        value: formatCurrency(rawIngredientExpenses),
+        emphasize: true,
+      });
+    }
+    return lines;
+  }, [
+    shoppingIngredientExpenses,
+    manualIngredientExpenses,
+    isIngredientCostEstimated,
+    filteredOrders.length,
+    estimatedIngredientCost,
+    rawIngredientExpenses,
+  ]);
+
   const executiveKpis = [
     {
       id: "net-sales",
@@ -1448,11 +1636,21 @@ export default function Dashboard() {
       value: formatCurrency(netSales),
       delta: primaryComparisonCard.deltaLabel,
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Combined for ${selectedDateRange.toLowerCase()} and ${selectedPaymentSource.toLowerCase()}: Loyverse receipts + unmatched Clip payments + unmatched manual entries.${filteredDeduplicatedSalesCount ? ` ${filteredDeduplicatedSalesCount} duplicate matches removed.` : ""}`,
+      comparisonLabel: `Combined for ${selectedRangeLabelLower} and ${selectedPaymentSource.toLowerCase()}: Loyverse receipts + unmatched Clip payments + unmatched manual entries.${filteredDeduplicatedSalesCount ? ` ${filteredDeduplicatedSalesCount} duplicate matches removed.` : ""}`,
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue, 0)),
-      href: "/managementinsight?view=net-sales",
+      href: managementInsightView("net-sales"),
       dataSource: salesPipelineDataSource,
+      breakdown: {
+        type: "net-sales",
+        loyverse: filteredLoyverseSalesTotal,
+        clip: filteredClipSalesTotal,
+        manual: filteredManualContributionTotal,
+        total: netSales,
+        dedupeFilteredCount: filteredDeduplicatedSalesCount,
+        dedupeTotalCount: deduplicatedSalesCount,
+        dedupeRows: filteredDeduplicationRows,
+      },
     },
     {
       id: "orders-count",
@@ -1460,11 +1658,21 @@ export default function Dashboard() {
       value: formatNumber(ordersCount),
       delta: primaryComparisonCard.deltaLabel,
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Current count for ${selectedDateRange.toLowerCase()}.`,
+      comparisonLabel: `Current count for ${selectedRangeLabelLower}.`,
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => item.orders),
-      href: "/managementinsight?view=orders-count",
+      href: managementInsightView("orders-count"),
       dataSource: salesPipelineDataSource,
+      breakdown: {
+        type: "orders-count",
+        total: salesTransactionCount,
+        bySource: {
+          loyverse: canonicalSourceStats.count.loyverse,
+          clip: canonicalSourceStats.count.clip,
+          manual: canonicalSourceStats.count.manual,
+        },
+        eventRows: kpiEventDebugRows,
+      },
     },
     {
       id: "average-order-value",
@@ -1472,11 +1680,20 @@ export default function Dashboard() {
       value: formatCurrency(aov),
       delta: aov ? primaryComparisonCard.deltaLabel : "Waiting for source data",
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Average transaction amount from deduplicated Loyverse, Clip, and manual sales for ${selectedDateRange.toLowerCase()}`,
+      comparisonLabel: `Average transaction amount from deduplicated Loyverse, Clip, and manual sales for ${selectedRangeLabelLower}`,
       sparkTone: "positive",
       sparkline: aovTrend.map((item) => item.aov),
-      href: "/managementinsight?view=average-order-value",
+      href: managementInsightView("average-order-value"),
       dataSource: salesPipelineDataSource,
+      breakdown: {
+        type: "average-order-value",
+        sumAmounts: filteredSalesTotal,
+        count: salesTransactionCount,
+        aov,
+        avgLoyverse: canonicalSourceStats.avg.loyverse,
+        avgClip: canonicalSourceStats.avg.clip,
+        avgManual: canonicalSourceStats.avg.manual,
+      },
     },
     {
       id: "gross-profit",
@@ -1485,12 +1702,26 @@ export default function Dashboard() {
       delta: rawIngredientExpenses ? primaryComparisonCard.deltaLabel : isIngredientCostEstimated ? `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order × ${filteredOrders.length} orders` : "Waiting for ingredient purchase mapping",
       trend: primaryComparisonCard.trend,
       comparisonLabel: rawIngredientExpenses
-        ? `Calculated for ${selectedDateRange.toLowerCase()} using ${shoppingIngredientExpenses ? "Shopping List purchase expenses" : "ingredient expense entries"}.`
+        ? `Calculated for ${selectedRangeLabelLower} using ${shoppingIngredientExpenses ? "Shopping List purchase expenses" : "ingredient expense entries"}.`
         : `Estimated using MXN ${PIZZA_COST_ESTIMATE} average ingredient cost per order. Add real expenses to replace this.`,
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
-      href: "/managementinsight?view=gross-profit",
+      href: managementInsightView("gross-profit"),
       dataSource: rawIngredientExpenses ? "finance_ledger" : salesPipelineDataSource,
+      breakdown: {
+        type: "gross-profit",
+        grossSales,
+        grossProfit,
+        revenueLabel: filteredReceipts.length
+          ? "Loyverse · gross before discount (Σ receipts)"
+          : "Orders · delivered revenue (fallback)",
+        revenueNote: filteredReceipts.length
+          ? `${filteredReceipts.length} Loyverse receipts in ${displayPeriodLabel} (dashboard window + filters).`
+          : `No Loyverse receipts in window — using ${deliveredOrders.length} delivered orders’ total_amount.`,
+        lines: grossProfitIngredientLines,
+        isEstimated: isIngredientCostEstimated,
+        estimateNote: `Ingredient cost is estimated at MXN ${PIZZA_COST_ESTIMATE} per order × ${filteredOrders.length} orders in the filtered window until Finance ingredient purchases are mapped.`,
+      },
     },
     {
       id: "net-profit",
@@ -1499,12 +1730,32 @@ export default function Dashboard() {
       delta: laborExpenses && rawIngredientExpenses ? primaryComparisonCard.deltaLabel : "Missing ingredient and labor expenses.",
       trend: primaryComparisonCard.trend,
       comparisonLabel: laborExpenses && rawIngredientExpenses
-        ? `Derived from ingredients, labor, recurring costs, other expenses, and Clip fees for ${selectedDateRange.toLowerCase()}.`
+        ? `Derived from ingredients, labor, recurring costs, other expenses, and Clip fees for ${selectedRangeLabelLower}.`
         : `Needs ingredient expenses — log purchases in Finance with category "ingredients" or convert Shopping List items. Also needs labor — complete shifts in Employee Calendar or add salary expenses in Finance. Optional: recurring fixed costs and Clip fees for full accuracy.`,
       sparkTone: "negative",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue - ingredientExpenses / 7, 0)),
-      href: "/managementinsight?view=net-profit",
+      href: managementInsightView("net-profit"),
       dataSource: laborExpenses && rawIngredientExpenses && paymentFees ? "both" : laborExpenses && rawIngredientExpenses ? "finance_ledger" : salesPipelineDataSource,
+      breakdown: {
+        type: "generic",
+        lines: [
+          {
+            label: "Net profit",
+            value: laborExpenses && rawIngredientExpenses ? formatCurrency(netProfit) : "—",
+            emphasize: true,
+          },
+          { label: "Gross sales (gross profit base)", value: formatCurrency(grossSales) },
+          { label: "− Ingredient cost", value: formatCurrency(ingredientExpenses) },
+          { label: "− Labor (salary + unpaid shifts + template)", value: formatCurrency(laborExpenses) },
+          { label: "− Recurring expenses", value: formatCurrency(recurringExpenses) },
+          { label: "− Other operating", value: formatCurrency(otherOperatingExpenses) },
+          { label: "− Clip / payment fees", value: formatCurrency(paymentFees || 0) },
+        ],
+        note:
+          laborExpenses && rawIngredientExpenses
+            ? `Same period as card: ${displayPeriodLabel}. Uses gross sales from Loyverse receipts (or delivered orders if no receipts), not deduplicated Net Sales.`
+            : "Net profit stays empty until both mapped ingredient expenses and labor inputs exist.",
+      },
     },
     {
       id: "food-cost",
@@ -1515,8 +1766,23 @@ export default function Dashboard() {
       comparisonLabel: rawIngredientExpenses ? "Purchase-based cost until recipe-level COGS is added" : `Using MXN ${PIZZA_COST_ESTIMATE} average cost per order as estimate. Add ingredient expenses to replace.`,
       sparkTone: "negative",
       sparkline: mockCostTrendVsBudget.map((item) => item.actual),
-      href: "/managementinsight?view=food-cost",
+      href: managementInsightView("food-cost"),
       dataSource: rawIngredientExpenses ? "finance_ledger" : salesPipelineDataSource,
+      breakdown: {
+        type: "generic",
+        lines: [
+          { label: "Food cost %", value: `${foodCostPct.toFixed(1)}%`, emphasize: true },
+          { label: "Ingredient expenses (mapped or estimate)", value: formatCurrency(ingredientExpenses) },
+          { label: "÷ Gross sales", value: formatCurrency(grossSales) },
+          {
+            label: "Formula",
+            value: grossSales ? `${((ingredientExpenses / grossSales) * 100).toFixed(2)}%` : "—",
+          },
+        ],
+        note: rawIngredientExpenses
+          ? "Numerator uses Shopping List + manual ingredient expenses in the dashboard window."
+          : `Numerator uses MXN ${PIZZA_COST_ESTIMATE} × ${filteredOrders.length} orders until real purchases are categorized.`,
+      },
     },
     {
       id: "labor-cost",
@@ -1533,8 +1799,20 @@ export default function Dashboard() {
       comparisonLabel: laborExpenses ? "Uses employee calendar payouts where available" : "Needs salary expenses or completed shifts. Go to Employees → log shifts, or Finance → add a salary expense.",
       sparkTone: "negative",
       sparkline: laborExpenses ? mockLaborEfficiencyTrend.map((item) => item.efficiency / 20) : [16.8, 17.0, 17.3, 17.8, 18.0, 18.4, 18.7],
-      href: "/managementinsight?view=labor-cost",
+      href: managementInsightView("labor-cost"),
       dataSource: laborExpenses ? "finance_ledger" : "mock",
+      breakdown: {
+        type: "generic",
+        lines: [
+          { label: "Labor cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—", emphasize: true },
+          { label: "Salary expenses (Finance)", value: formatCurrency(salaryLedgerInRange) },
+          { label: "+ Unpaid shift accrual", value: formatCurrency(unpaidShiftLaborAccrued) },
+          { label: "+ Template labor (no shift row)", value: formatCurrency(templateLaborAccrued) },
+          { label: "= Labor total (card)", value: formatCurrency(laborExpenses) },
+          { label: "÷ Gross sales", value: formatCurrency(grossSales) },
+        ],
+        note: "Labor numerator mixes paid salary expenses, unpaid scheduled shifts, and template coverage — same idea as Daily Cash labor card.",
+      },
     },
     {
       id: "open-anomalies",
@@ -1545,34 +1823,51 @@ export default function Dashboard() {
       comparisonLabel: liveAlerts.length ? "Built from current data mismatches and config gaps" : "Replace once more anomaly rules are wired",
       sparkTone: liveAlerts.length ? "positive" : "negative",
       sparkline: liveAlerts.length ? [1, 1, 2, 2, 3, 3, alerts.length] : [4, 5, 6, 7, 8, 9, 12],
-      href: "/managementinsight?view=alerts-exceptions",
+      href: managementInsightView("alerts-exceptions"),
       dataSource: liveAlerts.length ? salesPipelineDataSource : "mock",
+      breakdown: {
+        type: "generic",
+        lines: [{ label: "Alerts in feed", value: formatNumber(alerts.length), emphasize: true }],
+        note: liveAlerts.length
+          ? "Each item below is a live rule hit (config, reconciliation, refunds, etc.)."
+          : "Showing curated mock alerts until integrations produce live rule hits.",
+      },
     },
   ];
 
   const liveOperations = [
-    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Order module: in-app Order rows (status in your ordering flow)", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
-    { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: `Order module: SLA estimate for selected ${selectedRangeLabelLower}`, href: "/managementinsight?view=live-operations", dataSource: orders.length ? "order_records" : "mock" },
-    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? `Order module for selected ${selectedRangeLabelLower}` : "Order module: needs preparation_minutes or estimated_delivery_minutes on Order records.", href: "/managementinsight?view=live-operations", dataSource: orders.length ? "order_records" : "mock" },
-    { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Order module: status = preparing", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
-    { id: "out-for-delivery", label: "Out For Delivery", value: formatNumber(ordersOutForDelivery), tone: "text-yellow-400", subtext: "Order module: status = out for delivery", href: "/managementinsight?view=live-operations", dataSource: "order_records" },
-    { id: "reservations", label: `Reservations (${selectedDateRange})`, value: "—", tone: "text-white", subtext: "Needs a Reservation entity with a date field. Once reservations are logged, the selected range count auto-populates.", href: "/managementinsight?view=live-operations", dataSource: "mock" },
-    { id: "refunds", label: `Refund Count (${selectedDateRange})`, value: formatNumber(todayRefundCount), tone: "text-red-300", subtext: `Clip API: refund fields in selected ${selectedRangeLabelLower}`, href: "/managementinsight?view=payments-reconciliation", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
-    { id: "cancelled", label: `Cancelled Orders (${selectedDateRange})`, value: formatNumber(todayCancelledOrders), tone: "text-yellow-400", subtext: "Order module: status = cancelled", href: "/managementinsight?view=alerts-exceptions", dataSource: "order_records" },
-  ].filter((item) => {
-    if (!leanOpsMode) {
+    { id: "active-orders", label: "Active Orders", value: formatNumber(activeOrders), tone: "text-white", subtext: "Order module: in-app Order rows (status in your ordering flow)", href: managementInsightView("live-operations"), dataSource: "order_records" },
+    { id: "delayed-orders", label: "Delayed Orders", value: formatNumber(todayDelayedOrders), tone: "text-yellow-400", subtext: `Order module: SLA estimate for selected ${selectedRangeLabelLower}`, href: managementInsightView("live-operations"), dataSource: orders.length ? "order_records" : "mock" },
+    { id: "avg-prep-time", label: "Average Prep Time", value: avgPrepTime ? `${avgPrepTime} min` : "—", tone: "text-white", subtext: avgPrepTime ? `Order module for selected ${selectedRangeLabelLower}` : "Order module: needs preparation_minutes or estimated_delivery_minutes on Order records.", href: managementInsightView("live-operations"), dataSource: orders.length ? "order_records" : "mock" },
+    { id: "orders-in-kitchen", label: "Orders In Kitchen", value: formatNumber(ordersInKitchen), tone: "text-white", subtext: "Order module: status = preparing", href: managementInsightView("live-operations"), dataSource: "order_records" },
+    { id: "out-for-delivery", label: "Out For Delivery", value: formatNumber(ordersOutForDelivery), tone: "text-yellow-400", subtext: "Order module: status = out for delivery", href: managementInsightView("live-operations"), dataSource: "order_records" },
+    { id: "reservations", label: `Reservations (${displayPeriodLabel})`, value: "—", tone: "text-white", subtext: "Needs a Reservation entity with a date field. Once reservations are logged, the selected range count auto-populates.", href: managementInsightView("live-operations"), dataSource: "mock" },
+    { id: "refunds", label: `Refund Count (${displayPeriodLabel})`, value: formatNumber(todayRefundCount), tone: "text-red-300", subtext: `Clip API: refund fields in selected ${selectedRangeLabelLower}`, href: managementInsightView("payments-reconciliation"), dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
+    { id: "cancelled", label: `Cancelled Orders (${displayPeriodLabel})`, value: formatNumber(todayCancelledOrders), tone: "text-yellow-400", subtext: "Order module: status = cancelled", href: managementInsightView("alerts-exceptions"), dataSource: "order_records" },
+  ]
+    .filter((item) => {
+      if (
+        !isDayOnlyDashboardContext
+        && ["active-orders", "delayed-orders", "orders-in-kitchen", "out-for-delivery"].includes(item.id)
+      ) {
+        return false;
+      }
       return true;
-    }
+    })
+    .filter((item) => {
+      if (!leanOpsMode) {
+        return true;
+      }
 
-    return ["active-orders", "avg-prep-time", "refunds", "cancelled"].includes(item.id);
-  });
+      return ["active-orders", "avg-prep-time", "refunds", "cancelled"].includes(item.id);
+    });
 
   const paymentSummary = [
-    { label: `Total Received (${selectedDateRange})`, value: formatCurrency(filteredSalesTotal), subtext: `Deduplicated received amount filtered to ${selectedPaymentSource.toLowerCase()} for ${selectedDateRange.toLowerCase()}`, dataSource: salesPipelineDataSource },
-    { label: `Net Sales Inflow (${selectedDateRange})`, value: formatCurrency(netSales), subtext: filteredDeduplicatedSalesCount ? `Duplicate same-amount same-time sales removed across Loyverse, Clip, and manual entries (${filteredDeduplicatedSalesCount} matches for current payment-source filter).` : `Filtered to ${selectedPaymentSource.toLowerCase()} across Loyverse, Clip, and manual contributions for the selected period`, dataSource: salesPipelineDataSource },
-    { label: `Pending Settlements (${selectedDateRange})`, value: clipFilterActive ? formatCurrency(pendingSettlements) : "—", subtext: clipOverview ? (clipFilterActive ? "Clip payments older than 24h compared against filtered net deposits" : "Only applicable for All sources or Clip view") : "Needs Clip to calculate", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
-    { label: `Settled Amounts (${selectedDateRange})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
-    { label: `Refunds (${selectedDateRange})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
+    { label: `Total Received (${displayPeriodLabel})`, value: formatCurrency(filteredSalesTotal), subtext: `Deduplicated received amount filtered to ${selectedPaymentSource.toLowerCase()} for ${selectedRangeLabelLower}`, dataSource: salesPipelineDataSource },
+    { label: `Net Sales Inflow (${displayPeriodLabel})`, value: formatCurrency(netSales), subtext: filteredDeduplicatedSalesCount ? `Duplicate same-amount same-time sales removed across Loyverse, Clip, and manual entries (${filteredDeduplicatedSalesCount} matches for current payment-source filter).` : `Filtered to ${selectedPaymentSource.toLowerCase()} across Loyverse, Clip, and manual contributions for the selected period`, dataSource: salesPipelineDataSource },
+    { label: `Pending Settlements (${displayPeriodLabel})`, value: clipFilterActive ? formatCurrency(pendingSettlements) : "—", subtext: clipOverview ? (clipFilterActive ? "Clip payments older than 24h compared against filtered net deposits" : "Only applicable for All sources or Clip view") : "Needs Clip to calculate", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
+    { label: `Settled Amounts (${displayPeriodLabel})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
+    { label: `Refunds (${displayPeriodLabel})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
     { label: "Payment Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", subtext: paymentFees ? "Live from Clip settlement fee fields" : "Clip must return total_fee, fee_amount, fees, or commission_amount in its settlement records for this to auto-fill.", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
   ];
 
@@ -1625,9 +1920,17 @@ export default function Dashboard() {
   ];
 
   const costsSummary = [
-    { label: `Ingredient Cost (${selectedDateRange})`, value: ingredientExpensesInRange ? formatCurrency(ingredientExpensesInRange) : formatCurrency(filteredOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesInRange ? `Purchase-based from ingredient expenses in selected ${selectedRangeLabelLower}` : `Estimated: ${filteredOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesInRange ? "finance_ledger" : salesPipelineDataSource },
+    {
+      label: `All expenses (${displayPeriodLabel})`,
+      value: totalExpenseLedger ? formatCurrency(totalExpenseLedger) : "—",
+      delta: totalExpenseLedger
+        ? `Every Finance expense row in the selected ${selectedRangeLabelLower} (all categories and payment sources)`
+        : "Log expenses in Finance (Company account) so the full ledger appears here.",
+      dataSource: totalExpenseLedger ? "finance_ledger" : "mock",
+    },
+    { label: `Ingredient Cost (${displayPeriodLabel})`, value: ingredientExpensesInRange ? formatCurrency(ingredientExpensesInRange) : formatCurrency(filteredOrders.length * PIZZA_COST_ESTIMATE), delta: ingredientExpensesInRange ? `Purchase-based from ingredient expenses in selected ${selectedRangeLabelLower}` : `Estimated: ${filteredOrders.length} orders × MXN ${PIZZA_COST_ESTIMATE}`, dataSource: ingredientExpensesInRange ? "finance_ledger" : salesPipelineDataSource },
     { label: "Food Cost %", value: `${foodCostPct.toFixed(1)}%`, delta: rawIngredientExpenses ? "Calculated live from purchase-based ingredient cost" : `Estimated at MXN ${PIZZA_COST_ESTIMATE}/order avg. Add expenses to replace.`, dataSource: rawIngredientExpenses ? "finance_ledger" : salesPipelineDataSource },
-    { label: `Labor Cost (${selectedDateRange})`, value: laborExpensesInRange ? formatCurrency(laborExpensesInRange) : "—", delta: laborExpensesInRange ? `Shift-linked and salary expenses in selected ${selectedRangeLabelLower}` : "Log shifts in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpensesInRange ? "finance_ledger" : "mock" },
+    { label: `Labor Cost (${displayPeriodLabel})`, value: laborExpensesInRange ? formatCurrency(laborExpensesInRange) : "—", delta: laborExpensesInRange ? `Salaries, unpaid shifts, and workday template (no double-count with shifts) in selected ${selectedRangeLabelLower}` : "Log shifts in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpensesInRange ? "finance_ledger" : "mock" },
     { label: "Labor Cost %", value: laborExpenses ? `${laborCostPct.toFixed(1)}%` : "—", delta: laborExpenses ? "Calculated live from tracked labor expenses" : "Needs salary expenses. Log shifts with pay in Employee Calendar or add salary expenses in Finance.", dataSource: laborExpenses ? "finance_ledger" : "mock" },
     { label: "Payment Processing Fees", value: paymentFees ? formatCurrency(paymentFees) : "—", delta: paymentFees ? "Live from Clip settlement reports" : "Requires Clip to return fee fields (total_fee / fee_amount / fees / commission_amount) in settlement records.", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
     { label: "Fixed Costs", value: recurringExpenses ? formatCurrency(recurringExpenses) : "—", delta: recurringExpenses ? "Live from recurring expenses" : "Add recurring expenses in Finance (e.g. rent, utilities) and check the 'recurring' checkbox.", dataSource: recurringExpenses ? "finance_ledger" : "mock" },
@@ -1638,20 +1941,28 @@ export default function Dashboard() {
   const inventoryInsights = {
     lowStock: inventoryRows.length ? inventoryRows : mockInventoryInsights.lowStock,
     purchases: recentPurchases.length ? recentPurchases : mockInventoryInsights.purchases,
-    forecast: inventoryForecast.length ? inventoryForecast : mockInventoryInsights.forecast,
+    forecast: laborCostForecastItems.length
+      ? [...laborCostForecastItems, ...(inventoryForecast.length ? inventoryForecast : mockInventoryInsights.forecast)]
+      : inventoryForecast.length
+        ? inventoryForecast
+        : mockInventoryInsights.forecast,
   };
 
   const hasLoyverseCatalog = Boolean(loyverseOverview?.items?.length);
   const inventoryDataSource = inventoryRows.length || hasLoyverseApiConfig(appSettings) ? "loyverse" : "mock";
   const inventoryPurchasesSource = recentPurchases.length ? "finance_ledger" : "mock";
-  const inventoryForecastSource = inventoryForecast.length || hasLoyverseApiConfig(appSettings) ? "loyverse" : "mock";
+  const inventoryForecastSource = laborCostForecastItems.length
+    ? "finance_ledger"
+    : inventoryForecast.length || hasLoyverseApiConfig(appSettings)
+      ? "loyverse"
+      : "mock";
   const bestSellingSource = (hasLoyverseApiConfig(appSettings) || filteredLoyverseReceipts.length || hasLoyverseCatalog) ? "loyverse" : "mock";
   const worstPerformingSource = (hasLoyverseApiConfig(appSettings) || filteredLoyverseReceipts.length || hasLoyverseCatalog) ? "loyverse" : "mock";
   const staffMetrics = [
     { label: "Total Worked Hours", value: totalWorkedHours ? `${formatNumber(totalWorkedHours)} h` : "—", detail: totalWorkedHours ? `Finance / HR: Shift records in selected ${selectedRangeLabelLower}` : "Log shifts with hours_worked in Employee Calendar to populate this.", dataSource: totalWorkedHours ? "finance_ledger" : "mock" },
     { label: "Sales Per Labor Hour", value: salesPerLaborHour ? formatCurrency(salesPerLaborHour) : "—", detail: salesPerLaborHour ? `Merged POS sales ÷ shift hours for selected ${selectedRangeLabelLower}` : "Needs completed shifts with hours_worked. Auto-calculates as selected-range revenue ÷ total shift hours.", dataSource: salesPerLaborHour ? "finance_ledger" : "mock" },
     { label: "Labor Cost Per Shift", value: laborCostPerShift ? formatCurrency(laborCostPerShift) : "—", detail: laborCostPerShift ? "Finance: average tracked shift payouts" : "Set an amount (payout) on each shift in Employee Calendar. Average auto-calculates.", dataSource: laborCostPerShift ? "finance_ledger" : "mock" },
-    { label: "Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "—", detail: currentShiftStaffing ? `${selectedDateRange} shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : `Schedule shifts in Employee Calendar to see staffing for selected ${selectedRangeLabelLower}.`, dataSource: currentShiftStaffing ? "finance_ledger" : "mock" },
+    { label: "Shift Staffing", value: currentShiftStaffing ? `${formatNumber(currentShiftStaffing)} staff` : "—", detail: currentShiftStaffing ? `${displayPeriodLabel} shifts. ${formatNumber(activeEmployeesCount)} active employees in roster.` : `Schedule shifts in Employee Calendar to see staffing for selected ${selectedRangeLabelLower}.`, dataSource: currentShiftStaffing ? "finance_ledger" : "mock" },
     { label: "Overtime Alerts", value: overtimeAlertsCount ? formatNumber(overtimeAlertsCount) : "—", detail: overtimeAlertsCount ? "Triggered by shifts above 8 tracked hours" : "Auto-triggers when any shift has more than 8 hours logged. No overtime in current data.", dataSource: overtimeAlertsCount ? "finance_ledger" : "mock" },
   ];
   const staffDataSource = staffMetrics.some((metric) => metric.dataSource === "finance_ledger") ? "finance_ledger" : "mock";
@@ -1679,6 +1990,15 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white">
+      <KpiBreakdownDialog
+        open={Boolean(kpiDetailItem)}
+        onOpenChange={(open) => {
+          if (!open) setKpiDetailItem(null);
+        }}
+        title={kpiDetailItem?.label || ""}
+        filterSummary={kpiFilterSummary}
+        breakdown={kpiDetailItem?.breakdown}
+      />
       <div className="border-b border-yellow-500/20">
         <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1691,6 +2011,75 @@ export default function Dashboard() {
                 Live data is loaded from Loyverse, Clip, the Order module (in-app orders), and the Finance ledger (expenses, shifts) wherever integrations are already available.
                 Anything that still needs replacement is clearly marked as <span className="text-yellow-300">Hardcoded</span>.
               </p>
+              <div className="mt-8 rounded-2xl border border-yellow-500/15 bg-[#141414]/90 p-4 sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-500/70">Calendar month</p>
+                    <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+                      Select a month to align every KPI with that full calendar window. Changing the date range below clears this.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 border-yellow-500/25 bg-black/30 text-yellow-200 hover:bg-yellow-400/10"
+                      onClick={() => setCalendarBrowseYear((y) => y - 1)}
+                      aria-label="Previous year"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="min-w-[4.5rem] text-center text-sm font-semibold tabular-nums text-yellow-200">{calendarBrowseYear}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 border-yellow-500/25 bg-black/30 text-yellow-200 hover:bg-yellow-400/10"
+                      onClick={() => setCalendarBrowseYear((y) => y + 1)}
+                      aria-label="Next year"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12">
+                  {CALENDAR_MONTH_SHORT.map((shortLabel, monthIndex) => {
+                    const isActive =
+                      calendarMonth?.y === calendarBrowseYear && calendarMonth?.m === monthIndex;
+                    return (
+                      <button
+                        key={shortLabel}
+                        type="button"
+                        onClick={() => setCalendarMonth({ y: calendarBrowseYear, m: monthIndex })}
+                        className={`rounded-lg border px-1 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide transition-colors sm:text-xs ${
+                          isActive
+                            ? "border-yellow-400/80 bg-yellow-400/15 text-yellow-100 shadow-[0_0_0_1px_rgba(250,204,21,0.15)]"
+                            : "border-white/10 bg-black/25 text-gray-400 hover:border-yellow-500/35 hover:text-gray-200"
+                        }`}
+                      >
+                        {shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+                {calendarMonth ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+                    <span className="text-xs text-gray-500">
+                      Active: <span className="font-medium text-yellow-200/90">{displayPeriodLabel}</span>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-200"
+                      onClick={() => setCalendarMonth(null)}
+                    >
+                      Clear · use date range
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:w-[460px]">
@@ -1763,7 +2152,15 @@ export default function Dashboard() {
           </div>
 
           <div className="mx-auto mt-5 grid max-w-[1500px] gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <SelectField label="Date range" options={filterOptions.dateRanges} value={selectedDateRange} onChange={setSelectedDateRange} />
+            <SelectField
+              label="Date range"
+              options={filterOptions.dateRanges}
+              value={selectedDateRange}
+              onChange={(value) => {
+                setSelectedDateRange(value);
+                setCalendarMonth(null);
+              }}
+            />
             <SelectField label="Branch" options={filterOptions.branches} value={selectedBranch} onChange={setSelectedBranch} />
             <SelectField label="Sales channel" options={filterOptions.salesChannels} value={selectedChannel} onChange={setSelectedChannel} />
             <SelectField label="Payment source" options={filterOptions.paymentSources} value={selectedPaymentSource} onChange={setSelectedPaymentSource} />
@@ -1795,7 +2192,7 @@ export default function Dashboard() {
           </details>
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {executiveKpis.map((item) => (
-              <KpiCard key={item.id} item={item} />
+              <KpiCard key={item.id} item={item} onOpenBreakdown={item.breakdown ? setKpiDetailItem : undefined} />
             ))}
           </div>
         </section>
@@ -1804,10 +2201,16 @@ export default function Dashboard() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Live Operations</p>
-              <h2 className="mt-1 text-2xl font-bold text-yellow-400">{leanOpsMode ? `${selectedDateRange} at a glance` : `Current service flow (${selectedDateRange})`}</h2>
+              <h2 className="mt-1 text-2xl font-bold text-yellow-400">
+                {leanOpsMode
+                  ? `${displayPeriodLabel} at a glance`
+                  : isDayOnlyDashboardContext
+                    ? `Current service flow (${displayPeriodLabel})`
+                    : `Operations in period (${displayPeriodLabel})`}
+              </h2>
             </div>
             <Button asChild variant="outline" className="border-yellow-500/20 bg-[#242424] text-gray-200 hover:bg-[#2b2b2b]">
-              <Link to="/managementinsight?view=live-operations">
+              <Link to={managementInsightView("live-operations")}>
                 View operations detail
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -1876,20 +2279,22 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
-                <p className="text-sm font-semibold text-yellow-400">Sales events by hour ({selectedDateRange})</p>
-                <div className="mt-4 h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ordersByHourToday}>
-                      <CartesianGrid stroke="rgba(250,204,21,0.08)" vertical={false} />
-                      <XAxis dataKey="hour" stroke="#737373" />
-                      <YAxis stroke="#737373" />
-                      <Tooltip contentStyle={{ background: "#242424", border: "1px solid rgba(250,204,21,0.18)", borderRadius: "12px" }} />
-                      <Bar dataKey="orders" fill="#eab308" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              {isDayOnlyDashboardContext ? (
+                <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
+                  <p className="text-sm font-semibold text-yellow-400">Sales events by hour ({displayPeriodLabel})</p>
+                  <div className="mt-4 h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={ordersByHourToday}>
+                        <CartesianGrid stroke="rgba(250,204,21,0.08)" vertical={false} />
+                        <XAxis dataKey="hour" stroke="#737373" />
+                        <YAxis stroke="#737373" />
+                        <Tooltip contentStyle={{ background: "#242424", border: "1px solid rgba(250,204,21,0.18)", borderRadius: "12px" }} />
+                        <Bar dataKey="orders" fill="#eab308" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <p className="text-sm font-semibold text-yellow-400">Sales by channel</p>
@@ -2126,12 +2531,13 @@ export default function Dashboard() {
             <div className="mb-4 rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4 text-sm text-gray-300">
               <p className="font-medium text-white">Current calculation basis</p>
               <p className="mt-2">
-                Ingredient cost uses Shopping List purchases converted into expenses when available, with manual ingredient expenses as fallback.
-                Labor uses shift-linked salary expenses from the employee calendar when available, with manual salary expenses as fallback.
-                Net profit also includes recurring expenses, other operating expenses, and Clip settlement fees.
+                The <strong className="text-gray-100">expense ledger</strong> below lists every Finance row in the selected range
+                (shopping-registered purchases, manual entries, salaries, bank/card payments, etc.). Summary cards still split
+                ingredient, labor, recurring, and other costs for margin math. Net profit also includes Clip settlement fees.
               </p>
               <p className="mt-2 text-xs text-gray-500">
-                This is already much closer to reality, but food cost is still purchase-based until recipe-level COGS and ingredient depletion are added.
+                Food cost remains purchase-based until recipe-level COGS exists; labor includes booked salaries plus unpaid shifts and
+                workday template where configured.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -2145,6 +2551,26 @@ export default function Dashboard() {
                   <p className="mt-2 text-xs text-gray-400">{cost.delta}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 max-h-[min(520px,60vh)] overflow-y-auto">
+              <InsightTable
+                title="Full expense ledger"
+                subtitle={`All expenses in the selected ${selectedRangeLabelLower}, newest first. Filter or export CSV below.`}
+                sourceBadge={<SourceBadge source={expenseLedgerRows.length ? "finance_ledger" : "mock"} />}
+                columns={[
+                  { key: "date", label: "Date" },
+                  { key: "name", label: "Name" },
+                  { key: "category", label: "Category" },
+                  { key: "amount", label: "Amount", render: (v) => formatCurrency(v) },
+                  { key: "payment", label: "Paid from" },
+                  { key: "origin", label: "Source" },
+                ]}
+                rows={expenseLedgerRows}
+                defaultSortKey="date"
+                emptyMessage="No expenses in this date range. Add them under Finance / Company account."
+                className="border-yellow-500/15"
+              />
             </div>
 
             <div className="mt-6 rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
@@ -2207,7 +2633,7 @@ export default function Dashboard() {
             </div>
           </DashboardPanel>
 
-          <DashboardPanel title="Forecasted shortages" description="Derived from current low-stock thresholds when Loyverse inventory is available." sourceBadge={<SourceBadge source={inventoryForecastSource} />}>
+          <DashboardPanel title="Forecasted shortages" description="Includes upcoming labor from the employee roster (workdays + shifts) and inventory risk when Loyverse data is available." sourceBadge={<SourceBadge source={inventoryForecastSource} />}>
             <div className="space-y-3">
               {inventoryInsights.forecast.map((item) => (
                 <div key={item.id} className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
@@ -2263,11 +2689,11 @@ export default function Dashboard() {
           <DashboardPanel title="Management detail hub" description="Entry points into drill-downs and the architecture notes page.">
             <div className="space-y-3">
               {[
-                { icon: CreditCard, title: "Payments & reconciliation", subtitle: "Card totals, Clip sync, and settlement gaps", href: "/managementinsight?view=payments-reconciliation" },
-                { icon: Pizza, title: "Product mix", subtitle: "Best sellers are partially live, margins still need cost mapping", href: "/managementinsight?view=products" },
-                { icon: ChefHat, title: "Food cost investigation", subtitle: "Expense-based today, needs real COGS and supplier costing", href: "/managementinsight?view=costs" },
-                { icon: Activity, title: "Alert queue", subtitle: "Generated from current sync and reconciliation conditions", href: "/managementinsight?view=alerts-exceptions" },
-                { icon: Store, title: "Integration blueprint", subtitle: `Clip and Loyverse are live. Revolut still needs an API client, auth settings, and backend proxy. ${detailViews["payments-reconciliation"].summary}`, href: "/managementinsight?view=payments-reconciliation" },
+                { icon: CreditCard, title: "Payments & reconciliation", subtitle: "Card totals, Clip sync, and settlement gaps", href: managementInsightView("payments-reconciliation") },
+                { icon: Pizza, title: "Product mix", subtitle: "Best sellers are partially live, margins still need cost mapping", href: managementInsightView("products") },
+                { icon: ChefHat, title: "Food cost investigation", subtitle: "Expense-based today, needs real COGS and supplier costing", href: managementInsightView("costs") },
+                { icon: Activity, title: "Alert queue", subtitle: "Generated from current sync and reconciliation conditions", href: managementInsightView("alerts-exceptions") },
+                { icon: Store, title: "Integration blueprint", subtitle: `Clip and Loyverse are live. Revolut still needs an API client, auth settings, and backend proxy. ${detailViews["payments-reconciliation"].summary}`, href: managementInsightView("payments-reconciliation") },
               ].map((item) => (
                 <Link
                   key={item.title}

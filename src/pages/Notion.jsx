@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { invokeNotionProxy } from "@/api/notionClient";
 import { useQuery } from "@tanstack/react-query";
@@ -24,11 +24,17 @@ function buildNotionSearchBody(overrides) {
   return b;
 }
 
+/** Space between paginated search calls — Notion throttles burst traffic (HTTP 429). */
+const NOTION_SEARCH_PAGE_GAP_MS = 450;
+
 /** Pages only (excludes top-level data_source objects from search). Follows Notion search pagination. */
-async function fetchAllNotionSearchPages(integrationSettings, extra = {}, maxPages = 30) {
+async function fetchAllNotionSearchPages(integrationSettings, extra = {}, maxPages = 12) {
   const all = [];
   let cursor;
   for (let i = 0; i < maxPages; i++) {
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, NOTION_SEARCH_PAGE_GAP_MS));
+    }
     const body = buildNotionSearchBody({
       page_size: 100,
       filter: { property: "object", value: "page" },
@@ -551,7 +557,7 @@ function SearchTab({ integrationSettings }) {
 
 // ─── DocumentsTab ─────────────────────────────────────────────────────────────
 
-function DocumentsTab({ integrationSettings }) {
+function DocumentsTab({ integrationSettings, enabled }) {
   const [selected, setSelected] = useState(null);
   const { results, loading, error, search } = useNotionSearch(integrationSettings);
 
@@ -561,9 +567,10 @@ function DocumentsTab({ integrationSettings }) {
   };
 
   useEffect(() => {
+    if (!enabled) return;
     setSelected(null);
     search({ page_size: 100 }, { fetchAllPages: true });
-  }, [integrationSettings, search]);
+  }, [enabled, integrationSettings, search]);
 
   // Only show pages that are NOT tasks and have a real title
   const docs = results.filter((item) => {
@@ -603,7 +610,7 @@ function DocumentsTab({ integrationSettings }) {
 
 // ─── TasksTab ─────────────────────────────────────────────────────────────────
 
-function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSettings }) {
+function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSettings, refreshDisabled = false }) {
   const [selected, setSelected] = useState(null);
   const [commentCounts, setCommentCounts] = useState({});
 
@@ -631,8 +638,14 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSet
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-400">{!loading && `${tasks.length} open tasks`}</p>
-        <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={loading}
-          className="border-white/10 bg-transparent text-gray-300 hover:bg-white/5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading || refreshDisabled}
+          className="border-white/10 bg-transparent text-gray-300 hover:bg-white/5"
+        >
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
@@ -675,40 +688,55 @@ function TasksTab({ tasks, loading, error, onRefresh, onMarkDone, integrationSet
 // ─── NotionPage ───────────────────────────────────────────────────────────────
 
 export default function NotionPage() {
+  const [notionTab, setNotionTab] = useState("tasks");
   const [allResults, setAllResults] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState(null);
 
-  const { data: settings = [] } = useQuery({
+  const { data: settings, isSuccess: settingsQueryReady } = useQuery({
     queryKey: ["appSettings"],
     queryFn: () => base44.entities.AppSettings.list(),
   });
 
+  /** Row identity only — `useQuery` may yield a fresh `[]` each render while loading; that must not recreate this every time. */
+  const appSettingsRow = settings?.[0] ?? null;
   const integrationSettings = useMemo(
-    () => buildDefaultAppSettings(getResolvedIntegrationSettings(settings[0] || {})),
-    [settings],
+    () => buildDefaultAppSettings(getResolvedIntegrationSettings(appSettingsRow || {})),
+    [appSettingsRow],
   );
 
+  const tasksFetchId = useRef(0);
+
   const fetchTasks = useCallback(async () => {
+    const id = ++tasksFetchId.current;
     setTasksLoading(true);
     setTasksError(null);
     try {
       const results = await fetchAllNotionSearchPages(integrationSettings, {});
+      if (id !== tasksFetchId.current) return;
       setAllResults(results);
     } catch (e) {
-      setTasksError(
+      if (id !== tasksFetchId.current) return;
+      const base =
         typeof e?.response?.data?.error === "string"
           ? e.response.data.error
-          : e?.response?.data?.error?.message || e?.message || "Failed to load.",
-      );
+          : e?.response?.data?.error?.message || e?.message || "Failed to load.";
+      const hint =
+        String(base).includes("429") || String(e?.message || "").includes("429")
+          ? " Notion rate limit — wait a minute, then tap Refresh. Avoid opening Documents and Tasks at the same time."
+          : "";
+      setTasksError(`${base}${hint}`);
     } finally {
-      setTasksLoading(false);
+      if (id === tasksFetchId.current) {
+        setTasksLoading(false);
+      }
     }
   }, [integrationSettings]);
 
   useEffect(() => {
+    if (!settingsQueryReady) return;
     fetchTasks();
-  }, [fetchTasks]);
+  }, [settingsQueryReady, fetchTasks]);
 
   const tasks = allResults.filter((item) => {
     if (item.object !== "page") return false;
@@ -769,11 +797,11 @@ export default function NotionPage() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Tabs defaultValue="tasks" className="space-y-6">
+        <Tabs value={notionTab} onValueChange={setNotionTab} className="space-y-6">
           <TabsList className="bg-[#1a1a1a] border border-white/10 p-1 h-auto gap-1">
             <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-400/10 data-[state=active]:text-yellow-300 text-gray-400 rounded-lg px-4 py-2">
               <CheckSquare className="h-4 w-4 mr-2" /> Open Tasks
-              {tasksLoading
+              {!settingsQueryReady || tasksLoading
                 ? <Loader2 className="ml-1.5 h-3 w-3 animate-spin text-yellow-400" />
                 : tasks.length > 0 && (
                   <span className="ml-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/30 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 leading-none">
@@ -793,16 +821,17 @@ export default function NotionPage() {
             <SearchTab integrationSettings={integrationSettings} />
           </TabsContent>
           <TabsContent value="documents" className="mt-0">
-            <DocumentsTab integrationSettings={integrationSettings} />
+            <DocumentsTab integrationSettings={integrationSettings} enabled={notionTab === "documents"} />
           </TabsContent>
           <TabsContent value="tasks" className="mt-0">
             <TasksTab
               tasks={tasks}
-              loading={tasksLoading}
+              loading={!settingsQueryReady || tasksLoading}
               error={tasksError}
               onRefresh={fetchTasks}
               onMarkDone={handleMarkDone}
               integrationSettings={integrationSettings}
+              refreshDisabled={!settingsQueryReady}
             />
           </TabsContent>
         </Tabs>

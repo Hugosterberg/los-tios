@@ -122,7 +122,10 @@ function matchesPaymentSourceFilter(event, selectedPaymentSource) {
     return event.source === "clip";
   }
   if (selectedPaymentSource === "Cash") {
-    return method === "cash";
+    if (method === "cash" || method === "efectivo") return true;
+    if (method.includes("efectivo")) return true;
+    if (method.includes("cash") && !method.includes("cashback")) return true;
+    return false;
   }
   if (selectedPaymentSource === "Bank transfer") {
     return method.includes("transfer") || method.includes("bank");
