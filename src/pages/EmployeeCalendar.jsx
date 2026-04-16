@@ -573,7 +573,53 @@ export default function EmployeeCalendar() {
     alert("Shift completed and salary added to expenses");
   };
 
-  const handleEmployeeSubmit = (e) => {
+  const autoCreateShiftsForWeek = async (employee, payload) => {
+    if (!payload.auto_register_shifts) return;
+    const allowedIso = new Set(
+      (payload.work_days || "")
+        .split(",")
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => n >= 1 && n <= 7),
+    );
+    if (!allowedIso.size) return;
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    const { defaultShiftStart, defaultShiftEnd } = parseDefaultWorkHoursFromEmployee({ notes: payload.notes });
+    const start = defaultShiftStart || "09:00";
+    const end = defaultShiftEnd || "17:00";
+    const hours = (() => {
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+      const h = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+      return h > 0 ? h : 8;
+    })();
+    const empObj = { ...employee, ...payload };
+    for (const day of days) {
+      const iso = getISODay(day);
+      if (!allowedIso.has(iso)) continue;
+      const dateStr = format(day, "yyyy-MM-dd");
+      const alreadyExists = shifts.some(
+        (s) => s.employee_id === employee.id && s.date === dateStr && s.status !== "cancelled",
+      );
+      if (alreadyExists) continue;
+      const shiftPayload = sanitizeShiftPayload({
+        employee_id: employee.id,
+        employee_name: payload.name,
+        date: dateStr,
+        start_time: start,
+        end_time: end,
+        hours_worked: hours,
+        amount: shiftAmountForEmployee(empObj, hours),
+        status: "scheduled",
+        notes: "Auto: saved workdays",
+      });
+      await createShift.mutateAsync(shiftPayload);
+    }
+    queryClient.invalidateQueries({ queryKey: ["shifts"] });
+  };
+
+  const handleEmployeeSubmit = async (e) => {
     e.preventDefault();
     if (isoDaysFromChecks(employeeForm.workDays).length === 0) {
       alert("Select at least one workday.");
@@ -594,9 +640,24 @@ export default function EmployeeCalendar() {
       return;
     }
     if (editingEmployee) {
-      updateEmployee.mutate({ id: editingEmployee.id, data: payload });
+      updateEmployee.mutate(
+        { id: editingEmployee.id, data: payload },
+        {
+          onSuccess: async () => {
+            if (payload.auto_register_shifts) {
+              await autoCreateShiftsForWeek(editingEmployee, payload);
+            }
+          },
+        },
+      );
     } else {
-      createEmployee.mutate(payload);
+      createEmployee.mutate(payload, {
+        onSuccess: async (created) => {
+          if (payload.auto_register_shifts && created?.id) {
+            await autoCreateShiftsForWeek(created, payload);
+          }
+        },
+      });
     }
   };
 
@@ -1695,8 +1756,28 @@ export default function EmployeeCalendar() {
                   variant="outline"
                   className="border-red-500/40 text-red-400 hover:bg-red-500/10"
                   onClick={() => {
-                    deleteShift.mutate(editingShift.id);
-                    resetShiftForm();
+                    const hasWorkDay = (() => {
+                      const emp = employees.find((e) => e.id === editingShift.employee_id);
+                      if (!emp) return false;
+                      return employeeWorksOnCalendarDate(emp, selectedDate || new Date(editingShift.date + "T12:00:00"));
+                    })();
+                    if (hasWorkDay) {
+                      const choice = window.confirm(
+                        "This employee has this weekday as a workday.\n\n• OK = Cancel shift (keeps day as 'off' — no wage in cash/dashboard)\n• Cancel = Delete shift row entirely (wage may reappear from workday template)"
+                      );
+                      if (choice) {
+                        updateShift.mutate(
+                          { id: editingShift.id, data: sanitizeShiftPayload({ ...editingShift, status: "cancelled" }) },
+                          { onSuccess: resetShiftForm },
+                        );
+                      } else {
+                        deleteShift.mutate(editingShift.id);
+                        resetShiftForm();
+                      }
+                    } else {
+                      deleteShift.mutate(editingShift.id);
+                      resetShiftForm();
+                    }
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
