@@ -108,8 +108,9 @@ function buildEmployeePayload(form) {
   const { workDays, defaultShiftStart, defaultShiftEnd, ...raw } = form;
   const start = defaultShiftStart || "09:00";
   const end = defaultShiftEnd || "17:00";
-  const mergedWorkDays = mergeNotesWithWorkDays(stripWorkHoursTag(raw.notes ?? ""), workDays);
-  const mergedNotes = mergeNotesWithDefaultHours(mergedWorkDays, start, end);
+  // Strip both tags from notes — work_days field is the canonical source now
+  const cleanNotes = stripWorkDaysTag(stripWorkHoursTag(raw.notes ?? ""));
+  const mergedNotes = mergeNotesWithDefaultHours(cleanNotes, start, end);
   const role = VALID_EMPLOYEE_ROLES.has(raw.role) ? raw.role : "waiter";
   const payment_type = raw.payment_type === "hourly" ? "hourly" : "daily";
   const wd = isoDaysFromChecks(workDays);
