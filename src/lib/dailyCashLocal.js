@@ -196,6 +196,42 @@ export function recordOpeningCountDiff(payload) {
   writeRaw(store);
 }
 
+function syncOpeningFromLatestDiff(store, dateKey) {
+  const latest = (Array.isArray(store.openingDiffEvents) ? store.openingDiffEvents : [])
+    .filter((ev) => ev?.dateKey === dateKey && Number.isFinite(Number(ev.enteredOpening)))
+    .sort((a, b) => new Date(b.ts || 0).getTime() - new Date(a.ts || 0).getTime())[0];
+  if (latest) {
+    store.openings[dateKey] = Number(latest.enteredOpening);
+    store.openingCountMeta[dateKey] = { updatedAt: latest.ts };
+  } else {
+    delete store.openings[dateKey];
+    delete store.openingCountMeta[dateKey];
+  }
+}
+
+export function removeOpeningCountDiff(id) {
+  const store = readRaw();
+  const list = Array.isArray(store.openingDiffEvents) ? store.openingDiffEvents : [];
+  const removed = list.find((ev) => ev?.id === id);
+  if (!removed) return;
+  store.openingDiffEvents = list.filter((ev) => ev?.id !== id);
+  if (!store.openingCountMeta || typeof store.openingCountMeta !== "object") {
+    store.openingCountMeta = {};
+  }
+  syncOpeningFromLatestDiff(store, removed.dateKey);
+  writeRaw(store);
+}
+
+export function updateOpeningCountDiffComment(id, comment) {
+  const store = readRaw();
+  const list = Array.isArray(store.openingDiffEvents) ? [...store.openingDiffEvents] : [];
+  const idx = list.findIndex((ev) => ev?.id === id);
+  if (idx === -1) return;
+  list[idx] = { ...list[idx], comment: typeof comment === "string" ? comment.trim() : "" };
+  store.openingDiffEvents = list;
+  writeRaw(store);
+}
+
 /** Newest first */
 export function listOpeningCountDiffs() {
   const ev = readRaw().openingDiffEvents;

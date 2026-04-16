@@ -55,9 +55,11 @@ import {
   getOpeningCountMeta,
   listOpeningCountDiffs,
   recordOpeningCountDiff,
+  removeOpeningCountDiff,
   removeManualLine,
   setDetailOverride,
   setOpeningBalance,
+  updateOpeningCountDiffComment,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
 import {
@@ -99,6 +101,11 @@ function formatMx(value) {
 
 function rowTimeLabel(iso) {
   return formatMexicoTime(iso);
+}
+
+function rowSortTime(iso, fallbackDayStr) {
+  const t = new Date(iso || `${fallbackDayStr}T12:00:00`).getTime();
+  return Number.isFinite(t) ? t : new Date(`${fallbackDayStr}T12:00:00`).getTime();
 }
 
 function matchesDay(isoDate, key) {
@@ -364,10 +371,44 @@ function mergeLaborCashLedgerRows(dayStr, baseRows, employees, shifts, expenses)
   return merged;
 }
 
-function sumDrawerCashTotals(rows) {
+function latestManualCountForDay(events, dayStr) {
+  const list = Array.isArray(events) ? events : [];
+  return (
+    list
+      .filter((ev) => ev?.dateKey === dayStr && Number.isFinite(Number(ev.enteredOpening)))
+      .sort((a, b) => rowSortTime(b.ts, dayStr) - rowSortTime(a.ts, dayStr))[0] || null
+  );
+}
+
+function withManualCountResetRow(dayStr, rows, manualCount) {
+  if (!manualCount) return rows;
+  const amount = Number(manualCount.enteredOpening);
+  if (!Number.isFinite(amount)) return rows;
+  const resetRow = {
+    _ledgerDay: dayStr,
+    id: `manual-count-reset-${manualCount.id || manualCount.ts || dayStr}`,
+    sortTime: rowSortTime(manualCount.ts, dayStr),
+    timeLabel: rowTimeLabel(manualCount.ts),
+    source: "Manual count",
+    detail: manualCount.comment
+      ? `Drawer counted: ${formatMx(amount)} · ${manualCount.comment}`
+      : `Drawer counted: ${formatMx(amount)}`,
+    inAmount: null,
+    outAmount: null,
+    resetAmount: amount,
+    isManualCountReset: true,
+  };
+  const merged = [...rows.filter((row) => row.id !== resetRow.id), resetRow];
+  merged.sort((a, b) => b.sortTime - a.sortTime);
+  return merged;
+}
+
+function sumDrawerCashTotals(rows, resetAfterTime = null) {
   let cashIn = 0;
   let cashOut = 0;
   for (const r of rows) {
+    if (r.isManualCountReset) continue;
+    if (resetAfterTime != null && Number.isFinite(resetAfterTime) && r.sortTime <= resetAfterTime) continue;
     if (r.inAmount) cashIn += r.inAmount;
     if (r.outAmount) cashOut += r.outAmount;
   }
@@ -699,8 +740,11 @@ export default function DailyCash() {
         shifts,
         expenses,
       );
-      const t = sumDrawerCashTotals(rows);
-      return { closeDayStr: d, priorOpening: opening, net: t.net, end: opening + t.net };
+      const reset = latestManualCountForDay(listOpeningCountDiffs(), d);
+      const resetTime = reset ? rowSortTime(reset.ts, d) : null;
+      const t = sumDrawerCashTotals(rows, resetTime);
+      const anchor = reset ? Number(reset.enteredOpening) : opening;
+      return { closeDayStr: d, priorOpening: anchor, net: t.net, end: anchor + t.net };
     }
     return null;
   }, [periodMode, formDayStr, loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick]);
@@ -720,6 +764,10 @@ export default function DailyCash() {
   }, [formDayStr, storeTick, periodMode, monthEarliestOpening]);
 
   const openingCountDiffHistory = useMemo(() => listOpeningCountDiffs(), [storeTick]);
+  const selectedDayManualCount = useMemo(
+    () => latestManualCountForDay(openingCountDiffHistory, formDayStr),
+    [openingCountDiffHistory, formDayStr],
+  );
 
   const persistOpening = useCallback(() => {
     const trimmed = openingInput.trim();
@@ -767,7 +815,7 @@ export default function DailyCash() {
   const tableRows = useMemo(() => {
     if (periodMode === "month") return [];
     const lv = loyverseByDay.get(formDayStr) || [];
-    return mergeLaborCashLedgerRows(
+    const rows = mergeLaborCashLedgerRows(
       formDayStr,
       buildDayTableRows(formDayStr, {
         orders,
@@ -780,7 +828,8 @@ export default function DailyCash() {
       shifts,
       expenses,
     );
-  }, [periodMode, formDayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick]);
+    return withManualCountResetRow(formDayStr, rows, selectedDayManualCount);
+  }, [periodMode, formDayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick, selectedDayManualCount]);
 
   const monthLedgerSections = useMemo(() => {
     if (periodMode !== "month") return [];
@@ -790,7 +839,7 @@ export default function DailyCash() {
       .map((d) => {
         const ds = dayKey(d);
         const lv = loyverseByDay.get(ds) || [];
-        const rows = mergeLaborCashLedgerRows(
+        const baseRows = mergeLaborCashLedgerRows(
           ds,
           buildDayTableRows(ds, {
             orders,
@@ -803,7 +852,9 @@ export default function DailyCash() {
           shifts,
           expenses,
         );
-        const t = sumDrawerCashTotals(rows);
+        const reset = latestManualCountForDay(openingCountDiffHistory, ds);
+        const rows = withManualCountResetRow(ds, baseRows, reset);
+        const t = sumDrawerCashTotals(rows, reset ? rowSortTime(reset.ts, ds) : null);
         const labor = totalExpectedLaborForDate(ds, employees, shifts);
         return {
           dateStr: ds,
@@ -815,7 +866,7 @@ export default function DailyCash() {
       })
       .filter((s) => s.dateStr <= todayStr)
       .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
-  }, [periodMode, selectedDate, todayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick]);
+  }, [periodMode, selectedDate, todayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick, openingCountDiffHistory]);
 
   const monthDrawerTotals = useMemo(() => {
     if (periodMode !== "month") return null;
@@ -850,11 +901,12 @@ export default function DailyCash() {
         end: null,
       };
     }
-    const t = sumDrawerCashTotals(tableRows);
-    const opening = getOpeningBalance(formDayStr);
+    const resetTime = selectedDayManualCount ? rowSortTime(selectedDayManualCount.ts, formDayStr) : null;
+    const t = sumDrawerCashTotals(tableRows, resetTime);
+    const opening = selectedDayManualCount ? Number(selectedDayManualCount.enteredOpening) : getOpeningBalance(formDayStr);
     const end = opening !== null && Number.isFinite(opening) ? opening + t.net : null;
     return { ...t, opening, end };
-  }, [periodMode, monthDrawerTotals, tableRows, formDayStr, storeTick]);
+  }, [periodMode, monthDrawerTotals, tableRows, formDayStr, storeTick, selectedDayManualCount]);
 
   const goPrevMonth = () => setSelectedDate((d) => subMonths(d, 1));
   const goNextMonth = () => setSelectedDate((d) => addMonths(d, 1));
@@ -911,6 +963,17 @@ export default function DailyCash() {
       });
     }
   };
+
+  const handleManualCountCommentCommit = useCallback((eventId, value) => {
+    updateOpeningCountDiffComment(eventId, value);
+    setStoreTick((t) => t + 1);
+  }, []);
+
+  const handleRemoveManualCountDiff = useCallback((eventId) => {
+    if (!window.confirm("Delete this logged manual count?")) return;
+    removeOpeningCountDiff(eventId);
+    setStoreTick((t) => t + 1);
+  }, []);
 
   const handleUndoManual = async () => {
     if (!lastRemovedManual) return;
@@ -1003,11 +1066,15 @@ export default function DailyCash() {
 
   const renderLedgerTableRows = (rows, sectionDayStr) => {
     const ov = getDetailOverrides(sectionDayStr);
+    const sectionManualCount = latestManualCountForDay(openingCountDiffHistory, sectionDayStr);
+    const sectionResetTime = sectionManualCount ? rowSortTime(sectionManualCount.ts, sectionDayStr) : null;
     return rows.flatMap((r, i) => {
       const expandKey = `${sectionDayStr}::${r.id}`;
       const isExpanded = expandedLedgerKey === expandKey;
       const canExpand = Boolean(r.receipt || r.order);
       const rowStripe = i % 2 === 1 ? "bg-black/20" : "bg-transparent";
+      const excludedByManualCount =
+        sectionResetTime != null && !r.isManualCountReset && Number.isFinite(r.sortTime) && r.sortTime <= sectionResetTime;
 
       const mainTr = (
         <tr
@@ -1015,7 +1082,10 @@ export default function DailyCash() {
           className={cn(
             "border-b border-yellow-500/10 transition-colors hover:bg-yellow-500/[0.03]",
             rowStripe,
+            r.isManualCountReset && "bg-emerald-500/[0.06] hover:bg-emerald-500/[0.09]",
+            excludedByManualCount && "opacity-45",
           )}
+          title={excludedByManualCount ? "Before the latest manual count, so it is not included in End cash." : undefined}
         >
           <td className="w-10 px-1 py-1 align-middle">
             {canExpand ? (
@@ -1035,12 +1105,18 @@ export default function DailyCash() {
             )}
           </td>
           <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-500">{r.timeLabel}</td>
-          <td className="px-3 py-2 text-gray-300">{r.source}</td>
+          <td className={cn("px-3 py-2 text-gray-300", r.isManualCountReset && "font-semibold text-emerald-200")}>
+            {r.source}
+          </td>
           <td className="px-2 py-1 align-middle text-gray-400">
-            <LedgerDetailCell
-              displayDetail={ov[r.id] ?? r.detail}
-              onCommit={(value) => handleDetailCommit(r, value)}
-            />
+            {r.isManualCountReset ? (
+              <span className="block px-1 py-1 text-emerald-100/90">{r.detail}</span>
+            ) : (
+              <LedgerDetailCell
+                displayDetail={ov[r.id] ?? r.detail}
+                onCommit={(value) => handleDetailCommit(r, value)}
+              />
+            )}
           </td>
           <td className="px-3 py-2 text-right font-medium tabular-nums text-emerald-300/90">
             {r.inAmount != null ? formatMx(r.inAmount) : "—"}
@@ -1304,16 +1380,9 @@ export default function DailyCash() {
               {periodMode === "month" ? "All days · incomes & expenses in the list below" : longDate}
             </p>
             {laborCalendarHeroTitle != null && (
-              <div className="mt-6 border-t border-yellow-500/15 pt-6 sm:mt-8 sm:pt-8">
-                <p
-                  className="text-3xl font-extralight tracking-[-0.04em] text-yellow-50 sm:text-4xl md:text-5xl"
-                  style={{ fontFeatureSettings: '"ss01", "cv02"' }}
-                >
-                  {laborCalendarHeroTitle}
-                </p>
-                <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">
-                  Expected cash wages from employee calendar
-                </p>
+              <div className="mt-5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/20 px-3 py-2 text-xs sm:text-sm">
+                <span className="font-medium text-yellow-200/90">{laborCalendarHeroTitle}</span>
+                <span className="text-gray-500">Expected cash wages from employee calendar</span>
               </div>
             )}
           </div>
@@ -1360,7 +1429,7 @@ export default function DailyCash() {
                     <p>
                       Updated cash from manual count at{" "}
                       <span className="font-medium tabular-nums text-gray-300">
-                        {formatMexicoDateShort(openingCountMeta?.updatedAt?.slice(0, 10) || formDayStr)}{" "}
+                        {formatMexicoDateShort(openingCountMeta?.updatedAt || formDayStr)}{" "}
                         {formatMexicoTime(openingCountMeta?.updatedAt)}
                       </span>
                       . End cash = manual count + net for the day.
@@ -1425,7 +1494,7 @@ export default function DailyCash() {
             </p>
             <p className="mt-2 text-[11px] text-gray-600">
               In {formatMx(totals.cashIn)} · Out {formatMx(totals.cashOut)}
-              {periodMode === "month" ? " · drawer only" : ""}
+              {periodMode === "month" ? " · drawer only" : selectedDayManualCount ? " · after manual count" : ""}
             </p>
             {laborInNet > 0 && (
               <p className="mt-1 text-[11px] text-sky-400/80">
@@ -1444,7 +1513,9 @@ export default function DailyCash() {
               {periodMode === "month"
                 ? "Manual counts apply per day in Today view"
                 : totals.opening !== null
-                  ? "Manual count + net for the day"
+                  ? selectedDayManualCount
+                    ? "Manual count + net after that time"
+                    : "Manual count + net for the day"
                   : "Manual counting not done this day"}
             </p>
           </div>
@@ -1460,7 +1531,7 @@ export default function DailyCash() {
               difference. Add an optional comment when you want to explain why it differs. Stored in this browser only.
             </p>
             <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-yellow-500/15">
-              <table className="w-full min-w-[820px] border-collapse text-left text-[11px]">
+              <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
                 <thead>
                   <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
                     <th className="px-2 py-2">Updated</th>
@@ -1470,21 +1541,30 @@ export default function DailyCash() {
                     <th className="px-2 py-2 text-right">Expected</th>
                     <th className="px-2 py-2 text-right">Actual manual</th>
                     <th className="px-2 py-2 text-right">Diff</th>
+                    <th className="w-10 px-1 py-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {openingCountDiffHistory.map((ev) => (
                     <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
                       <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-500">
-                        {formatMexicoDateShort(ev.ts?.slice(0, 10) || "")}{" "}
+                        {formatMexicoDateShort(ev.ts || "")}{" "}
                         <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
                         {ev.priorCloseDayStr || "No prior close"}
                       </td>
-                      <td className="max-w-[240px] px-2 py-1.5 text-gray-400">
-                        {ev.comment ? ev.comment : <span className="text-gray-700">-</span>}
+                      <td className="max-w-[240px] px-2 py-1.5">
+                        <Input
+                          defaultValue={ev.comment || ""}
+                          onBlur={(e) => handleManualCountCommentCommit(ev.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                          placeholder="Why?"
+                          className="h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
+                        />
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
                         {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
@@ -1503,6 +1583,19 @@ export default function DailyCash() {
                         )}
                       >
                         {ev.diff == null ? "-" : `${ev.diff > 0 ? "+" : ""}${formatMx(ev.diff)}`}
+                      </td>
+                      <td className="px-1 py-1.5 text-right">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-gray-600 hover:bg-rose-950/40 hover:text-rose-300"
+                          onClick={() => handleRemoveManualCountDiff(ev.id)}
+                          aria-label="Delete logged manual count"
+                          title="Delete logged manual count"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -1624,7 +1717,9 @@ export default function DailyCash() {
               <strong className="text-gray-300">cash refunds</strong>, delivered cash orders, company transactions, and manual
               lines. Expected <strong className="text-gray-300">staff wages paid from cash</strong> appear as{" "}
               <strong className="text-gray-300">Labor (cash)</strong> OUT when not already covered by a Finance salary expense from
-              the drawer that day. Rows are <strong className="text-gray-300">newest first</strong>. Use{" "}
+              the drawer that day. A <strong className="text-gray-300">Manual count</strong> row resets End cash from that exact
+              Puerto Escondido time; older rows stay visible but no longer affect the after-count total. Rows are{" "}
+              <strong className="text-gray-300">newest first</strong>. Use{" "}
               <strong className="text-gray-300">▾</strong> on Loyverse and app cash orders for ticket notes, channel, table, and
               line items. In <strong className="text-gray-300">Month</strong>, each date is a section (newest day first; future
               days hidden) with subtotals + labor (header). Click detail to edit (blur or Enter).
@@ -1678,6 +1773,20 @@ export default function DailyCash() {
                   renderLedgerTableRows(tableRows, formDayStr)
                 )}
               </tbody>
+              <tfoot>
+                <tr className="border-t border-yellow-500/25 bg-[#181610] text-sm font-semibold">
+                  <td colSpan={4} className="px-3 py-3 text-right uppercase tracking-[0.18em] text-yellow-600/90">
+                    Total
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-emerald-300/95">
+                    {formatMx(totals.cashIn)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-rose-300/95">
+                    {formatMx(totals.cashOut)}
+                  </td>
+                  <td className="px-2 py-3" />
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
