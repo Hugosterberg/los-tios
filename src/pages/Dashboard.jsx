@@ -1053,7 +1053,9 @@ export default function Dashboard() {
     [filteredExpenses],
   );
   const filteredTransactions = filterByDashboardWindow(transactions, dashboardFilterWindow);
-  const filteredShifts = filterByDashboardWindow(shifts, dashboardFilterWindow);
+  const filteredShifts = filterByDashboardWindow(shifts, dashboardFilterWindow).filter(
+    (shift) => shift.status !== "removed" && !String(shift.notes || "").includes("[lt_removed_shift]"),
+  );
   const filteredReceipts = filterByDashboardWindow(receipts, dashboardFilterWindow);
   const filteredClipPayments = filterByDashboardWindow(clipPayments, dashboardFilterWindow);
   const filteredClipSettlements = filterByDashboardWindow(clipSettlements, dashboardFilterWindow);

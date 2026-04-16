@@ -16,6 +16,7 @@ ShoppingCart,
   Users,
   BookOpen,
 Settings2,
+CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -36,6 +37,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Finance", shortName: "Finance", url: createPageUrl("Finance"), icon: Wallet },
     { name: "Shopping List", shortName: "Shopping", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
     { name: "Employees", shortName: "Employees", url: createPageUrl("EmployeeCalendar"), icon: Users },
+    { name: "Events", shortName: "Events", url: createPageUrl("Events"), icon: CalendarDays },
     { name: "Customer Page", shortName: "Customers", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
   ];
 

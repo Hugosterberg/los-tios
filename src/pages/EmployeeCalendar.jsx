@@ -54,6 +54,7 @@ import {
   localUpdateShift,
   localDeleteShift,
   localCreateExpense,
+  localDeleteExpense,
 } from "@/lib/localDevFinance";
 import {
   WORK_DAY_DEFS,
@@ -89,10 +90,16 @@ const EMPLOYEE_WRITE_KEYS = [
 const VALID_EMPLOYEE_ROLES = new Set(["cook", "waiter", "cashier", "delivery", "manager", "cleaner", "other"]);
 
 const LAST_CALENDAR_EMPLOYEE_LS = "los_tios_employee_calendar_preferred_employee_id";
+const REMOVED_SHIFT_STATUS = "removed";
+const REMOVED_SHIFT_NOTE = "[lt_removed_shift]";
+
+function isRemovedShift(shift) {
+  return shift?.status === REMOVED_SHIFT_STATUS || String(shift?.notes || "").includes(REMOVED_SHIFT_NOTE);
+}
 
 /** Readable on dark panels; `color-scheme: dark` fixes native time picker contrast in Chromium. */
 const calendarFieldClass =
-  "border-yellow-500/35 bg-[#252014] text-yellow-50 placeholder:text-gray-500 [color-scheme:dark] focus-visible:ring-yellow-500/40";
+  "border-yellow-500/45 bg-[#252014] font-medium text-yellow-50 placeholder:text-gray-400 [color-scheme:dark] focus-visible:ring-yellow-500/50";
 
 function formatMutationError(err) {
   const d = err?.response?.data;
@@ -108,9 +115,9 @@ function buildEmployeePayload(form) {
   const { workDays, defaultShiftStart, defaultShiftEnd, ...raw } = form;
   const start = defaultShiftStart || "09:00";
   const end = defaultShiftEnd || "17:00";
-  // Strip both tags from notes — work_days field is the canonical source now
+  // Store workdays both as a field and as a notes tag for hosted schemas that drop new fields.
   const cleanNotes = stripWorkDaysTag(stripWorkHoursTag(raw.notes ?? ""));
-  const mergedNotes = mergeNotesWithDefaultHours(cleanNotes, start, end);
+  const mergedNotes = mergeNotesWithDefaultHours(mergeNotesWithWorkDays(cleanNotes, workDays), start, end);
   const role = VALID_EMPLOYEE_ROLES.has(raw.role) ? raw.role : "waiter";
   const payment_type = raw.payment_type === "hourly" ? "hourly" : "daily";
   const wd = isoDaysFromChecks(workDays);
@@ -196,7 +203,7 @@ function buildMonthGrid(anchorInMonth) {
 
 function dayShiftStats(date, shiftsList) {
   const dateStr = format(date, "yyyy-MM-dd");
-  const list = shiftsList.filter((s) => s.date === dateStr && s.status !== "cancelled");
+  const list = shiftsList.filter((s) => s.date === dateStr && s.status !== "cancelled" && !isRemovedShift(s));
   const count = list.length;
   const total = list.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   return { count, total, list };
@@ -358,9 +365,52 @@ export default function EmployeeCalendar() {
   });
 
   const deleteShift = useMutation({
-    mutationFn: (id) => (useLocalFinance ? localDeleteShift(id) : base44.entities.Shift.delete(id)),
+    mutationFn: async ({ shift, keepLaborBlocker = false }) => {
+      if (!shift?.id) throw new Error("Shift not found");
+      if (shift.expense_id) {
+        try {
+          if (useLocalFinance) {
+            await localDeleteExpense(shift.expense_id);
+          } else {
+            await base44.entities.Expense.delete(shift.expense_id);
+          }
+        } catch (err) {
+          const msg = String(err?.message || err || "");
+          if (!msg.toLowerCase().includes("not found")) throw err;
+        }
+      }
+      if (keepLaborBlocker) {
+        const deletedAt = new Date().toISOString();
+        const notes = String(shift.notes || "").trim();
+        const deletedNote = `${REMOVED_SHIFT_NOTE} Deleted shift ${deletedAt}`;
+        return useLocalFinance
+          ? localUpdateShift(
+              shift.id,
+              sanitizeShiftPayload({
+                ...shift,
+                status: "completed",
+                hours_worked: 0,
+                amount: 0,
+                notes: notes ? `${notes}\n${deletedNote}` : deletedNote,
+              }),
+            )
+          : base44.entities.Shift.update(
+              shift.id,
+              sanitizeShiftPayload({
+                ...shift,
+                status: "completed",
+                hours_worked: 0,
+                amount: 0,
+                notes: notes ? `${notes}\n${deletedNote}` : deletedNote,
+              }),
+            );
+      }
+      return useLocalFinance ? localDeleteShift(shift.id) : base44.entities.Shift.delete(shift.id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      resetShiftForm();
     },
     onError: (err) => alert(`Could not delete shift: ${formatMutationError(err)}`),
   });
@@ -406,7 +456,7 @@ export default function EmployeeCalendar() {
     let shiftTotal = 0;
     let count = 0;
     for (const s of shifts) {
-      if (!s.date || s.status === "cancelled") continue;
+      if (!s.date || s.status === "cancelled" || isRemovedShift(s)) continue;
       if (s.date >= startStr && s.date <= endStr) {
         shiftTotal += Number(s.amount || 0);
         count += 1;
@@ -428,7 +478,7 @@ export default function EmployeeCalendar() {
     let shiftTotal = 0;
     let count = 0;
     for (const s of shifts) {
-      if (!s.date || s.status === "cancelled") continue;
+      if (!s.date || s.status === "cancelled" || isRemovedShift(s)) continue;
       if (s.date >= startStr && s.date <= endStr) {
         shiftTotal += Number(s.amount || 0);
         count += 1;
@@ -445,7 +495,7 @@ export default function EmployeeCalendar() {
 
   const getShiftsForDay = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return shifts.filter((s) => s.date === dateStr);
+    return shifts.filter((s) => s.date === dateStr && !isRemovedShift(s));
   };
 
   const openShiftDialog = (date, shift = null) => {
@@ -487,6 +537,32 @@ export default function EmployeeCalendar() {
         notes: "",
       });
     }
+    setShowShiftDialog(true);
+  };
+
+  const openTemplateShiftDialog = (date, employee) => {
+    if (!employee) {
+      openShiftDialog(date);
+      return;
+    }
+    const startT = templateStart || parseDefaultWorkHoursFromEmployee(employee).defaultShiftStart || "09:00";
+    const endT = templateEnd || parseDefaultWorkHoursFromEmployee(employee).defaultShiftEnd || "17:00";
+    const hours = calculateHours(startT, endT);
+    const hw = hours > 0 ? hours : 8;
+    setSelectedDate(date);
+    setEditingShift(null);
+    persistPreferredEmployeeId(employee.id);
+    setShiftForm({
+      employee_id: employee.id,
+      employee_name: employee.name,
+      date: format(date, "yyyy-MM-dd"),
+      start_time: startT,
+      end_time: endT,
+      hours_worked: hw,
+      amount: shiftAmountForEmployee(employee, hw) || 0,
+      status: "scheduled",
+      notes: "Manual: from weekly template",
+    });
     setShowShiftDialog(true);
   };
 
@@ -533,8 +609,17 @@ export default function EmployeeCalendar() {
 
   const handleShiftSubmit = (e) => {
     e.preventDefault();
-    persistPreferredEmployeeId(shiftForm.employee_id);
-    const payload = sanitizeShiftPayload(shiftForm);
+    const employee = employees.find((x) => x.id === shiftForm.employee_id);
+    if (!employee) {
+      alert("Select an employee.");
+      return;
+    }
+    persistPreferredEmployeeId(employee.id);
+    const payload = sanitizeShiftPayload({
+      ...shiftForm,
+      employee_id: employee.id,
+      employee_name: employee.name,
+    });
     if (editingShift) {
       updateShift.mutate({ id: editingShift.id, data: payload });
     } else {
@@ -572,6 +657,42 @@ export default function EmployeeCalendar() {
     });
 
     alert("Shift completed and salary added to expenses");
+  };
+
+  const requestDeleteShift = (shift, dateOverride = null) => {
+    if (!shift) return;
+    const shiftDate = dateOverride || selectedDate || new Date(`${shift.date}T12:00:00`);
+    const emp = employees.find((e) => e.id === shift.employee_id);
+    const keepLaborBlocker = emp ? employeeWorksOnCalendarDate(emp, shiftDate) : false;
+    const isPaid = shift.status === "paid";
+    const message = isPaid
+      ? `Delete this registered paid shift? This will also delete the linked salary expense so Dashboard and Daily Cash no longer count ${formatMx(shift.amount)}.${keepLaborBlocker ? " The day will stay blocked from roster-template labor." : ""}`
+      : `Delete this scheduled shift?${keepLaborBlocker ? " The day will stay blocked from roster-template labor so the cost does not reappear." : ""}`;
+    if (window.confirm(message)) {
+      deleteShift.mutate({ shift, keepLaborBlocker });
+    }
+  };
+
+  const requestRemoveTemplateShift = () => {
+    const employee = employees.find((e) => e.id === shiftForm.employee_id);
+    const shiftDate = selectedDate || (shiftForm.date ? new Date(`${shiftForm.date}T12:00:00`) : null);
+    if (!employee || !shiftDate) return;
+    const dateStr = format(shiftDate, "yyyy-MM-dd");
+    const message = `Delete this workday shift for ${employee.name} on ${formatMexicoLongDateEn(shiftDate)}? This removes the expected labor cost for this day and keeps it from coming back from the roster template.`;
+    if (!window.confirm(message)) return;
+    createShift.mutate(
+      sanitizeShiftPayload({
+        employee_id: employee.id,
+        employee_name: employee.name,
+        date: dateStr,
+        start_time: shiftForm.start_time || templateStart || "09:00",
+        end_time: shiftForm.end_time || templateEnd || "17:00",
+        hours_worked: 0,
+        amount: 0,
+        status: "completed",
+        notes: `${REMOVED_SHIFT_NOTE} Removed workday/template shift ${new Date().toISOString()}`,
+      }),
+    );
   };
 
   const autoCreateShiftsForWeek = async (employee, payload) => {
@@ -1074,9 +1195,12 @@ export default function EmployeeCalendar() {
                   const dayShifts = getShiftsForDay(day);
                   const isToday = isSameDay(day, new Date());
                   const isScheduledWeekday = anyActiveEmployeeWorksOnCalendarDate(activeEmployees, day);
+                  const dayStr = format(day, "yyyy-MM-dd");
                   const hasTemplateEmployeeShift =
                     templateEmployee &&
-                    dayShifts.some((s) => s.employee_id === templateEmployee.id && s.status !== "cancelled");
+                    shifts.some(
+                      (s) => s.date === dayStr && s.employee_id === templateEmployee.id && s.status !== "cancelled",
+                    );
                   const showTemplateRosterHint =
                     Boolean(templateEmployee) &&
                     employeeWorksOnCalendarDate(templateEmployee, day) &&
@@ -1112,17 +1236,19 @@ export default function EmployeeCalendar() {
                       </CardHeader>
                       <CardContent className="min-h-[140px] space-y-2 p-2">
                         {showTemplateRosterHint && (
-                          <div
-                            className="rounded-lg border border-dashed border-yellow-500/30 bg-black/25 px-2 py-1.5 text-center"
+                          <button
+                            type="button"
+                            onClick={() => openTemplateShiftDialog(day, templateEmployee)}
+                            className="w-full rounded-lg border border-dashed border-yellow-400/50 bg-yellow-400/10 px-2 py-1.5 text-center transition-colors hover:border-yellow-300/70 hover:bg-yellow-400/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/60"
                             title="Workday for the employee selected in Weekly template — no shift row yet. Use Create shifts or + below."
                           >
-                            <p className="truncate text-[11px] font-medium leading-tight text-gray-200">
+                            <p className="truncate text-[11px] font-semibold leading-tight text-yellow-50">
                               {templateEmployee.name}
                             </p>
-                            <p className="text-[10px] tabular-nums text-gray-500">
+                            <p className="text-[10px] font-medium tabular-nums text-gray-200">
                               {formatShiftClock(templateStart)}–{formatShiftClock(templateEnd)}
                             </p>
-                          </div>
+                          </button>
                         )}
                         <div className="space-y-1.5">
                           {dayShifts.map((shift) => (
@@ -1131,22 +1257,22 @@ export default function EmployeeCalendar() {
                               type="button"
                               onClick={() => openShiftDialog(day, shift)}
                               className={cn(
-                                "w-full rounded-lg border px-2 py-1.5 text-left transition-all hover:brightness-110",
-                                shift.status === "paid" && "border-yellow-400/45 bg-yellow-400/15",
-                                shift.status === "completed" && "border-yellow-500/25 bg-yellow-400/8",
-                                shift.status === "cancelled" && "border-white/10 bg-black/30 opacity-50",
-                                shift.status === "scheduled" && "border-yellow-500/20 bg-yellow-400/8",
+                                "w-full rounded-lg border px-2 py-1.5 text-left transition-all hover:border-yellow-300/70 hover:bg-yellow-400/18 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/60",
+                                shift.status === "paid" && "border-yellow-400/55 bg-yellow-400/20",
+                                shift.status === "completed" && "border-yellow-400/40 bg-yellow-400/14",
+                                shift.status === "cancelled" && "border-white/15 bg-black/30 opacity-60",
+                                shift.status === "scheduled" && "border-yellow-400/40 bg-yellow-400/14",
                               )}
                             >
-                              <div className="truncate text-[11px] leading-snug text-gray-100">
-                                <span className="font-medium">{shift.employee_name}</span>
+                              <div className="truncate text-[11px] font-semibold leading-snug text-yellow-50">
+                                <span>{shift.employee_name}</span>
                                 <span className="text-gray-600"> · </span>
-                                <span className="tabular-nums text-gray-400">
+                                <span className="font-medium tabular-nums text-gray-100">
                                   {formatShiftClock(shift.start_time)}–{formatShiftClock(shift.end_time)}
                                 </span>
                               </div>
                               <div className="mt-0.5 flex items-center justify-between gap-1">
-                                <span className="text-[10px] font-semibold tabular-nums text-yellow-500/80">
+                                <span className="text-[10px] font-bold tabular-nums text-yellow-200">
                                   {formatMx(shift.amount)}
                                 </span>
                                 {shift.status === "paid" && (
@@ -1213,8 +1339,16 @@ export default function EmployeeCalendar() {
                           key={day.toISOString()}
                           type="button"
                           onClick={() => {
+                            if (stats.list.length > 0) {
+                              openShiftDialog(day, stats.list[0]);
+                              return;
+                            }
                             setCurrentWeekStart(startOfWeek(day, { weekStartsOn: 1 }));
                             setScheduleView("week");
+                            if (showMonthTemplateRoster) {
+                              openTemplateShiftDialog(day, templateEmployee);
+                              return;
+                            }
                             openShiftDialog(day);
                           }}
                           className={cn(
@@ -1298,6 +1432,15 @@ export default function EmployeeCalendar() {
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="text-lg font-bold text-yellow-200">{formatMx(shift.amount)}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openShiftDialog(new Date(`${shift.date}T12:00:00`), shift)}
+                            className="rounded-lg border-yellow-400/45 bg-[#252014] font-semibold text-yellow-50 hover:bg-yellow-400/15 hover:text-yellow-100"
+                          >
+                            <Edit className="mr-2 h-4 w-4" /> Open
+                          </Button>
                           {shift.status === "scheduled" && (
                             <Button
                               size="sm"
@@ -1310,6 +1453,15 @@ export default function EmployeeCalendar() {
                           {shift.status === "paid" && (
                             <Badge className="border-0 bg-yellow-400 text-black">Paid</Badge>
                           )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => requestDeleteShift(shift, new Date(`${shift.date}T12:00:00`))}
+                            className="rounded-lg border-red-500/45 bg-red-950/20 font-semibold text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </Button>
                         </div>
                       </div>
                     ))
@@ -1654,16 +1806,37 @@ export default function EmployeeCalendar() {
       </Dialog>
 
       <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
-        <DialogContent className="max-w-md border border-yellow-500/20 bg-[#141210] text-gray-100 shadow-2xl">
+        <DialogContent className="max-w-lg border border-yellow-400/35 bg-[#181610] text-gray-100 shadow-2xl shadow-black/60">
           <DialogHeader>
-            <DialogTitle className="text-yellow-100">
+            <DialogTitle className="text-2xl font-bold text-yellow-50">
               {editingShift ? "Edit shift" : "New shift"} —{" "}
               {selectedDate && formatMexicoLongDateEn(selectedDate)}
             </DialogTitle>
+            <DialogDescription className="text-sm font-medium text-gray-300">
+              {editingShift ? "Update this shift or delete it from labor costs." : "Create a scheduled shift for this day."}
+            </DialogDescription>
           </DialogHeader>
+          {editingShift && (
+            <div className="grid gap-2 rounded-lg border border-yellow-400/40 bg-yellow-400/10 px-3 py-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-300/70">Employee</p>
+                <p className="mt-1 font-semibold text-yellow-50">{editingShift.employee_name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-300/70">Time</p>
+                <p className="mt-1 font-semibold tabular-nums text-gray-100">
+                  {formatShiftClock(editingShift.start_time)}-{formatShiftClock(editingShift.end_time)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-300/70">Cost</p>
+                <p className="mt-1 font-semibold tabular-nums text-yellow-100">{formatMx(editingShift.amount)}</p>
+              </div>
+            </div>
+          )}
           <form onSubmit={handleShiftSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-gray-300">Employee *</Label>
+              <Label className="font-semibold text-gray-100">Employee *</Label>
               <Select value={shiftForm.employee_id} onValueChange={handleEmployeeSelect}>
                 <SelectTrigger className={calendarFieldClass}>
                   <SelectValue placeholder="Select…" />
@@ -1679,7 +1852,7 @@ export default function EmployeeCalendar() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-gray-300">Start</Label>
+                <Label className="font-semibold text-gray-100">Start</Label>
                 <Input
                   type="time"
                   value={shiftForm.start_time}
@@ -1688,7 +1861,7 @@ export default function EmployeeCalendar() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">End</Label>
+                <Label className="font-semibold text-gray-100">End</Label>
                 <Input
                   type="time"
                   value={shiftForm.end_time}
@@ -1699,7 +1872,7 @@ export default function EmployeeCalendar() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-gray-300">Hours</Label>
+                <Label className="font-semibold text-gray-100">Hours</Label>
                 <Input
                   type="number"
                   step="0.5"
@@ -1717,7 +1890,7 @@ export default function EmployeeCalendar() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Amount (MXN)</Label>
+                <Label className="font-semibold text-gray-100">Amount (MXN)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -1734,12 +1907,12 @@ export default function EmployeeCalendar() {
               variant="outline"
               size="sm"
               onClick={syncAmountFromEmployee}
-              className="w-full border-yellow-500/30 text-yellow-200 hover:bg-yellow-400/10"
+              className="w-full border-yellow-400/45 bg-[#252014] font-semibold text-yellow-50 hover:bg-yellow-400/15 hover:text-yellow-100"
             >
               Sync amount from daily wage / hourly rate
             </Button>
             <div className="space-y-2">
-              <Label className="text-gray-300">Notes</Label>
+              <Label className="font-semibold text-gray-100">Notes</Label>
               <Textarea
                 value={shiftForm.notes}
                 onChange={(e) => setShiftForm({ ...shiftForm, notes: e.target.value })}
@@ -1747,43 +1920,47 @@ export default function EmployeeCalendar() {
                 className={cn(calendarFieldClass, "min-h-[72px]")}
               />
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={resetShiftForm} className="flex-1 border-yellow-500/30">
+            <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetShiftForm}
+                className="flex-1 border-yellow-400/45 bg-[#252014] font-semibold text-yellow-50 hover:bg-yellow-400/15 hover:text-yellow-100"
+              >
                 Cancel
               </Button>
-              {editingShift && editingShift.status !== "paid" && (
+              {editingShift && (
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-red-500/40 text-red-400 hover:bg-red-500/10"
-                  onClick={() => {
-                    const hasWorkDay = (() => {
-                      const emp = employees.find((e) => e.id === editingShift.employee_id);
-                      if (!emp) return false;
-                      return employeeWorksOnCalendarDate(emp, selectedDate || new Date(editingShift.date + "T12:00:00"));
-                    })();
-                    if (hasWorkDay) {
-                      const choice = window.confirm(
-                        "This employee has this weekday as a workday.\n\n• OK = Cancel shift (keeps day as 'off' — no wage in cash/dashboard)\n• Cancel = Delete shift row entirely (wage may reappear from workday template)"
-                      );
-                      if (choice) {
-                        updateShift.mutate(
-                          { id: editingShift.id, data: sanitizeShiftPayload({ ...editingShift, status: "cancelled" }) },
-                          { onSuccess: resetShiftForm },
-                        );
-                      } else {
-                        deleteShift.mutate(editingShift.id);
-                        resetShiftForm();
-                      }
-                    } else {
-                      deleteShift.mutate(editingShift.id);
-                      resetShiftForm();
-                    }
-                  }}
+                  className="flex-1 gap-2 border-red-500/55 bg-red-950/20 font-semibold text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                  onClick={() => requestDeleteShift(editingShift)}
                 >
                   <Trash2 className="h-4 w-4" />
+                  {editingShift.status === "paid"
+                    ? "Delete registered shift"
+                    : editingShift.status === "scheduled"
+                      ? "Delete scheduled shift"
+                      : "Delete shift"}
                 </Button>
               )}
+              {!editingShift &&
+                shiftForm.employee_id &&
+                selectedDate &&
+                employeeWorksOnCalendarDate(
+                  employees.find((e) => e.id === shiftForm.employee_id),
+                  selectedDate,
+                ) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 gap-2 border-red-500/55 bg-red-950/20 font-semibold text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                    onClick={requestRemoveTemplateShift}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete workday shift
+                  </Button>
+                )}
               <Button type="submit" className="flex-1 bg-yellow-400 font-semibold text-black hover:bg-yellow-300">
                 {editingShift ? "Save" : "Create"}
               </Button>

@@ -636,6 +636,11 @@ export default function Statistics() {
     return [...rows].sort((a, b) => b.mergedPosNet - a.mergedPosNet).slice(0, 10);
   }, [dailyLedgerRows]);
 
+  const topSellingDaySlots = useMemo(
+    () => Array.from({ length: 10 }, (_, i) => topSellingDays[i] || null),
+    [topSellingDays],
+  );
+
   const mergedSalesRhythm = useMemo(() => {
     const events = statsView === "daily" ? dayCanonical : canonicalCurrent;
     const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, revenue: 0, count: 0 }));
@@ -1005,38 +1010,51 @@ export default function Statistics() {
           </div>
         )}
 
-        {(statsView === "monthly" || statsView === "yearly") && topSellingDays.length > 0 && (
+        {(statsView === "monthly" || statsView === "yearly") && (
           <div className={STATS_STRIP_CLASS}>
             <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-yellow-500/55">
-              Best calendar days (merged POS · up to 10)
+              Best calendar days (merged POS - 1-10)
             </p>
-            <ol className="grid gap-2 sm:grid-cols-2">
-              {topSellingDays.map((row, i) => {
-                const wdShort = formatMexicoWeekdayShortFromDateKey(row.dateIso);
-                return (
-                  <li
-                    key={row.dateIso}
-                    className="flex items-center justify-between gap-3 border-b border-yellow-500/10 pb-2 text-sm last:border-0 last:pb-0 sm:last:border-b sm:last:pb-2"
-                  >
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="shrink-0 text-yellow-500/50">{i + 1}.</span>
-                      <time
-                        dateTime={row.dateIso}
-                        className="shrink-0 font-mono text-xs tabular-nums tracking-tight text-gray-400"
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              {[topSellingDaySlots.slice(0, 5), topSellingDaySlots.slice(5, 10)].map((column, columnIndex) => (
+                <ol key={columnIndex} className="space-y-2">
+                  {column.map((row, slotIndex) => {
+                    const rank = columnIndex * 5 + slotIndex + 1;
+                    const wdShort = row ? formatMexicoWeekdayShortFromDateKey(row.dateIso) : "";
+                    return (
+                      <li
+                        key={row?.dateIso || `empty-day-rank-${rank}`}
+                        className="flex min-h-9 items-center justify-between gap-3 border-b border-yellow-500/10 pb-2 text-sm"
                       >
-                        {row.dateIso}
-                      </time>
-                      {wdShort ? (
-                        <span className="rounded-md border border-yellow-400/35 bg-yellow-400/[0.09] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yellow-200/95">
-                          {wdShort}
-                        </span>
-                      ) : null}
-                    </div>
-                    <span className="shrink-0 tabular-nums font-medium text-yellow-200/90">{formatCurrency(row.mergedPosNet)}</span>
-                  </li>
-                );
-              })}
-            </ol>
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="shrink-0 text-yellow-500/50">{rank}.</span>
+                          {row ? (
+                            <>
+                              <time
+                                dateTime={row.dateIso}
+                                className="shrink-0 font-mono text-xs tabular-nums tracking-tight text-gray-400"
+                              >
+                                {row.dateIso}
+                              </time>
+                              {wdShort ? (
+                                <span className="rounded-md border border-yellow-400/35 bg-yellow-400/[0.09] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yellow-200/95">
+                                  {wdShort}
+                                </span>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </div>
+                        {row ? (
+                          <span className="shrink-0 tabular-nums font-medium text-yellow-200/90">
+                            {formatCurrency(row.mergedPosNet)}
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+              ))}
+            </div>
           </div>
         )}
 

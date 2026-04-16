@@ -58,6 +58,17 @@ function escapeCsvField(value) {
   return s;
 }
 
+function parseDecimalInput(value, fallback = 0) {
+  const n = parseFloat(String(value ?? "").trim().replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatMoneyCompact(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return "0";
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 /** Strip server fields so a deleted row can be re-created with the same data */
 function shoppingListCreatePayloadFromRow(row) {
   const { id: _id, created_date: _c, updated_date: _u, ...rest } = row;
@@ -478,6 +489,9 @@ export default function ShoppingList() {
     e.preventDefault();
     const payload = {
       ...formData,
+      quantity: parseDecimalInput(formData.quantity, 0),
+      actual_cost: parseDecimalInput(formData.actual_cost, 0),
+      estimated_cost: parseDecimalInput(formData.estimated_cost, 0),
       priority: "medium",
       ...(editingItem ? {} : { status: "pending" }),
     };
@@ -494,7 +508,7 @@ export default function ShoppingList() {
   };
 
   const handleQuickLogPurchase = async () => {
-    const amount = parseFloat(quickAmount);
+    const amount = parseDecimalInput(quickAmount, NaN);
     if (!Number.isFinite(amount) || amount <= 0) {
       alert("Enter a valid amount greater than zero.");
       return;
@@ -623,7 +637,7 @@ export default function ShoppingList() {
 
   const readPurchaseAmountForItem = (item) => {
     const raw = amountDraftById[item.id];
-    const n = parseFloat(String(raw ?? "").replace(",", "."));
+    const n = parseDecimalInput(raw, NaN);
     if (Number.isFinite(n) && n >= 0) return n;
     return Number(item.estimated_cost || 0) || 0;
   };
@@ -680,7 +694,7 @@ export default function ShoppingList() {
 
   const commitPendingRowEstimatedCost = async (item) => {
     const raw = amountDraftById[item.id];
-    const n = parseFloat(String(raw ?? "").replace(",", "."));
+    const n = parseDecimalInput(raw, NaN);
     if (!Number.isFinite(n) || n < 0) return;
     if (Math.abs(n - Number(item.estimated_cost || 0)) < 0.005) return;
     try {
@@ -697,9 +711,9 @@ export default function ShoppingList() {
     const headers = ["Purchase", "Sum (MXN)", "Date (ISO)"];
     const rows = registeredPurchasesForMonth;
     const dataLines = rows.map((r) =>
-      [r.name, r.amount.toFixed(2), r.dateIso].map(escapeCsvField).join(","),
+      [r.name, formatMoneyCompact(r.amount), r.dateIso].map(escapeCsvField).join(","),
     );
-    const totalLine = ["TOTAL", registeredPurchasesMonthTotal.toFixed(2), ""].map(escapeCsvField).join(",");
+    const totalLine = ["TOTAL", formatMoneyCompact(registeredPurchasesMonthTotal), ""].map(escapeCsvField).join(",");
     const csv = `\uFEFF${[headers.map(escapeCsvField).join(","), ...dataLines, totalLine].join("\r\n")}`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -798,7 +812,7 @@ export default function ShoppingList() {
             <h2 className="text-sm font-bold text-yellow-400">Your list</h2>
             <p className="mt-1 text-xs text-gray-500">
               {pendingItems.length} to buy
-              {totalEstimatedCost > 0 ? ` · $${totalEstimatedCost.toFixed(2)} MXN estimated` : ""}
+              {totalEstimatedCost > 0 ? ` · $${formatMoneyCompact(totalEstimatedCost)} MXN estimated` : ""}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -909,13 +923,12 @@ export default function ShoppingList() {
                       </Label>
                       <Input
                         id="quantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         required
                         value={formData.quantity}
                         onChange={(e) =>
-                          setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })
+                          setFormData({ ...formData, quantity: e.target.value })
                         }
                         className="h-9 border-yellow-500/20 bg-[#1a1a1a] text-white [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
@@ -1014,14 +1027,13 @@ export default function ShoppingList() {
                       </Label>
                       <Input
                         id="actual_cost"
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={formData.actual_cost || ""}
                         onChange={(e) =>
-                          setFormData({ ...formData, actual_cost: parseFloat(e.target.value) || 0 })
+                          setFormData({ ...formData, actual_cost: e.target.value })
                         }
-                        placeholder="0.00"
+                        placeholder="0"
                         className="h-9 max-w-[12rem] border-yellow-500/20 bg-[#1a1a1a] text-white [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
@@ -1158,10 +1170,8 @@ export default function ShoppingList() {
                       </td>
                       <td className="w-[7rem] min-w-[6.5rem] px-1 py-1.5 align-middle">
                         <Input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="0.01"
-                          min="0"
                           aria-label={`Amount for ${item.item_name}`}
                           value={amountDraftById[item.id] ?? ""}
                           onChange={(e) =>
@@ -1348,13 +1358,11 @@ export default function ShoppingList() {
                     <Label className="text-xs font-medium text-gray-400">2 — Amount paid (MXN)</Label>
                     <Input
                       ref={quickAmountInputRef}
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.01"
-                      min="0"
                       value={quickAmount}
                       onChange={(e) => setQuickAmount(e.target.value)}
-                      placeholder="0.00"
+                      placeholder="0"
                       className={cn(
                         "border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500 [appearance:textfield] [-moz-appearance:textfield]",
                         "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
@@ -1476,7 +1484,7 @@ export default function ShoppingList() {
                           className="flex items-center justify-between gap-3 border-b border-yellow-500/5 pb-1.5 last:border-0 last:pb-0"
                         >
                           <span className="min-w-0 truncate text-gray-300">{e.name}</span>
-                          <span className="shrink-0 tabular-nums font-medium text-yellow-400/90">${e.amount.toFixed(2)} MXN</span>
+                          <span className="shrink-0 tabular-nums font-medium text-yellow-400/90">${formatMoneyCompact(e.amount)} MXN</span>
                         </li>
                       ))}
                     </ul>
@@ -1604,7 +1612,7 @@ export default function ShoppingList() {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold tabular-nums tracking-tight text-yellow-300 sm:text-3xl">
-                          ${registeredPurchasesMonthTotal.toFixed(2)}
+                          ${formatMoneyCompact(registeredPurchasesMonthTotal)}
                           <span className="ml-1.5 text-sm font-medium text-yellow-500/65">MXN</span>
                         </p>
                       </div>
@@ -1671,7 +1679,7 @@ export default function ShoppingList() {
                                   onClick={() => startEditingRegisteredAmount(r)}
                                   className="min-h-8 w-full min-w-[5.5rem] rounded border border-transparent px-2 py-1 text-right font-mono tabular-nums text-amber-200/90 transition-colors hover:border-yellow-500/35 hover:bg-yellow-500/10"
                                 >
-                                  ${r.amount.toFixed(2)}
+                                  ${formatMoneyCompact(r.amount)}
                                 </button>
                               )}
                             </td>
@@ -1725,7 +1733,7 @@ export default function ShoppingList() {
                         <tr className="border-t border-yellow-500/30 bg-yellow-500/[0.08] text-sm font-semibold text-yellow-100">
                           <td className="border-r border-yellow-500/20 px-3 py-2.5">Month total</td>
                           <td className="border-r border-yellow-500/20 px-3 py-2.5 text-right font-mono tabular-nums">
-                            ${registeredPurchasesMonthTotal.toFixed(2)}
+                            ${formatMoneyCompact(registeredPurchasesMonthTotal)}
                           </td>
                           <td className="border-r border-yellow-500/20 px-3 py-2.5 text-gray-500" />
                           <td className="px-1 py-2.5" />

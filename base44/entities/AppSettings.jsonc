@@ -123,6 +123,10 @@
       "type": "string",
       "default": "https://api.loyverse.com/v1.0",
       "description": "URL base de la API de Loyverse"
+    },
+    "customer_events_json": {
+      "type": "string",
+      "description": "JSON array of customer-facing events created in the admin Events page"
     }
   },
   "required": [

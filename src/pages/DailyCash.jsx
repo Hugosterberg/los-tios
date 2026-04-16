@@ -52,6 +52,7 @@ import {
   getEarliestOpeningInMexicoMonth,
   getManualLines,
   getOpeningBalance,
+  getOpeningCountMeta,
   listOpeningCountDiffs,
   recordOpeningCountDiff,
   removeManualLine,
@@ -486,8 +487,6 @@ export default function DailyCash() {
   const [selectedDate, setSelectedDate] = useState(() => dateFromMexicoDateKey(getMexicoNowDateKey()));
   const [periodMode, setPeriodMode] = useState(/** @type {"today" | "month"} */ ("today"));
   const prevPeriodMode = useRef(periodMode);
-  /** Prevents re-filling start cash after user clears the field for the same day / same expected close. */
-  const openingAutoFillSigRef = useRef("");
 
   useEffect(() => {
     if (periodMode === "today" && prevPeriodMode.current !== "today") {
@@ -568,6 +567,7 @@ export default function DailyCash() {
   }, [formDayStr, periodMode, loyverseWindowKey]);
 
   const [openingInput, setOpeningInput] = useState("");
+  const [openingComment, setOpeningComment] = useState("");
   const [storeTick, setStoreTick] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -706,6 +706,7 @@ export default function DailyCash() {
   }, [periodMode, formDayStr, loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick]);
 
   useEffect(() => {
+    setOpeningComment("");
     if (periodMode === "month") {
       setOpeningInput(monthEarliestOpening === null ? "" : String(monthEarliestOpening.value));
       return;
@@ -718,60 +719,43 @@ export default function DailyCash() {
     }
   }, [formDayStr, storeTick, periodMode, monthEarliestOpening]);
 
-  /** No saved opening: pre-fill from prior drawer close; allow user to clear without immediate re-fill for same expected amount. */
-  useEffect(() => {
-    if (periodMode !== "today") return;
-    if (getOpeningBalance(formDayStr) !== null) return;
-    if (!priorDrawerClose || !Number.isFinite(priorDrawerClose.end)) return;
-    const sig = `${formDayStr}|${priorDrawerClose.closeDayStr}|${priorDrawerClose.end}`;
-    setOpeningInput((prev) => {
-      const p = String(prev).trim();
-      if (p !== "") return prev;
-      if (openingAutoFillSigRef.current === sig) return prev;
-      openingAutoFillSigRef.current = sig;
-      return String(priorDrawerClose.end);
-    });
-  }, [periodMode, formDayStr, priorDrawerClose?.end, priorDrawerClose?.closeDayStr]);
-
   const openingCountDiffHistory = useMemo(() => listOpeningCountDiffs(), [storeTick]);
 
   const persistOpening = useCallback(() => {
     const trimmed = openingInput.trim();
+    const trimmedComment = openingComment.trim();
     const oldPersisted = getOpeningBalance(formDayStr);
-    let newPersisted = oldPersisted;
     if (trimmed === "") {
       setOpeningBalance(formDayStr, null);
-      newPersisted = null;
+      setOpeningComment("");
+      setStoreTick((t) => t + 1);
+      return;
     } else {
       const n = parseFloat(trimmed.replace(",", "."));
       if (Number.isFinite(n)) {
-        setOpeningBalance(formDayStr, n);
-        newPersisted = n;
-      }
-    }
-    if (
-      periodMode === "today" &&
-      priorDrawerClose != null &&
-      newPersisted != null &&
-      Number.isFinite(newPersisted) &&
-      Number.isFinite(priorDrawerClose.end) &&
-      oldPersisted !== newPersisted
-    ) {
-      const diff = newPersisted - priorDrawerClose.end;
-      if (Math.abs(diff) >= 0.005) {
-        recordOpeningCountDiff({
-          dateKey: formDayStr,
-          priorCloseDayStr: priorDrawerClose.closeDayStr,
-          expectedEnd: priorDrawerClose.end,
-          enteredOpening: newPersisted,
-          diff,
-        });
+        const expectedEnd =
+          periodMode === "today" && priorDrawerClose != null && Number.isFinite(priorDrawerClose.end)
+            ? priorDrawerClose.end
+            : null;
+        const diff = expectedEnd === null ? null : n - expectedEnd;
+        if (oldPersisted !== n || trimmedComment !== "") {
+          recordOpeningCountDiff({
+            dateKey: formDayStr,
+            priorCloseDayStr: priorDrawerClose?.closeDayStr || null,
+            expectedEnd,
+            enteredOpening: n,
+            diff,
+            comment: trimmedComment,
+          });
+          setOpeningComment("");
+        }
       }
     }
     setStoreTick((t) => t + 1);
-  }, [formDayStr, openingInput, periodMode, priorDrawerClose]);
+  }, [formDayStr, openingComment, openingInput, periodMode, priorDrawerClose]);
 
   const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
+  const openingCountMeta = useMemo(() => getOpeningCountMeta(formDayStr), [formDayStr, storeTick]);
 
   const openingDiffVsPriorClose = useMemo(() => {
     if (periodMode !== "today" || priorDrawerClose == null || persistedOpening === null) return null;
@@ -1340,7 +1324,7 @@ export default function DailyCash() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-yellow-500/15 bg-[#161612] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
-              {periodMode === "month" ? "Start cash (month)" : "Start cash"}
+              {periodMode === "month" ? "Manual counting (month)" : "Manual counting"}
             </p>
             <div className="mt-2 flex items-end gap-2">
               <span className="pb-2 text-sm text-gray-500">MXN</span>
@@ -1350,7 +1334,7 @@ export default function DailyCash() {
                 value={openingInput}
                 onChange={(e) => setOpeningInput(e.target.value)}
                 onBlur={persistOpening}
-                placeholder="Count at open"
+                placeholder="Manual count"
                 readOnly={periodMode === "month"}
                 className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600 read-only:cursor-default read-only:opacity-90"
               />
@@ -1360,24 +1344,37 @@ export default function DailyCash() {
                 <p>
                   {monthEarliestOpening ? (
                     <>
-                      Earliest opening saved this month:{" "}
+                      Earliest manual count saved this month:{" "}
                       <span className="tabular-nums text-gray-400">{formatMexicoDateShort(monthEarliestOpening.dateKey)}</span>
                       . Use Today to edit a specific day.
                     </>
                   ) : (
-                    "No opening balance saved for any day in this month (Mexico calendar). Use Today to add one."
+                    "No manual counting saved for any day in this month (Mexico calendar). Use Today to add one."
                   )}
                 </p>
               ) : (
                 <>
+                  {persistedOpening === null ? (
+                    <p className="font-medium text-amber-300/90">Manual counting not done this day.</p>
+                  ) : (
+                    <p>
+                      Updated cash from manual count at{" "}
+                      <span className="font-medium tabular-nums text-gray-300">
+                        {formatMexicoDateShort(openingCountMeta?.updatedAt?.slice(0, 10) || formDayStr)}{" "}
+                        {formatMexicoTime(openingCountMeta?.updatedAt)}
+                      </span>
+                      . End cash = manual count + net for the day.
+                    </p>
+                  )}
                   <p>
-                    Saved locally for {formDayStr}. With no saved count, the field pre-fills from{" "}
-                    <strong className="font-medium text-gray-400">latest calculated</strong> prior close — edit to match your
-                    physical count, then blur to save. End cash = start + net for the day.
+                    Enter the exact physical cash count for {formDayStr}. Saving a number records the update time and compares it
+                    with the calculated expected value.
                   </p>
-                  {persistedOpening === null && priorDrawerClose ? (
+                  {priorDrawerClose ? (
                     <div className="border-t border-yellow-500/10 pt-2">
-                      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">Latest calculated</p>
+                      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                        Expected from calculations
+                      </p>
                       <p className="mt-1 text-sm font-semibold tabular-nums text-yellow-100/90">{formatMx(priorDrawerClose.end)}</p>
                       <p className="mt-0.5 text-[10px] text-gray-500">
                         Prior drawer close ·{" "}
@@ -1397,6 +1394,19 @@ export default function DailyCash() {
                       {formatMx(openingDiffVsPriorClose)}
                     </p>
                   ) : null}
+                  <div className="pt-1">
+                    <Label className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      Comment (optional)
+                    </Label>
+                    <Input
+                      type="text"
+                      value={openingComment}
+                      onChange={(e) => setOpeningComment(e.target.value)}
+                      onBlur={persistOpening}
+                      placeholder="Why does it differ?"
+                      className="mt-1 h-9 border-yellow-500/15 bg-[#0f0f0c] text-xs text-gray-200 placeholder:text-gray-600"
+                    />
+                  </div>
                 </>
               )}
             </div>
@@ -1432,10 +1442,10 @@ export default function DailyCash() {
             </p>
             <p className="mt-2 text-[11px] text-yellow-700/80">
               {periodMode === "month"
-                ? "Opening/end apply per day in Today view"
+                ? "Manual counts apply per day in Today view"
                 : totals.opening !== null
-                  ? "Start + net for the day"
-                  : "Set start cash to calculate"}
+                  ? "Manual count + net for the day"
+                  : "Manual counting not done this day"}
             </p>
           </div>
         </div>
@@ -1443,22 +1453,22 @@ export default function DailyCash() {
         {openingCountDiffHistory.length > 0 && (
           <div className="rounded-xl border border-amber-500/20 bg-[#14120c] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">
-              Opening count vs ledger (history)
+              Manual counting difference history
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              Each row is a time you saved a <strong className="font-medium text-gray-400">start cash</strong> that did not match
-              the books-expected amount from the last day we had an opening + that day&apos;s drawer net (same anchor as &quot;vs
-              prior close&quot;). Positive = you counted more cash than expected; negative = less. Stored in this browser only.
+              Each row is a saved manual cash count with the calculated expected value, the actual count entered, and the
+              difference. Add an optional comment when you want to explain why it differs. Stored in this browser only.
             </p>
             <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-yellow-500/15">
-              <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
+              <table className="w-full min-w-[820px] border-collapse text-left text-[11px]">
                 <thead>
                   <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
-                    <th className="px-2 py-2">Logged</th>
-                    <th className="px-2 py-2">Opening day</th>
-                    <th className="px-2 py-2">Prior ledger day</th>
+                    <th className="px-2 py-2">Updated</th>
+                    <th className="px-2 py-2">Count day</th>
+                    <th className="px-2 py-2">Expected source</th>
+                    <th className="px-2 py-2">Comment</th>
                     <th className="px-2 py-2 text-right">Expected</th>
-                    <th className="px-2 py-2 text-right">You counted</th>
+                    <th className="px-2 py-2 text-right">Actual manual</th>
                     <th className="px-2 py-2 text-right">Diff</th>
                   </tr>
                 </thead>
@@ -1470,9 +1480,14 @@ export default function DailyCash() {
                         <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">{ev.priorCloseDayStr}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
+                        {ev.priorCloseDayStr || "No prior close"}
+                      </td>
+                      <td className="max-w-[240px] px-2 py-1.5 text-gray-400">
+                        {ev.comment ? ev.comment : <span className="text-gray-700">-</span>}
+                      </td>
                       <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
-                        {formatMx(ev.expectedEnd)}
+                        {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
                         {formatMx(ev.enteredOpening)}
@@ -1480,11 +1495,14 @@ export default function DailyCash() {
                       <td
                         className={cn(
                           "px-2 py-1.5 text-right font-mono font-medium tabular-nums",
-                          ev.diff > 0 ? "text-emerald-400/90" : "text-rose-400/90",
+                          ev.diff == null
+                            ? "text-gray-500"
+                            : ev.diff > 0
+                              ? "text-emerald-400/90"
+                              : "text-rose-400/90",
                         )}
                       >
-                        {ev.diff > 0 ? "+" : ""}
-                        {formatMx(ev.diff)}
+                        {ev.diff == null ? "-" : `${ev.diff > 0 ? "+" : ""}${formatMx(ev.diff)}`}
                       </td>
                     </tr>
                   ))}

@@ -1,7 +1,7 @@
 import { eachDayOfInterval, format, getISODay, parseISO } from "date-fns";
 
-/** Persisted at end of notes: ISO weekdays 1=Mon … 7=Sun */
-export const WORK_DAYS_NOTE_RE = /\[lt_work_days:([0-7,]+)\]\s*$/;
+/** Persisted in notes as a schema-compatible fallback: ISO weekdays 1=Mon ... 7=Sun */
+export const WORK_DAYS_NOTE_RE = /\[lt_work_days:([0-7,]+)\]/;
 
 /** Persisted at end of notes after work_days: default shift window for templates / accrual */
 export const WORK_HOURS_NOTE_RE = /\[lt_default_hours:([^\]]+)\]\s*$/;
@@ -88,7 +88,6 @@ export function anyActiveEmployeeWorksOnCalendarDate(employees, day) {
 export function stripWorkDaysTag(notes) {
   return String(notes || "")
     .replace(/\[lt_work_days:[0-7,]+\]/gi, "")
-    .replace(WORK_DAYS_NOTE_RE, "")
     .replace(/\s+/g, " ")
     .trim();
 }

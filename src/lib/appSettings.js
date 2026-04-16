@@ -41,6 +41,8 @@ export const DEFAULT_APP_SETTINGS = {
   revolut_access_token: "",
   /** Optional: limit transaction list to one business account UUID (from GET /accounts). */
   revolut_account_id: "",
+  /** JSON array of customer-facing events created from the admin Events page. */
+  customer_events_json: "",
 };
 
 export const INTEGRATION_SETTINGS_SECTIONS = [

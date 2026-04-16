@@ -12,6 +12,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import EventShareButtons from "@/components/EventShareButtons";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { createOrderEntity } from "@/lib/local-dev-orders";
+import {
+  eventDateLabel,
+  isCustomerEventPast,
+  listLocalCustomerEvents,
+  normalizeEventButtons,
+  parseCustomerEvents,
+} from "@/lib/customerEvents";
 import losTiosLogo from "@/assets/los-tios-logo.png";
 
 export default function CustomerOrder() {
@@ -55,6 +62,9 @@ export default function CustomerOrder() {
     accept_card: true,
     clip_payment_link: "",
   };
+  const adminCustomerEvents = [...parseCustomerEvents(appSettings), ...listLocalCustomerEvents()].filter(
+    (event, index, events) => event?.id && events.findIndex((candidate) => candidate?.id === event.id) === index,
+  );
 
   const createOrder = useMutation({
     mutationFn: (data) => createOrderEntity(data, (payload) => base44.entities.Order.create(payload)),
@@ -1068,6 +1078,65 @@ export default function CustomerOrder() {
                   </div>
                 </div>
               </div>
+              {adminCustomerEvents.length > 0 && (
+                <>
+                  {adminCustomerEvents
+                    .slice()
+                    .sort((a, b) => String(a.startDate || "").localeCompare(String(b.startDate || "")))
+                    .map((event) => {
+                      const isPast = isCustomerEventPast(event);
+                      const esButtons = normalizeEventButtons(event.buttonsEs, "es");
+                      const enButtons = normalizeEventButtons(event.buttonsEn, "en");
+                      const cardClass = isPast
+                        ? "bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale"
+                        : "bg-[#242424] border-yellow-500/30";
+                      return (
+                        <div key={event.id} className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                          <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${cardClass}`}>
+                            <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2 max-w-[8rem]">
+                              <span className="font-black text-2xl leading-none uppercase text-center">{eventDateLabel(event, "es").split(" ")[0]}</span>
+                              <span className="font-bold text-[10px] tracking-widest uppercase leading-tight text-center">{eventDateLabel(event, "es").split(" ").slice(1).join(" ")}</span>
+                            </div>
+                            <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? "text-gray-500" : "text-yellow-400"}`}>ESPANOL</p>
+                            <p className={`text-xs font-bold tracking-widest uppercase mb-4 pr-24 ${isPast ? "text-gray-600" : "text-yellow-400/60"}`}>{event.badgeEs || eventDateLabel(event, "es")}</p>
+                            <h3 className={`text-xl font-black mb-3 pr-20 ${isPast ? "text-gray-400" : "text-white"}`}>{event.titleEs}</h3>
+                            <p className={`leading-relaxed text-sm ${isPast ? "text-gray-600" : "text-gray-300"}`}>{event.descriptionEs}</p>
+                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {esButtons.map(({ emoji, text }) => (
+                                <div key={`${event.id}-es-${text}`} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? "bg-gray-800/50 text-gray-500" : "bg-yellow-400/10 text-yellow-400"}`}>
+                                  <span className="text-base leading-none">{emoji}</span>
+                                  <span className="text-xs text-center leading-tight">{text}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="mt-4 text-xs text-gray-500">{event.location}</p>
+                            <EventShareButtons title={`${event.titleEs} - ${eventDateLabel(event, "es")}`} text={event.descriptionEs} url={`${window.location.origin}/#eventos`} />
+                          </div>
+                          <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${cardClass}`}>
+                            <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2 max-w-[8rem]">
+                              <span className="font-black text-2xl leading-none uppercase text-center">{eventDateLabel(event, "en").split(" ")[0]}</span>
+                              <span className="font-bold text-[10px] tracking-widest uppercase leading-tight text-center">{eventDateLabel(event, "en").split(" ").slice(1).join(" ")}</span>
+                            </div>
+                            <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? "text-gray-500" : "text-yellow-400"}`}>ENGLISH</p>
+                            <p className={`text-xs font-bold tracking-widest uppercase mb-4 pr-24 ${isPast ? "text-gray-600" : "text-yellow-400/60"}`}>{event.badgeEn || eventDateLabel(event, "en")}</p>
+                            <h3 className={`text-xl font-black mb-3 pr-20 ${isPast ? "text-gray-400" : "text-white"}`}>{event.titleEn}</h3>
+                            <p className={`leading-relaxed text-sm ${isPast ? "text-gray-600" : "text-gray-300"}`}>{event.descriptionEn}</p>
+                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {enButtons.map(({ emoji, text }) => (
+                                <div key={`${event.id}-en-${text}`} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? "bg-gray-800/50 text-gray-500" : "bg-yellow-400/10 text-yellow-400"}`}>
+                                  <span className="text-base leading-none">{emoji}</span>
+                                  <span className="text-xs text-center leading-tight">{text}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="mt-4 text-xs text-gray-500">{event.location}</p>
+                            <EventShareButtons title={`${event.titleEn} - ${eventDateLabel(event, "en")}`} text={event.descriptionEn} lang="en" url={`${window.location.origin}/#eventos`} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </>
+              )}
               {!isEventInPast("beerfestcondido") && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>

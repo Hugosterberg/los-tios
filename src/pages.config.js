@@ -15,6 +15,7 @@ import EmployeeCalendar from './pages/EmployeeCalendar';
 import FinanceSummary from './pages/FinanceSummary';
 import DailyCash from './pages/DailyCash';
 import ManagementInsight from './pages/ManagementInsight';
+import Events from './pages/Events';
 import __Layout from './Layout.jsx';
 
 
@@ -36,6 +37,7 @@ export const PAGES = {
     "ManagementInsight": ManagementInsight,
     "CompanyAccount": CompanyAccount,
     "EmployeeCalendar": EmployeeCalendar,
+    "Events": Events,
 }
 
 export const pagesConfig = {

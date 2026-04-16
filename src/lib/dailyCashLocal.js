@@ -8,6 +8,7 @@ const STORAGE_KEY = "los_tios_daily_cash_store_v1";
 
 const defaultStore = () => ({
   openings: {},
+  openingCountMeta: {},
   manualLines: {},
   detailOverrides: {},
   openingDiffEvents: [],
@@ -21,6 +22,8 @@ function readRaw() {
     const p = JSON.parse(raw);
     return {
       openings: typeof p.openings === "object" && p.openings !== null ? p.openings : {},
+      openingCountMeta:
+        typeof p.openingCountMeta === "object" && p.openingCountMeta !== null ? p.openingCountMeta : {},
       manualLines: typeof p.manualLines === "object" && p.manualLines !== null ? p.manualLines : {},
       detailOverrides:
         typeof p.detailOverrides === "object" && p.detailOverrides !== null ? p.detailOverrides : {},
@@ -40,6 +43,11 @@ export function getOpeningBalance(dateKey) {
   const v = readRaw().openings[dateKey];
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+export function getOpeningCountMeta(dateKey) {
+  const raw = readRaw().openingCountMeta?.[dateKey];
+  return raw && typeof raw === "object" ? { ...raw } : null;
 }
 
 /**
@@ -72,10 +80,14 @@ export function setOpeningBalance(dateKey, value) {
   const store = readRaw();
   if (value === null || value === undefined || value === "") {
     delete store.openings[dateKey];
+    delete store.openingCountMeta[dateKey];
   } else {
     const n = Number(value);
     if (Number.isFinite(n)) {
       store.openings[dateKey] = n;
+      store.openingCountMeta[dateKey] = {
+        updatedAt: new Date().toISOString(),
+      };
     }
   }
   writeRaw(store);
@@ -147,26 +159,36 @@ export function updateManualLine(dateKey, lineId, patch) {
 const OPENING_DIFF_CAP = 250;
 
 /**
- * When the counted opening for `dateKey` differs from the ledger-implied prior drawer close.
- * @param {{ dateKey: string, priorCloseDayStr: string, expectedEnd: number, enteredOpening: number, diff: number }} payload
+ * Manual count history for the opening cash drawer.
+ * @param {{ dateKey: string, priorCloseDayStr?: string | null, expectedEnd: number | null, enteredOpening: number, diff: number | null, comment?: string }} payload
  */
 export function recordOpeningCountDiff(payload) {
   const { dateKey, priorCloseDayStr, expectedEnd, enteredOpening, diff } = payload;
-  if (!dateKey || !priorCloseDayStr) return;
-  if (![expectedEnd, enteredOpening, diff].every((x) => typeof x === "number" && Number.isFinite(x))) return;
+  const comment = typeof payload.comment === "string" ? payload.comment.trim() : "";
+  if (!dateKey) return;
+  if (typeof enteredOpening !== "number" || !Number.isFinite(enteredOpening)) return;
+  if (expectedEnd !== null && (typeof expectedEnd !== "number" || !Number.isFinite(expectedEnd))) return;
+  if (diff !== null && (typeof diff !== "number" || !Number.isFinite(diff))) return;
   const store = readRaw();
   if (!Array.isArray(store.openingDiffEvents)) {
     store.openingDiffEvents = [];
   }
+  if (!store.openingCountMeta || typeof store.openingCountMeta !== "object") {
+    store.openingCountMeta = {};
+  }
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const ts = new Date().toISOString();
+  store.openings[dateKey] = enteredOpening;
+  store.openingCountMeta[dateKey] = { updatedAt: ts };
   store.openingDiffEvents.unshift({
     id,
-    ts: new Date().toISOString(),
+    ts,
     dateKey,
-    priorCloseDayStr,
+    priorCloseDayStr: priorCloseDayStr || null,
     expectedEnd,
     enteredOpening,
     diff,
+    comment,
   });
   if (store.openingDiffEvents.length > OPENING_DIFF_CAP) {
     store.openingDiffEvents.length = OPENING_DIFF_CAP;
