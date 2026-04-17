@@ -88,6 +88,7 @@ import {
   getMexicoYearMonthKey,
   matchesMexicoCalendarDay,
   mexicoWallDateTimeToUtcIso,
+  withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
 
 /** Marks rows created from Daily Cash so they can be removed / undone from this page */
@@ -830,7 +831,9 @@ export default function DailyCash() {
 
   const createCompanyTx = useMutation({
     mutationFn: (data) =>
-      useLocalFinance ? localCreateCompanyTransaction(data) : base44.entities.CompanyTransaction.create(data),
+      useLocalFinance
+        ? localCreateCompanyTransaction(data)
+        : base44.entities.CompanyTransaction.create(withMexicoCreatedDateForPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
     },

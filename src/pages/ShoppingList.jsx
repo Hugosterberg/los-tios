@@ -48,6 +48,7 @@ import {
   getMexicoDateKey,
   getMexicoNowDateKey,
   getMexicoNowYearMonth,
+  withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
 
 function escapeCsvField(value) {
@@ -254,7 +255,9 @@ export default function ShoppingList() {
 
   const createExpense = useMutation({
     mutationFn: (data) =>
-      useLocalFinance ? localCreateExpense(data) : base44.entities.Expense.create(data),
+      useLocalFinance
+        ? localCreateExpense(data)
+        : base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
@@ -649,7 +652,7 @@ export default function ShoppingList() {
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getMexicoNowDateKey();
 
     try {
       await updateItem.mutateAsync({
@@ -767,12 +770,11 @@ export default function ShoppingList() {
         <div className="border-b border-amber-500/25 bg-amber-950/35">
           <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
             <p className="text-xs leading-relaxed text-amber-100/90">
-              <span className="font-semibold text-amber-200">Local dev mode.</span> Shopping data and purchases are stored in this browser only — the
-              backend is not configured or is still a placeholder. Add{" "}
+              <span className="font-semibold text-amber-200">Local finance dev mode.</span> Shopping and purchases are stored in
+              this browser only because <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_LOCAL_DEV_FINANCE=true</code>.
+              Remove it or set it to false and configure{" "}
               <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_BASE44_APP_ID</code> and{" "}
-              <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_BASE44_BACKEND_URL</code> in{" "}
-              <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">.env</code> to use the real backend. Set{" "}
-              <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_LOCAL_DEV_FINANCE=false</code> to force API calls in dev once configured.
+              <code className="rounded bg-black/40 px-1 py-0.5 text-[10px]">VITE_BASE44_BACKEND_URL</code> to use the database.
             </p>
           </div>
         </div>

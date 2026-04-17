@@ -1,3 +1,5 @@
+import { getMexicoNowDateKey, mexicoBusinessDayCreatedAtIso } from "@/lib/mexicoTime";
+
 const isBrowser = typeof window !== "undefined";
 
 export const isLocalDevOrdersMode =
@@ -54,12 +56,12 @@ export const createOrderEntity = async (data, remoteCreateFn) => {
     return remoteCreateFn(data);
   }
 
-  const now = new Date().toISOString();
+  const now = mexicoBusinessDayCreatedAtIso(getMexicoNowDateKey());
   const createdOrder = {
     ...data,
     id: createLocalId(),
     created_date: now,
-    updated_date: now,
+    updated_date: new Date().toISOString(),
   };
 
   const orders = [createdOrder, ...readStoredOrders()];

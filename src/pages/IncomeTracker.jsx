@@ -8,12 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Calendar as CalendarIcon } from "lucide-react";
 import { startOfDay, endOfDay } from "date-fns";
-import { formatMexicoLongDateEs } from "@/lib/mexicoTime";
+import { formatMexicoLongDateEs, getMexicoNowDateKey } from "@/lib/mexicoTime";
 import { listOrders } from "@/lib/local-dev-orders";
 import { isLocalFinanceMode, localListCompanyTransactions } from "@/lib/localDevFinance";
 
 export default function IncomeTracker() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getMexicoNowDateKey());
   const useLocalFinance = isLocalFinanceMode();
 
   const { data: orders = [] } = useQuery({

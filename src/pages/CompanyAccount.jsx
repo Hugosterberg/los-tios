@@ -15,6 +15,8 @@ import {
   formatMexicoDateShort,
   formatMexicoLongDateEs,
   formatMexicoMonthDayShort,
+  getMexicoNowDateKey,
+  withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +25,7 @@ import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 
 export default function CompanyAccount() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getMexicoNowDateKey());
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [showContributorForm, setShowContributorForm] = useState(false);
@@ -34,7 +36,7 @@ export default function CompanyAccount() {
     type: "contribution",
     contributor_name: "",
     amount: 0,
-    date: new Date().toISOString().split('T')[0],
+    date: getMexicoNowDateKey(),
     payment_method: "cash",
     description: "",
     notes: "",
@@ -62,7 +64,7 @@ export default function CompanyAccount() {
     unit: "units",
     is_recurring: false,
     recurring_frequency: "monthly",
-    date: new Date().toISOString().split('T')[0],
+    date: getMexicoNowDateKey(),
     notes: "",
     supplier: "",
     payment_source: "company_cash",
@@ -114,7 +116,7 @@ export default function CompanyAccount() {
   });
 
   const createTransaction = useMutation({
-    mutationFn: (data) => base44.entities.CompanyTransaction.create(data),
+    mutationFn: (data) => base44.entities.CompanyTransaction.create(withMexicoCreatedDateForPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
@@ -162,7 +164,7 @@ export default function CompanyAccount() {
   });
 
   const createExpense = useMutation({
-    mutationFn: (data) => base44.entities.Expense.create(data),
+    mutationFn: (data) => base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       resetExpenseForm();
@@ -363,7 +365,7 @@ export default function CompanyAccount() {
       type: "contribution",
       contributor_name: "",
       amount: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: getMexicoNowDateKey(),
       payment_method: "cash",
       description: "",
       notes: "",
@@ -474,7 +476,7 @@ export default function CompanyAccount() {
       unit: "units",
       is_recurring: false,
       recurring_frequency: "monthly",
-      date: new Date().toISOString().split('T')[0],
+      date: getMexicoNowDateKey(),
       notes: "",
       supplier: "",
       payment_source: "company_cash",

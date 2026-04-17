@@ -152,6 +152,43 @@ export function mexicoWallDateTimeToUtcIso(dateKey, timeHHmm) {
   return inst.toISOString();
 }
 
+/** Current HH:mm (24h) in America/Mexico_City — for anchoring "now" on the Mexico wall clock. */
+export function getMexicoNowTimeHHmm() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+
+/**
+ * UTC ISO instant for when a finance row was "recorded": Mexico calendar `dateKey` at Mexico-local time.
+ * Same Mexico day as today → current Mexico clock; backdated days → 12:00 Mexico (stable).
+ */
+export function mexicoBusinessDayCreatedAtIso(dateKey) {
+  if (!isPlainDateKey(dateKey)) return new Date().toISOString();
+  const todayMx = getMexicoNowDateKey();
+  const hhmm = dateKey === todayMx ? getMexicoNowTimeHHmm() : "12:00";
+  return mexicoWallDateTimeToUtcIso(dateKey, hhmm) || new Date().toISOString();
+}
+
+/**
+ * Ensures `created_date` reflects Puerto Escondido (Mexico) local civil time on the business `date` field.
+ * Use when calling remote APIs that accept `created_date` on create.
+ */
+export function withMexicoCreatedDateForPayload(data, { dateField = "date" } = {}) {
+  if (!data || typeof data !== "object") return data;
+  const raw = data[dateField];
+  const dk = isPlainDateKey(raw) ? String(raw).trim().slice(0, 10) : getMexicoNowDateKey();
+  return { ...data, created_date: mexicoBusinessDayCreatedAtIso(dk) };
+}
+
 export function formatMexicoDateTimeSlashed(isoLike, fallback = "—") {
   const d = toDate(isoLike);
   if (!d) return fallback;

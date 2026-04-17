@@ -13,13 +13,12 @@ export default function LocalSetupHelp() {
           </p>
 
           <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-950/25 p-4 text-sm leading-relaxed text-amber-100/95">
-            <p className="font-semibold text-amber-200">Local dev mode.</p>
+            <p className="font-semibold text-amber-200">Backend not reachable from this build.</p>
             <p className="mt-2">
-              Shopping data and purchases are stored in this browser only — the hosted backend is not configured or is still a
-              placeholder. Add the <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_*</code> variables below in{" "}
-              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">.env</code> to use the real API. Set{" "}
-              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_LOCAL_DEV_FINANCE=false</code> to force API calls in
-              dev once configured.
+              Add the <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_*</code> variables below in{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">.env.local</code> so shopping and finance data save to
+              your hosted database. Finance data is only kept in this browser if you set{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-xs">VITE_LOCAL_DEV_FINANCE=true</code> for offline UI work.
             </p>
           </div>
 

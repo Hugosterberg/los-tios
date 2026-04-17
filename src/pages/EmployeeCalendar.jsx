@@ -42,7 +42,7 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatMexicoLongDateEn } from "@/lib/mexicoTime";
+import { formatMexicoLongDateEn, withMexicoCreatedDateForPayload } from "@/lib/mexicoTime";
 import {
   isLocalFinanceMode,
   localListEmployees,
@@ -416,7 +416,10 @@ export default function EmployeeCalendar() {
   });
 
   const createExpense = useMutation({
-    mutationFn: (data) => (useLocalFinance ? localCreateExpense(data) : base44.entities.Expense.create(data)),
+    mutationFn: (data) =>
+      useLocalFinance
+        ? localCreateExpense(data)
+        : base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
@@ -966,9 +969,9 @@ export default function EmployeeCalendar() {
         <div className="border-b border-amber-500/25 bg-amber-950/35">
           <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
             <p className="text-xs leading-relaxed text-amber-100/90">
-              <span className="font-semibold text-amber-200">Local dev mode.</span> Employees and shifts are stored in this
-              browser only. Configure the backend in <code className="rounded bg-black/30 px-1">.env.local</code> to sync with
-              the server.
+              <span className="font-semibold text-amber-200">Local finance dev mode.</span> Employees and shifts are in this
+              browser only because <code className="rounded bg-black/30 px-1">VITE_LOCAL_DEV_FINANCE=true</code>. Turn it off and
+              set Base44 env vars in <code className="rounded bg-black/30 px-1">.env.local</code> to use the database.
             </p>
           </div>
         </div>

@@ -1,7 +1,7 @@
 /**
- * Offline dev storage for Shopping list + Expenses when the hosted API is unavailable.
- * Active in DEV when app env is missing or clearly placeholder, or when
- * VITE_LOCAL_DEV_FINANCE=true. Prevents "App not found" during local UI work.
+ * Offline dev storage for Shopping list + Expenses when you explicitly opt in.
+ * In DEV, active only when VITE_LOCAL_DEV_FINANCE=true; otherwise shopping/expenses
+ * use the hosted API (same as production).
  */
 
 const isBrowser = typeof window !== "undefined";
@@ -12,6 +12,8 @@ const COMPANY_TX_KEY = "los_tios_local_company_transactions_v1";
 const EMPLOYEE_KEY = "los_tios_local_employees_v1";
 const SHIFT_KEY = "los_tios_local_shifts_v1";
 
+import { getMexicoNowDateKey, isPlainDateKey, mexicoBusinessDayCreatedAtIso } from "@/lib/mexicoTime";
+
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 function createId(prefix) {
@@ -21,16 +23,10 @@ function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Use local finance storage in dev when the backend is not configured. */
+/** Use local finance storage in dev only when VITE_LOCAL_DEV_FINANCE=true. */
 export function isLocalFinanceMode() {
   if (!import.meta.env.DEV) return false;
-  if (import.meta.env.VITE_LOCAL_DEV_FINANCE === "false") return false;
-  if (import.meta.env.VITE_LOCAL_DEV_FINANCE === "true") return true;
-  const id = import.meta.env.VITE_BASE44_APP_ID;
-  const url = import.meta.env.VITE_BASE44_BACKEND_URL;
-  if (!id?.trim() || !url?.trim()) return true;
-  if (/placeholder|changeme|your_app/i.test(String(id))) return true;
-  return false;
+  return import.meta.env.VITE_LOCAL_DEV_FINANCE === "true";
 }
 
 function readShopping() {
@@ -127,12 +123,12 @@ export async function localListShoppingList() {
 
 export async function localCreateShoppingList(data) {
   const items = readShopping();
-  const now = new Date().toISOString();
+  const now = mexicoBusinessDayCreatedAtIso(getMexicoNowDateKey());
   const row = {
     ...clone(data),
     id: createId("shop"),
     created_date: now,
-    updated_date: now,
+    updated_date: new Date().toISOString(),
   };
   items.push(row);
   writeShopping(items);
@@ -167,10 +163,11 @@ export async function localListExpenses() {
 
 export async function localCreateExpense(data) {
   const items = readExpenses();
+  const dateKey = isPlainDateKey(data?.date) ? String(data.date).trim().slice(0, 10) : getMexicoNowDateKey();
   const row = {
     ...clone(data),
     id: createId("exp"),
-    created_date: new Date().toISOString(),
+    created_date: mexicoBusinessDayCreatedAtIso(dateKey),
   };
   items.push(row);
   writeExpenses(items);
@@ -205,11 +202,11 @@ export async function localListCompanyTransactions() {
 
 export async function localCreateCompanyTransaction(data) {
   const items = readCompanyTransactions();
-  const now = new Date().toISOString();
+  const dateKey = isPlainDateKey(data?.date) ? String(data.date).trim().slice(0, 10) : getMexicoNowDateKey();
   const row = {
     ...clone(data),
     id: createId("ctx"),
-    created_date: now,
+    created_date: mexicoBusinessDayCreatedAtIso(dateKey),
   };
   items.push(row);
   writeCompanyTransactions(items);
@@ -244,12 +241,12 @@ export async function localListEmployees() {
 
 export async function localCreateEmployee(data) {
   const items = readEmployees();
-  const now = new Date().toISOString();
+  const now = mexicoBusinessDayCreatedAtIso(getMexicoNowDateKey());
   const row = {
     ...clone(data),
     id: createId("emp"),
     created_date: now,
-    updated_date: now,
+    updated_date: new Date().toISOString(),
   };
   items.push(row);
   writeEmployees(items);
@@ -286,12 +283,12 @@ export async function localListShifts() {
 
 export async function localCreateShift(data) {
   const items = readShifts();
-  const now = new Date().toISOString();
+  const now = mexicoBusinessDayCreatedAtIso(getMexicoNowDateKey());
   const row = {
     ...clone(data),
     id: createId("shf"),
     created_date: now,
-    updated_date: now,
+    updated_date: new Date().toISOString(),
   };
   items.push(row);
   writeShifts(items);
