@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,14 @@ import {
   parseCustomerEvents,
 } from "@/lib/customerEvents";
 import losTiosLogo from "@/assets/los-tios-logo.png";
+import PublicRestaurantExperience from "@/components/restaurant/PublicRestaurantExperience.jsx";
+import {
+  getPublicRestaurantCopy,
+  normalizeSiteLocale,
+  persistLocale,
+  readStoredLocale,
+} from "@/lib/restaurantPublicLocale";
+import { GOOGLE_MAPS_PLACE_URL } from "@/lib/mapsPlace";
 
 export default function CustomerOrder() {
   const [cart, setCart] = useState([]);
@@ -36,6 +44,14 @@ export default function CustomerOrder() {
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [siteLocale, setSiteLocale] = useState(() => normalizeSiteLocale(readStoredLocale()));
+
+  const publicCopy = useMemo(() => getPublicRestaurantCopy(siteLocale), [siteLocale]);
+
+  useEffect(() => {
+    persistLocale(siteLocale);
+    document.documentElement.lang = siteLocale === "en" ? "en" : "es-MX";
+  }, [siteLocale]);
 
   const isEventPast = (year, month, day) => {
     const today = new Date();
@@ -79,6 +95,79 @@ export default function CustomerOrder() {
   });
 
   const availableItems = menuItems.filter(item => item.is_available);
+
+  const featuredItems = useMemo(() => {
+    const pizzas = availableItems.filter((i) => i.category === "pizzas");
+    if (pizzas.length >= 3) return pizzas.slice(0, 6);
+    const rest = availableItems.filter((i) => i.category !== "pizzas");
+    return [...pizzas, ...rest].slice(0, 6);
+  }, [availableItems]);
+
+  useEffect(() => {
+    const name = (appSettings.restaurant_name && String(appSettings.restaurant_name).trim()) || "Los Tíos";
+    document.title = `${name} · Pizza artesanal · Puerto Escondido, Oax.`;
+    const desc = `${name}: Neapolitan-style pizza in downtown Puerto Escondido. Delivery, pickup, or dine-in. Av. Oaxaca 305, Plaza Monte Albán.`;
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "description");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", desc);
+
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      name,
+      image: `${window.location.origin}/favicon.png`,
+      url: window.location.origin,
+      telephone: "+52-954-130-7386",
+      servesCuisine: ["Pizza", "Italian", "Neapolitan pizza"],
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "Av. Oaxaca 305, Plaza Monte Albán",
+        addressLocality: "Puerto Escondido",
+        addressRegion: "Oax.",
+        postalCode: "71980",
+        addressCountry: "MX",
+      },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: 15.8719,
+        longitude: -97.0673,
+      },
+      priceRange: "$$",
+      sameAs: [
+        "https://www.instagram.com/lostios.pxm",
+        "https://www.facebook.com/lostios.pxm",
+        "https://www.tiktok.com/@lostios.mx",
+      ],
+      openingHoursSpecification: [
+        {
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: [
+            "https://schema.org/Tuesday",
+            "https://schema.org/Wednesday",
+            "https://schema.org/Thursday",
+            "https://schema.org/Friday",
+            "https://schema.org/Saturday",
+            "https://schema.org/Sunday",
+          ],
+          opens: "16:00",
+          closes: "23:00",
+        },
+      ],
+    };
+    const scriptId = "jsonld-restaurant";
+    let script = document.getElementById(scriptId);
+    if (!script) {
+      script = document.createElement("script");
+      script.id = scriptId;
+      script.type = "application/ld+json";
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(ld);
+  }, [appSettings.restaurant_name]);
 
   const categories = [
     { id: "specials", name: "ESPECIALES DEL DIA" },
@@ -735,100 +824,34 @@ export default function CustomerOrder() {
   // Menu Screen (Main)
   return (
     <div id="top" className="min-h-screen bg-[#1a1a1a] pb-24">
-      {/* Header */}
-          <div className="sticky top-0 z-40 overflow-hidden bg-yellow-400 py-4 shadow-lg">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-40"
-              style={pizzaPatternStyle}
-            />
-            <div className="relative max-w-7xl mx-auto px-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <a href="#top">
-                    <img 
-                      src={losTiosLogo}
-                      alt="Los Tios"
-                      className="w-20 h-20 rounded-full bg-[#f5c400] p-0.5 border-2 border-yellow-300/90 object-contain shadow-md"
-                    />
-                  </a>
-                </div>
-                {/* Desktop nav */}
-                <div className="hidden md:flex items-center gap-4">
-                  <a href="#menu" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Menu</a>
-                  <a href="#about" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Sobre nosotros</a>
-                  <a href="#eventos" className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">Eventos</a>
-                  <a href="https://wa.me/529541307386" target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                    </svg>
-                    +52 954 130 7386
-                  </a>
-                </div>
-
-                {/* Mobile hamburger */}
-                <div className="md:hidden relative">
-                  <button
-                    onClick={() => setMobileNavOpen(prev => !prev)}
-                    className="flex flex-col justify-center items-center w-10 h-10 gap-1.5 bg-black/10 hover:bg-black/20 rounded-xl transition-colors focus:outline-none"
-                  >
-                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? 'opacity-0' : ''}`}></span>
-                    <span className={`block w-5 h-0.5 bg-[#1a1a1a] transition-all duration-300 ${mobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-                  </button>
-                  {mobileNavOpen && (
-                    <div className="absolute right-0 top-14 bg-yellow-400 rounded-2xl shadow-xl p-4 flex flex-col gap-2 min-w-[180px] z-50">
-                      <a href="#menu" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Menu</a>
-                      <a href="#about" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Sobre nosotros</a>
-                      <a href="#eventos" onClick={() => setMobileNavOpen(false)} className="text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors text-center">Eventos</a>
-                      <a href="https://wa.me/529541307386" target="_blank" rel="noopener noreferrer" onClick={() => setMobileNavOpen(false)}
-                        className="flex items-center justify-center gap-1.5 text-[#1a1a1a] text-sm font-bold bg-black/10 hover:bg-black/20 px-4 py-2 rounded-full transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                        WhatsApp
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-      {/* Hero Banner */}
-      <div className="bg-[#111111] py-8 px-4 text-center border-b border-yellow-500/20">
-        <div className="max-w-3xl mx-auto space-y-4">
-          {/* Spanish */}
-          <div>
-            <p className="text-yellow-400 text-[11px] font-bold tracking-[0.28em] uppercase mb-1.5">ES</p>
-            <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
-              HAMBRE? PRUEBA LA MEJOR PIZZA DE PUERTO ESCONDIDO
-            </h2>
-            <p className="text-gray-400 mt-2 text-base md:text-lg">Hecha por 4 tios que se conocieron viajando ? Servida con muy buena vibra</p>
-            <p className="text-yellow-400/60 mt-1 text-[11px] font-bold tracking-[0.2em] uppercase">4 TIOS CON RAICES EN MEXICO, FRANCIA, SUECIA E ITALIA.</p>
-          </div>
-
-          <div className="border-t border-yellow-500/30 pt-4">
-            <p className="text-yellow-400 text-[11px] font-bold tracking-[0.28em] uppercase mb-1.5">EN</p>
-            <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
-              HUNGRY? TRY THE BEST PIZZA IN PUERTO ESCONDIDO
-            </h2>
-            <p className="text-gray-400 mt-2 text-base md:text-lg">Made by 4 uncles who met while traveling ? Served with great vibes</p>
-            <p className="text-yellow-400/60 mt-1 text-[11px] font-bold tracking-[0.2em] uppercase">4 UNCLES WITH ROOTS IN MEXICO, FRANCE, SWEDEN & ITALY.</p>
-          </div>
-        </div>
-      </div>
+      <PublicRestaurantExperience
+        logoSrc={losTiosLogo}
+        restaurantName={appSettings.restaurant_name || "Los Tíos"}
+        featuredItems={featuredItems}
+        isLoadingMenu={isLoading}
+        onAddToCart={addToCart}
+        mobileNavOpen={mobileNavOpen}
+        setMobileNavOpen={setMobileNavOpen}
+        pizzaPatternStyle={pizzaPatternStyle}
+        locale={siteLocale}
+        onLocaleChange={(next) => setSiteLocale(normalizeSiteLocale(next))}
+      />
 
       <div id="menu" className="max-w-7xl mx-auto px-4 py-6 lg:py-7 scroll-mt-20">
         {/* Menu */}
         {isLoading ? (
           <div className="text-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Cargando menu... / Loading menu...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto"></div>
+            <p className="mt-4 text-gray-400">{publicCopy.menuLoading}</p>
           </div>
         ) : (
-          <div className="space-y-12">
+          <section aria-labelledby="full-menu-heading" className="space-y-12">
+            <div className="text-center">
+              <h2 id="full-menu-heading" className="text-2xl font-bold text-white sm:text-3xl">
+                {publicCopy.fullMenuSectionTitle}
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">{publicCopy.fullMenuSectionSubtitle}</p>
+            </div>
             {categories.map((category) => {
               const items = availableItems.filter(item => item.category === category.id);
               if (items.length === 0) return null;
@@ -836,12 +859,25 @@ export default function CustomerOrder() {
               return (
                 <div key={category.id}>
                   <div className="flex flex-col items-center mb-8">
-                    <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">
+                    <h3 className="text-2xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl tracking-wide sm:text-3xl">
                       {category.name}
-                    </h2>
+                    </h3>
                   </div>
                       <div className="flex flex-wrap justify-center gap-6">
-                        {items.map((item) => (
+                        {items.map((item) => {
+                          const title = siteLocale === "en" ? item.name_en || item.name : item.name;
+                          const subName =
+                            siteLocale === "en" && item.name && item.name_en && item.name !== item.name_en
+                              ? item.name
+                              : siteLocale === "es" && item.name_en
+                                ? item.name_en
+                                : null;
+                          const desc =
+                            siteLocale === "en"
+                              ? item.description_en || item.description
+                              : item.description;
+                          const imgAlt = siteLocale === "en" ? item.name_en || item.name : item.name;
+                          return (
                           <motion.div
                             key={item.id}
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -854,32 +890,29 @@ export default function CustomerOrder() {
                                              <div className="relative h-56 flex-shrink-0">
                                                <img
                                                  src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
-                                                 alt={item.name}
+                                                 alt={imgAlt}
                                                  className="w-full h-full object-cover"
                                                />
                             {item.is_vegetarian && (
-                              <Badge className="absolute top-3 right-3 bg-green-500">
-                                Vegetariano / Vegetarian
+                              <Badge className="absolute top-3 right-3 bg-green-600">
+                                {publicCopy.vegetarian}
                               </Badge>
                             )}
                           </div>
                           <CardContent className="p-6 flex flex-col flex-1">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
-                                <h3 className="font-bold text-xl text-white">{item.name}</h3>
-                                {item.name_en && (
-                                  <p className="text-sm text-gray-400 italic">{item.name_en}</p>
+                                <h4 className="font-bold text-xl text-white">{title}</h4>
+                                {subName && (
+                                  <p className="text-sm text-gray-400 italic">{subName}</p>
                                 )}
                               </div>
                               <span className="text-2xl font-bold text-yellow-400 ml-2">${item.price?.toFixed(2)}</span>
                             </div>
 
                             <div className="flex-1">
-                              {item.description && (
-                                <p className="text-gray-400 text-sm mb-2 line-clamp-3">{item.description}</p>
-                              )}
-                              {item.description_en && (
-                                <p className="text-gray-500 text-xs mb-4 line-clamp-3 italic">{item.description_en}</p>
+                              {desc && (
+                                <p className="text-gray-400 text-sm mb-2 line-clamp-4">{desc}</p>
                               )}
                             </div>
                             <div className="mt-auto pt-4">
@@ -887,18 +920,19 @@ export default function CustomerOrder() {
                                 onClick={() => addToCart(item)}
                                 className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold"
                               >
-                                Agregar al carrito / Add to cart
+                                {publicCopy.addToCart}
                               </Button>
                             </div>
                           </CardContent>
                         </Card>
                       </motion.div>
-                    ))}
+                          );
+                        })}
                   </div>
                 </div>
               );
             })}
-          </div>
+          </section>
         )}
       </div>
 
@@ -1000,32 +1034,6 @@ export default function CustomerOrder() {
         )}
       </AnimatePresence>
 
-      {/* Sobre nosotros */}
-      <div id="about" className="bg-[#111111] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col items-center mb-10">
-            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Sobre nosotros</h2>
-            <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide mt-2">About us</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Spanish */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ESPANOL</p>
-              <p className="text-gray-300 leading-relaxed">
-                Los Tios es una pizzeria con mucha vibra en Puerto Escondido, donde servimos deliciosa pizza estilo napolitano en un ambiente relajado y playero. Fundado por cuatro amigos con raices en Mexico, Francia, Italia y Suecia que se conocieron en Mexico, Los Tios une inspiracion internacional con la energia tranquila de Puerto Escondido. Si buscas buena pizza, buena vibra y un lugar chido y acogedor para pasar el rato, Los Tios es el lugar.
-              </p>
-            </div>
-            {/* English */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-yellow-500/20">
-              <p className="text-yellow-400 text-xs font-bold tracking-widest uppercase mb-3">ENGLISH</p>
-              <p className="text-gray-300 leading-relaxed">
-                Los Tios is a vibrant pizza spot in Puerto Escondido serving delicious Neapolitan-style pizza in a relaxed beach atmosphere. Founded by four friends with roots in Mexico, France, Italy and Sweden who met in Mexico, Los Tios brings together international inspiration and the laid-back energy of Puerto Escondido. If you're looking for great pizza, good vibes and a welcoming place to hang out, Los Tios is the spot.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Eventos */}
       {(() => {
         const eventStatuses = [
@@ -1043,40 +1051,45 @@ export default function CustomerOrder() {
           <div id="eventos" className="bg-[#1a1a1a] border-t border-yellow-500/20 py-16 px-4 scroll-mt-20">
             <div className="max-w-5xl mx-auto">
               <div className="flex flex-col items-center mb-10">
-                <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">Eventos</h2>
-                <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">Lo que viene &#128293;</p>
+                <h2 className="text-3xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl inline-block tracking-wide">
+                  {publicCopy.eventsTitle}
+                </h2>
+                <p className="text-center text-gray-500 text-sm mt-3 tracking-widest uppercase">{publicCopy.eventsTagline}</p>
               </div>
-              <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-                <div id="event-contact" className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    &#127881; <span className="text-yellow-400 font-bold">&iquest;Tienes una idea para un evento con nosotros?</span><br/><br/>
-                    En nuestro restaurante en Centro, Puerto Escondido, contamos con nuestro horno h&iacute;brido de gas y le&ntilde;a, una inversi&oacute;n seria para una pizza seria.<br/><br/>
-                    Bajo nuestra marca <span className="text-yellow-400 font-semibold">Los Tios Express</span> tambi&eacute;n podemos llevar hornos de pizza port&aacute;tiles a casi cualquier lugar, con un resultado casi igual de incre&iacute;ble. &iexcl;La masa es tan importante como el horno!
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                    <a
-                      href="mailto:info@lostios.mx?subject=Propuesta de evento&body=Hola equipo de Los Tios, me gustaria proponer un evento..."
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
-                    >
-                      Contactanos
-                    </a>
+              <div className="mb-10 max-w-2xl mx-auto">
+                {siteLocale === "es" ? (
+                  <div id="event-contact" className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
+                    <p className="text-gray-300 text-sm leading-relaxed flex-1">
+                      &#127881; <span className="text-yellow-400 font-bold">&iquest;Tienes una idea para un evento con nosotros?</span><br/><br/>
+                      En nuestro restaurante en Centro, Puerto Escondido, contamos con nuestro horno h&iacute;brido de gas y le&ntilde;a, una inversi&oacute;n seria para una pizza seria.<br/><br/>
+                      Bajo nuestra marca <span className="text-yellow-400 font-semibold">Los Tios Express</span> tambi&eacute;n podemos llevar hornos de pizza port&aacute;tiles a casi cualquier lugar, con un resultado casi igual de incre&iacute;ble. &iexcl;La masa es tan importante como el horno!
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                      <a
+                        href="mailto:info@lostios.mx?subject=Propuesta de evento&body=Hola equipo de Los Tios, me gustaria proponer un evento..."
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                      >
+                        Contactanos
+                      </a>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    &#127881; <span className="text-yellow-400 font-bold">Do you have an idea for an event with us?</span><br/><br/>
-                    At our restaurant in Centro, Puerto Escondido, we have our well-invested hybrid wood and gas oven, a serious investment for serious pizza.<br/><br/>
-                    Under our brand <span className="text-yellow-400 font-semibold">Los Tios Express</span> we can also bring portable pizza ovens almost anywhere, delivering results that are nearly just as incredible. The dough matters just as much as the oven!
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                    <a
-                      href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
-                    >
-                      Contact us
-                    </a>
+                ) : (
+                  <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
+                    <p className="text-gray-300 text-sm leading-relaxed flex-1">
+                      &#127881; <span className="text-yellow-400 font-bold">Do you have an idea for an event with us?</span><br/><br/>
+                      At our restaurant in Centro, Puerto Escondido, we have our well-invested hybrid wood and gas oven, a serious investment for serious pizza.<br/><br/>
+                      Under our brand <span className="text-yellow-400 font-semibold">Los Tios Express</span> we can also bring portable pizza ovens almost anywhere, delivering results that are nearly just as incredible. The dough matters just as much as the oven!
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                      <a
+                        href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
+                      >
+                        Contact us
+                      </a>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
               {adminCustomerEvents.length > 0 && (
                 <>
@@ -1090,47 +1103,36 @@ export default function CustomerOrder() {
                       const cardClass = isPast
                         ? "bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale"
                         : "bg-[#242424] border-yellow-500/30";
+                      const dateLabel = eventDateLabel(event, siteLocale === "en" ? "en" : "es");
+                      const badge = siteLocale === "en" ? event.badgeEn || dateLabel : event.badgeEs || dateLabel;
+                      const title = siteLocale === "en" ? event.titleEn : event.titleEs;
+                      const description = siteLocale === "en" ? event.descriptionEn : event.descriptionEs;
+                      const buttons = siteLocale === "en" ? enButtons : esButtons;
                       return (
-                        <div key={event.id} className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div key={event.id} className="mb-8 max-w-3xl mx-auto">
                           <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${cardClass}`}>
                             <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2 max-w-[8rem]">
-                              <span className="font-black text-2xl leading-none uppercase text-center">{eventDateLabel(event, "es").split(" ")[0]}</span>
-                              <span className="font-bold text-[10px] tracking-widest uppercase leading-tight text-center">{eventDateLabel(event, "es").split(" ").slice(1).join(" ")}</span>
+                              <span className="font-black text-2xl leading-none uppercase text-center">{dateLabel.split(" ")[0]}</span>
+                              <span className="font-bold text-[10px] tracking-widest uppercase leading-tight text-center">{dateLabel.split(" ").slice(1).join(" ")}</span>
                             </div>
-                            <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? "text-gray-500" : "text-yellow-400"}`}>ESPANOL</p>
-                            <p className={`text-xs font-bold tracking-widest uppercase mb-4 pr-24 ${isPast ? "text-gray-600" : "text-yellow-400/60"}`}>{event.badgeEs || eventDateLabel(event, "es")}</p>
-                            <h3 className={`text-xl font-black mb-3 pr-20 ${isPast ? "text-gray-400" : "text-white"}`}>{event.titleEs}</h3>
-                            <p className={`leading-relaxed text-sm ${isPast ? "text-gray-600" : "text-gray-300"}`}>{event.descriptionEs}</p>
+                            <p className={`text-xs font-bold tracking-widest uppercase mb-4 pr-24 ${isPast ? "text-gray-600" : "text-yellow-400/60"}`}>{badge}</p>
+                            <h3 className={`text-xl font-black mb-3 pr-20 ${isPast ? "text-gray-400" : "text-white"}`}>{title}</h3>
+                            <p className={`leading-relaxed text-sm ${isPast ? "text-gray-600" : "text-gray-300"}`}>{description}</p>
                             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                              {esButtons.map(({ emoji, text }) => (
-                                <div key={`${event.id}-es-${text}`} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? "bg-gray-800/50 text-gray-500" : "bg-yellow-400/10 text-yellow-400"}`}>
+                              {buttons.map(({ emoji, text }) => (
+                                <div key={`${event.id}-${text}`} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? "bg-gray-800/50 text-gray-500" : "bg-yellow-400/10 text-yellow-400"}`}>
                                   <span className="text-base leading-none">{emoji}</span>
                                   <span className="text-xs text-center leading-tight">{text}</span>
                                 </div>
                               ))}
                             </div>
                             <p className="mt-4 text-xs text-gray-500">{event.location}</p>
-                            <EventShareButtons title={`${event.titleEs} - ${eventDateLabel(event, "es")}`} text={event.descriptionEs} url={`${window.location.origin}/#eventos`} />
-                          </div>
-                          <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${cardClass}`}>
-                            <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2 max-w-[8rem]">
-                              <span className="font-black text-2xl leading-none uppercase text-center">{eventDateLabel(event, "en").split(" ")[0]}</span>
-                              <span className="font-bold text-[10px] tracking-widest uppercase leading-tight text-center">{eventDateLabel(event, "en").split(" ").slice(1).join(" ")}</span>
-                            </div>
-                            <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isPast ? "text-gray-500" : "text-yellow-400"}`}>ENGLISH</p>
-                            <p className={`text-xs font-bold tracking-widest uppercase mb-4 pr-24 ${isPast ? "text-gray-600" : "text-yellow-400/60"}`}>{event.badgeEn || eventDateLabel(event, "en")}</p>
-                            <h3 className={`text-xl font-black mb-3 pr-20 ${isPast ? "text-gray-400" : "text-white"}`}>{event.titleEn}</h3>
-                            <p className={`leading-relaxed text-sm ${isPast ? "text-gray-600" : "text-gray-300"}`}>{event.descriptionEn}</p>
-                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                              {enButtons.map(({ emoji, text }) => (
-                                <div key={`${event.id}-en-${text}`} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isPast ? "bg-gray-800/50 text-gray-500" : "bg-yellow-400/10 text-yellow-400"}`}>
-                                  <span className="text-base leading-none">{emoji}</span>
-                                  <span className="text-xs text-center leading-tight">{text}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="mt-4 text-xs text-gray-500">{event.location}</p>
-                            <EventShareButtons title={`${event.titleEn} - ${eventDateLabel(event, "en")}`} text={event.descriptionEn} lang="en" url={`${window.location.origin}/#eventos`} />
+                            <EventShareButtons
+                              title={`${title} - ${dateLabel}`}
+                              text={description}
+                              lang={siteLocale === "en" ? "en" : undefined}
+                              url={`${window.location.origin}/#eventos`}
+                            />
                           </div>
                         </div>
                       );
@@ -1138,17 +1140,17 @@ export default function CustomerOrder() {
                 </>
               )}
               {!isEventInPast("beerfestcondido") && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+              <div className="max-w-3xl mx-auto mb-8">
+                {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-3xl leading-none">4-5</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">ABRIL</span>
                   </div>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio en Beerfestcondido</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
+                    El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1166,17 +1168,16 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
                   <EventShareButtons title="Bolas del Tio en Beerfestcondido - 4 y 5 Abril" text="Nos vemos en Nodo Brewery con Bolas del Tio, cerveza artesanal y buena vibra!" url={`${window.location.origin}/#eventos`} />
                 </div>
-
+                ) : (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-3xl leading-none">4-5</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">APRIL</span>
                   </div>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio at Beerfestcondido</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
+                    On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1194,22 +1195,22 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
                   <EventShareButtons title="Bolas del Tio at Beerfestcondido - April 4-5" text="Catch us at Nodo Brewery for Bolas del Tio, craft beer and great vibes!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
+                )}
               </div>
               )}
 
               {!isEventInPast("football-night") && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Football Night - Spanish */}
+              <div className="max-w-3xl mx-auto">
+                {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-5xl leading-none">28</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARZO</span>
                   </div>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM HASTA TARDE</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
-                    Vive el partido con nosotros en una noche de futbol, buena vibra y pura fiesta. Tendremos pizzas recien hechas, cervezas bien frias y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el animo. Cada jugada se vive mejor aqui, con musica, energia y toda la banda apoyando. Perfecto para venir con amigos, echar chela, gritar los goles y quedarte despues del partido. No es solo ver el juego... es vivirlo.
+                    Vive el partido con nosotros en una noche de futbol, buena vibra y pura fiesta. Tendremos pizzas recien hechas, cervezas bien frias y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el animo. Cada jugada se vive mejor aqui, con musica, energia y toda la banda apoyando. Perfecto para venir con los tíos, echar chela, gritar los goles y quedarte despues del partido. No es solo ver el juego... es vivirlo.
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1227,14 +1228,12 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                   <EventShareButtons title="Football Night at Los Tios - 28 Marzo" text="Ven a ver el partido, pizza, chela y mezcal!" url={`${window.location.origin}/#eventos`} />
                 </div>
-
-                {/* Football Night - English */}
+                ) : (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-5xl leading-none">28</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARCH</span>
                   </div>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
                   <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM TILL LATE</p>
                   <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
                   <p className="leading-relaxed text-sm text-gray-300">
@@ -1256,6 +1255,7 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                   <EventShareButtons title="Football Night at Los Tios - March 28" text="Come watch the match, fresh pizza, cold beers and mezcal shots!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
+                )}
               </div>
               )}
 
@@ -1295,19 +1295,19 @@ export default function CustomerOrder() {
 
               {/* Divider */}
               <div className="border-t border-yellow-500/10 my-8"></div>
-              <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">Evento pasado / Past event</p>
+              <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">{publicCopy.eventsPastSection}</p>
               {isEventInPast("beerfestcondido") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="max-w-3xl mx-auto mb-8">
+                  {siteLocale === "es" ? (
                   <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
                     <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                       <span className="font-black text-3xl leading-none">4-5</span>
                       <span className="font-bold text-xs tracking-widest uppercase leading-tight">ABRIL</span>
                     </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
                     <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
                     <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio en Beerfestcondido</h3>
                     <p className="leading-relaxed text-sm text-gray-300">
-                      El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
+                      El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
                     </p>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
@@ -1324,16 +1324,16 @@ export default function CustomerOrder() {
                     </div>
                     <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
                   </div>
+                  ) : (
                   <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
                     <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                       <span className="font-black text-3xl leading-none">4-5</span>
                       <span className="font-bold text-xs tracking-widest uppercase leading-tight">APRIL</span>
                     </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
                     <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
                     <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio at Beerfestcondido</h3>
                     <p className="leading-relaxed text-sm text-gray-300">
-                      On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span> — our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
+                      On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
                     </p>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
@@ -1350,21 +1350,21 @@ export default function CustomerOrder() {
                     </div>
                     <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
                   </div>
+                  )}
                 </div>
               )}
               {isEventInPast("football-night") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                  {/* Football Night - Spanish */}
+                <div className="max-w-3xl mx-auto mb-8">
+                  {siteLocale === "es" ? (
                   <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                     <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                       <span className="font-black text-5xl leading-none">28</span>
                       <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARZO</span>
                     </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ESPANOL</p>
                     <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM HASTA TARDE</p>
                     <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
                     <p className="leading-relaxed text-sm text-gray-300">
-                      Vive el partido con nosotros en una noche de futbol, buena vibra y pura fiesta. Tendremos pizzas recien hechas, cervezas bien frias y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el animo. Cada jugada se vive mejor aqui, con musica, energia y toda la banda apoyando. Perfecto para venir con amigos, echar chela, gritar los goles y quedarte despues del partido. No es solo ver el juego... es vivirlo.
+                      Vive el partido con nosotros en una noche de futbol, buena vibra y pura fiesta. Tendremos pizzas recien hechas, cervezas bien frias y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el animo. Cada jugada se vive mejor aqui, con musica, energia y toda la banda apoyando. Perfecto para venir con los tíos, echar chela, gritar los goles y quedarte despues del partido. No es solo ver el juego... es vivirlo.
                     </p>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
@@ -1382,14 +1382,12 @@ export default function CustomerOrder() {
                     <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                     <EventShareButtons title="Football Night at Los Tios - 28 Marzo" text="Ven a ver el partido, pizza, chela y mezcal!" url={`${window.location.origin}/#eventos`} />
                   </div>
-
-                  {/* Football Night - English */}
+                  ) : (
                   <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                     <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                       <span className="font-black text-5xl leading-none">28</span>
                       <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARCH</span>
                     </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-1 text-yellow-400">ENGLISH</p>
                     <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM TILL LATE</p>
                     <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
                     <p className="leading-relaxed text-sm text-gray-300">
@@ -1411,22 +1409,22 @@ export default function CustomerOrder() {
                     <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                     <EventShareButtons title="Football Night at Los Tios - March 28" text="Come watch the match, fresh pizza, cold beers and mezcal shots!" lang="en" url={`${window.location.origin}/#eventos`} />
                   </div>
+                  )}
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Spanish */}
+              <div className="max-w-3xl mx-auto">
+                {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("opening-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-5xl leading-none">20</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARZO</span>
                   </div>
-                  <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isEventInPast("opening-night") ? 'text-gray-500' : 'text-yellow-400'}`}>ESPANOL</p>
                   <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isEventInPast("opening-night") ? 'text-gray-600' : 'text-yellow-400/60'}`}>4 PM HASTA TARDE
                     {isEventInPast("opening-night") && <span className="ml-3 inline-flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full text-gray-400 normal-case tracking-normal font-semibold">+{attendees} asistieron</span>}
                   </p>
                   <h3 className={`text-xl font-black mb-3 pr-16 ${isEventInPast("opening-night") ? 'text-gray-400' : 'text-white'}`}>Cumpleanos del Chef<br/>& Apertura del Restaurante</h3>
                   <p className={`leading-relaxed text-sm ${isEventInPast("opening-night") ? 'text-gray-600' : 'text-gray-300'}`}>
-                    El evento mas importante de Los Tios! Celebramos el cumpleanos de nuestro chef y la apertura oficial del restaurante. Habra <span className={isEventInPast("opening-night") ? 'font-semibold' : 'text-yellow-400 font-semibold'}>bebida de bienvenida</span> para todos, musica de primer nivel toda la noche, pizzas increibles y cerveza a precios de amigo. No te lo puedes perder, ven, come, baila y brinda con nosotros. Nos vemos ahi, familia!
+                    El evento mas importante de Los Tios! Celebramos el cumpleanos de nuestro chef y la apertura oficial del restaurante. Habra <span className={isEventInPast("opening-night") ? 'font-semibold' : 'text-yellow-400 font-semibold'}>bebida de bienvenida</span> para todos, musica de primer nivel toda la noche, pizzas increibles y cerveza a precios de tío. No te lo puedes perder, ven, come, baila y brinda con nosotros. Nos vemos ahi, familia!
                   </p>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
@@ -1444,14 +1442,12 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                   <EventShareButtons title="Cumpleanos del Chef & Apertura - 20 Marzo" text="Bebida de bienvenida, pizza, musica y mucha fiesta!" url={`${window.location.origin}/#eventos`} />
                 </div>
-
-                {/* English */}
+                ) : (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("opening-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
                     <span className="font-black text-5xl leading-none">20</span>
                     <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARCH</span>
                   </div>
-                  <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${isEventInPast("opening-night") ? 'text-gray-500' : 'text-yellow-400'}`}>ENGLISH</p>
                   <p className={`text-xs font-bold tracking-widest uppercase mb-4 ${isEventInPast("opening-night") ? 'text-gray-600' : 'text-yellow-400/60'}`}>4 PM TILL LATE
                     {isEventInPast("opening-night") && <span className="ml-3 inline-flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full text-gray-400 normal-case tracking-normal font-semibold">+{attendees} attended</span>}
                   </p>
@@ -1475,14 +1471,23 @@ export default function CustomerOrder() {
                   <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
                   <EventShareButtons title="Chef's Birthday & Restaurant Opening - March 20" text="Welcome drink on the house, killer music, pizza and cold beers!" lang="en" url={`${window.location.origin}/#eventos`} />
                 </div>
+                )}
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* Footer */}
-      <div className="relative mt-0 overflow-hidden bg-yellow-400 py-8 text-[#1a1a1a]">
+      {/* Footer — map lives in #visit to avoid duplicate embeds */}
+      <footer className="relative mt-0 overflow-hidden bg-yellow-400 py-10 text-[#1a1a1a]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[#fde047]/60"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-[#fde047]/30 via-[#fde047]/10 to-transparent blur-[1px]"
+        />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-40"
@@ -1491,33 +1496,28 @@ export default function CustomerOrder() {
         <div className="relative max-w-7xl mx-auto px-4 text-center">
           <img 
             src={losTiosLogo}
-            alt="Los Tios"
+            alt="Los Tíos"
             className="w-40 h-40 mx-auto mb-4 rounded-full bg-[#f5c400] p-1 border-2 border-yellow-300/90 object-contain shadow-md"
           />
-          <p className="font-semibold mb-3">Pizzas autenticas hechas con amor / Authentic pizzas made with love</p>
+          <p className="mb-3 font-semibold">
+            {siteLocale === "en" ? "Authentic pizzas made with love" : "Pizzas autenticas hechas con amor"}
+          </p>
           <p className="text-sm font-medium mb-1">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax.</p>
-          <p className="text-sm font-bold mb-6">PLAZA MONTE ALBAN</p>
-
-          {/* Google Maps */}
-          <div className="mb-6 rounded-2xl overflow-hidden w-full max-w-lg mx-auto shadow-lg border-[3px] border-black">
-            <a href="https://www.google.com/maps/search/los+tios+puerto+escondido" target="_blank" rel="noopener noreferrer">
-              <iframe
-                title="Los Tios location"
-                width="100%"
-                height="220"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                src="https://maps.google.com/maps?q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax.&z=16&output=embed"
-              />
+          <p className="text-sm font-bold mb-4">PLAZA MONTE ALBÁN</p>
+          <div className="mb-6 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
+            <a
+              href="#visit"
+              className="inline-flex items-center justify-center rounded-full bg-[#1a1a1a] px-5 py-2.5 text-sm font-bold text-yellow-400 shadow-md transition hover:bg-black"
+            >
+              {publicCopy.ctaDirections}
             </a>
             <a
-              href="https://www.google.com/maps/search/los+tios+puerto+escondido"
+              href={GOOGLE_MAPS_PLACE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-[#1a1a1a] text-yellow-400 text-xs font-bold py-2 text-center hover:bg-black/80 transition-colors"
+              className="inline-flex items-center justify-center rounded-full border-2 border-[#1a1a1a] px-5 py-2.5 text-sm font-bold text-[#1a1a1a] transition hover:bg-[#1a1a1a] hover:text-yellow-400"
             >
-              Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. {"->"}
+              {publicCopy.ctaMaps}
             </a>
           </div>
           
@@ -1557,7 +1557,7 @@ export default function CustomerOrder() {
             </a>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
