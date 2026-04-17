@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { base44 } from "@/api/base44Client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addDays,
@@ -22,7 +23,6 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
@@ -67,6 +67,7 @@ import {
   setOpeningBalance,
   updateOpeningCountDiffComment,
   updateOpeningCountDiffDateTime,
+  moveManualLineToDay,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
 import {
@@ -139,13 +140,22 @@ function ManualCountWhenCell({ ev, onCommit }) {
   );
 }
 
-/** Editable TIME for ledger rows (Loyverse, orders, expenses, etc.) — stored as Mexico wall → ISO in ledgerTimeOverrides. */
+/** Editable TIME for ledger rows — persists to Finance entities when possible; Loyverse uses AppSettings overrides. */
 function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
   const overrideIso = getLedgerTimeOverrides(ledgerDay)[row.id];
   const refIso = overrideIso ?? new Date(row.sortTime).toISOString();
   const initParts = () => getMexicoDateAndTimePartsForInput(refIso);
   const [dateKey, setDateKey] = useState(() => initParts().dateKey);
   const [timeHHmm, setTimeHHmm] = useState(() => initParts().timeHHmm);
+  const dateKeyRef = useRef(dateKey);
+  const timeHHmmRef = useRef(timeHHmm);
+
+  useLayoutEffect(() => {
+    dateKeyRef.current = dateKey;
+  }, [dateKey]);
+  useLayoutEffect(() => {
+    timeHHmmRef.current = timeHHmm;
+  }, [timeHHmm]);
 
   useLayoutEffect(() => {
     const ri = overrideIso ?? new Date(row.sortTime).toISOString();
@@ -154,19 +164,30 @@ function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
     setTimeHHmm(p.timeHHmm);
   }, [row.id, row.sortTime, ledgerDay, overrideIso]);
 
-  const commitIfChanged = useCallback(
-    (overrideDateKey) => {
-      const d = (overrideDateKey ?? dateKey ?? "").trim();
-      const t = normalizeHHmm(timeHHmm);
+  const tryCommit = useCallback(
+    (dRaw, tRaw) => {
+      const d = String(dRaw ?? "").trim();
+      const t = normalizeHHmm(tRaw);
       if (!d || !t) return;
       const iso = mexicoWallDateTimeToUtcIso(d, t);
       if (!iso) return;
       const compareIso = overrideIso ?? new Date(row.sortTime).toISOString();
       const wall = getMexicoDateAndTimePartsForInput(compareIso);
       if (wall.dateKey === d && wall.timeHHmm === t) return;
-      onCommit(row.id, d, t);
+      void Promise.resolve(onCommit(row.id, d, t)).catch((err) => {
+        console.error("[ledgerTime]", err);
+      });
     },
-    [row.id, row.sortTime, onCommit, overrideIso, dateKey, timeHHmm],
+    [row.id, row.sortTime, onCommit, overrideIso],
+  );
+
+  const commitIfChanged = useCallback(
+    (overrideDateKey) => {
+      const d = (overrideDateKey ?? dateKeyRef.current ?? "").trim();
+      const t = normalizeHHmm(timeHHmmRef.current);
+      tryCommit(d, t);
+    },
+    [tryCommit],
   );
 
   if (row.isManualCountReset) {
@@ -185,10 +206,25 @@ function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
           Reset
         </button>
       ) : null}
-      <MexicoWallDatePicker value={dateKey} onChange={setDateKey} onPopoverClose={commitIfChanged} />
+      <MexicoWallDatePicker
+        value={dateKey}
+        onChange={(k) => {
+          setDateKey(k);
+          dateKeyRef.current = k;
+        }}
+        onPopoverClose={commitIfChanged}
+      />
       <MexicoWallTimePicker
         value={timeHHmm}
-        onChange={(v) => setTimeHHmm(v)}
+        onChange={(v) => {
+          setTimeHHmm(v);
+          timeHHmmRef.current = v;
+        }}
+        onInteractiveCommit={(next) => {
+          timeHHmmRef.current = next;
+          setTimeHHmm(next);
+          tryCommit(dateKeyRef.current, next);
+        }}
         onPopoverClose={() => commitIfChanged()}
       />
     </div>
@@ -1237,16 +1273,92 @@ export default function DailyCash() {
     setStoreTick((t) => t + 1);
   }, []);
 
-  const handleLedgerTimeCommit = useCallback((ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
-    const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
-    if (!iso) return;
-    setLedgerTimeOverride(ledgerDay, rowId, iso);
-    setStoreTick((t) => t + 1);
-  }, []);
+  const handleLedgerTimeCommit = useCallback(
+    async (ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
+      const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
+      if (!iso) return;
+
+      const clearOverridesForRow = () => {
+        setLedgerTimeOverride(ledgerDay, rowId, null);
+        if (dateKeyMexico !== ledgerDay) {
+          setLedgerTimeOverride(dateKeyMexico, rowId, null);
+        }
+      };
+
+      const persistOverrideOnly = () => {
+        setLedgerTimeOverride(ledgerDay, rowId, iso);
+        setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
+      };
+
+      try {
+        if (rowId.startsWith("loyverse-") || rowId.startsWith("labor-cash-")) {
+          persistOverrideOnly();
+          return;
+        }
+
+        if (rowId.startsWith("manual-count-reset-")) {
+          return;
+        }
+
+        if (rowId.startsWith("man-")) {
+          const manualId = rowId.slice("man-".length);
+          moveManualLineToDay(ledgerDay, dateKeyMexico, manualId, { createdAt: iso });
+          clearOverridesForRow();
+          setStoreTick((t) => t + 1);
+          void flushDailyCashPersistImmediate();
+          return;
+        }
+
+        if (rowId.startsWith("exp-")) {
+          const id = rowId.slice("exp-".length);
+          if (useLocalFinance) {
+            await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
+          } else {
+            await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
+          }
+          queryClient.invalidateQueries({ queryKey: ["expenses"] });
+          clearOverridesForRow();
+          setStoreTick((t) => t + 1);
+          return;
+        }
+
+        if (rowId.startsWith("tx-in-") || rowId.startsWith("tx-out-")) {
+          const id = rowId.startsWith("tx-in-") ? rowId.slice("tx-in-".length) : rowId.slice("tx-out-".length);
+          if (useLocalFinance) {
+            await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
+          } else {
+            await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
+          }
+          queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+          clearOverridesForRow();
+          setStoreTick((t) => t + 1);
+          return;
+        }
+
+        if (rowId.startsWith("order-")) {
+          const id = rowId.slice("order-".length);
+          const payload = { created_date: iso, updated_date: new Date().toISOString() };
+          await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+          queryClient.invalidateQueries({ queryKey: ["orders"] });
+          clearOverridesForRow();
+          setStoreTick((t) => t + 1);
+          return;
+        }
+
+        persistOverrideOnly();
+      } catch (e) {
+        console.error(e);
+        alert("Could not save time. Try again.");
+      }
+    },
+    [queryClient, useLocalFinance],
+  );
 
   const handleLedgerTimeReset = useCallback((ledgerDay, rowId) => {
     setLedgerTimeOverride(ledgerDay, rowId, null);
     setStoreTick((t) => t + 1);
+    void flushDailyCashPersistImmediate();
   }, []);
 
   const handleRemoveManualCountDiff = useCallback((eventId) => {

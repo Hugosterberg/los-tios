@@ -324,6 +324,27 @@ export function updateManualLine(dateKey, lineId, patch) {
   writeRaw(store);
 }
 
+/** Move a manual line to another Mexico calendar day (e.g. after editing ledger TIME date). */
+export function moveManualLineToDay(fromKey, toKey, lineId, patch) {
+  if (!fromKey || !toKey || !lineId) return;
+  if (fromKey === toKey) {
+    updateManualLine(fromKey, lineId, patch);
+    return;
+  }
+  const store = readRaw();
+  const fromList = Array.isArray(store.manualLines[fromKey]) ? [...store.manualLines[fromKey]] : [];
+  const idx = fromList.findIndex((x) => x.id === lineId);
+  if (idx === -1) return;
+  const [line] = fromList.splice(idx, 1);
+  if (fromList.length === 0) delete store.manualLines[fromKey];
+  else store.manualLines[fromKey] = fromList;
+  const nextLine = { ...line, ...patch };
+  const toList = Array.isArray(store.manualLines[toKey]) ? [...store.manualLines[toKey]] : [];
+  toList.push(nextLine);
+  store.manualLines[toKey] = toList;
+  writeRaw(store);
+}
+
 const OPENING_DIFF_CAP = 250;
 
 /**

@@ -14,8 +14,9 @@ function parseHHmm(value) {
 
 /**
  * Minimal hour:minute picker (Mexico wall clock display) — avoids native OS time popup styling.
+ * @param {{ onInteractiveCommit?: (nextHHmm: string) => void }} [props] — optional; called after each hour/minute tap so parents can save without closing the popover.
  */
-export function MexicoWallTimePicker({ value, onChange, onPopoverClose, className, disabled }) {
+export function MexicoWallTimePicker({ value, onChange, onPopoverClose, onInteractiveCommit, className, disabled }) {
   const [open, setOpen] = useState(false);
   const [h, m] = useMemo(() => parseHHmm(value), [value]);
   const hourColRef = useRef(null);
@@ -79,7 +80,11 @@ export function MexicoWallTimePicker({ value, onChange, onPopoverClose, classNam
                       ? "bg-yellow-500/18 text-yellow-100"
                       : "text-gray-500 hover:bg-white/[0.05] hover:text-gray-300",
                   )}
-                  onClick={() => onChange(`${hour}:${m}`)}
+                  onClick={() => {
+                    const next = `${hour}:${m}`;
+                    onChange(next);
+                    onInteractiveCommit?.(next);
+                  }}
                 >
                   {hour}
                 </button>
@@ -105,7 +110,11 @@ export function MexicoWallTimePicker({ value, onChange, onPopoverClose, classNam
                       ? "bg-yellow-500/18 text-yellow-100"
                       : "text-gray-500 hover:bg-white/[0.05] hover:text-gray-300",
                   )}
-                  onClick={() => onChange(`${h}:${minute}`)}
+                  onClick={() => {
+                    const next = `${h}:${minute}`;
+                    onChange(next);
+                    onInteractiveCommit?.(next);
+                  }}
                 >
                   {minute}
                 </button>
