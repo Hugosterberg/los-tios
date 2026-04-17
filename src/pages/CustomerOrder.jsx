@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pizza, ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, Copy } from "lucide-react";
+import { Pizza, ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, Copy, MapPin, Clock, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EventShareButtons from "@/components/EventShareButtons";
 import { listMenuItems } from "@/lib/local-dev-menu";
@@ -28,6 +28,9 @@ import {
   readStoredLocale,
 } from "@/lib/restaurantPublicLocale";
 import { GOOGLE_MAPS_PLACE_URL, TRIPADVISOR_URL } from "@/lib/mapsPlace";
+
+const MAP_EMBED =
+  "https://maps.google.com/maps?q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax.&z=16&output=embed";
 
 export default function CustomerOrder() {
   const [cart, setCart] = useState([]);
@@ -928,6 +931,113 @@ export default function CustomerOrder() {
           </section>
         )}
       </div>
+
+      <section
+        id="about"
+        aria-labelledby="about-heading"
+        className="scroll-mt-24 border-t border-yellow-500/20 bg-[#1a1a1a] px-4 py-12 sm:px-6 sm:py-16"
+      >
+        <div className="mx-auto max-w-3xl">
+          <h2 id="about-heading" className="text-2xl font-bold text-white sm:text-3xl">
+            {publicCopy.aboutTitle}
+          </h2>
+          <p className="mt-2 text-sm text-yellow-400/80">{publicCopy.aboutSubtitle}</p>
+          <p className="mt-8 leading-relaxed text-gray-300 sm:text-lg" lang={siteLocale === "es" ? "es-MX" : "en"}>
+            {publicCopy.aboutBody}
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="visit"
+        aria-labelledby="visit-heading"
+        className="scroll-mt-24 border-t border-yellow-500/15 bg-[#0a0a0a] px-4 py-14 sm:px-6 sm:py-16"
+      >
+        <div className="mx-auto max-w-6xl">
+          <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <h2 id="visit-heading" className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                {publicCopy.visitTitle}
+              </h2>
+              <p className="mt-2 text-base text-gray-400">{publicCopy.visitIntro}</p>
+            </div>
+            <div className="flex flex-col gap-2.5 sm:flex-row lg:justify-end">
+              <a
+                href="https://wa.me/529541307386"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-yellow-400/55 bg-yellow-400/10 px-4 text-sm font-semibold text-yellow-300 transition hover:border-yellow-300 hover:bg-yellow-400/15 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
+              >
+                <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                {publicCopy.ctaWhatsApp}
+              </a>
+              <a
+                href={GOOGLE_MAPS_PLACE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-white/25 bg-white/[0.03] px-4 text-sm font-semibold text-gray-100 transition hover:border-yellow-300/70 hover:bg-yellow-400/10 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
+              >
+                <MapPin className="h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
+                {publicCopy.ctaMaps}
+              </a>
+            </div>
+          </header>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-12 lg:gap-6 lg:items-stretch">
+            <div className="flex h-full flex-col gap-4 lg:col-span-5">
+              <div className="flex flex-1 flex-col justify-center rounded-2xl border border-white/10 bg-[#141414] p-6 text-center sm:p-7">
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">{publicCopy.addressLabel}</h3>
+                <address className="mt-5 not-italic">
+                  <p className="text-2xl font-semibold tracking-tight text-white">{appSettings.restaurant_name || "Los Tíos"}</p>
+                  <p className="mx-auto mt-4 max-w-xs text-[1.1rem] leading-relaxed text-gray-200 sm:max-w-sm">
+                    Av. Oaxaca 305, Centro
+                    <br />
+                    71980 Puerto Escondido, Oax., México
+                  </p>
+                  <p className="mt-3 text-lg font-semibold text-yellow-400/95">Plaza Monte Albán</p>
+                </address>
+              </div>
+
+              <div className="flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-[#161616] p-6 sm:p-7">
+                <div className="flex max-w-sm flex-col items-center text-center">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-yellow-400/12 text-yellow-400">
+                    <Clock className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="mt-3 min-w-0">
+                    <h3 className="text-[1.9rem] font-semibold tracking-tight text-white">{publicCopy.hoursLead}</h3>
+                    <p className="mt-2 text-[1.1rem] font-medium leading-snug text-gray-100">{publicCopy.hoursSchedule}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex min-h-0 flex-col lg:col-span-7">
+              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a1a1a]">
+                <iframe
+                  title={publicCopy.mapIframeTitle}
+                  width="100%"
+                  height="320"
+                  className="h-full min-h-[260px] w-full flex-1 bg-[#1a1a1a] sm:min-h-[320px]"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={MAP_EMBED}
+                />
+                <a
+                  href={GOOGLE_MAPS_PLACE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[46px] items-center justify-center gap-2 border-t border-white/10 bg-[#0f0f0f] px-4 py-3 text-center text-sm font-medium text-yellow-400 transition hover:bg-black hover:text-yellow-300"
+                >
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+                  {publicCopy.mapLarger}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Floating Cart */}
       <AnimatePresence>

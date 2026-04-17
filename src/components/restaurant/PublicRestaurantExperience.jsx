@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, MessageCircle, UtensilsCrossed, Star, ChevronRight, ChevronLeft } from "lucide-react";
+import { MapPin, MessageCircle, UtensilsCrossed, Star, ChevronRight, ChevronLeft } from "lucide-react";
 import { getPublicRestaurantCopy } from "@/lib/restaurantPublicLocale";
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_PLACE_URL, GOOGLE_PLACE_ID, TRIPADVISOR_URL } from "@/lib/mapsPlace";
 import { fetchGooglePlaceReviewStats } from "@/lib/googlePlaceStats";
 import { FEATURED_GOOGLE_REVIEWS } from "@/data/featuredGoogleReviews";
 
 const WA_HREF = "https://wa.me/529541307386";
-const MAP_EMBED =
-  "https://maps.google.com/maps?q=Av.+Oaxaca+305,+Centro,+71980+Puerto+Escondido,+Oax.&z=16&output=embed";
 
 /** @param {string} template @param {number | null} rating @param {number | null} count @param {'es' | 'en'} locale */
 function formatReviewsGoogleStats(template, rating, count, locale) {
@@ -19,15 +17,8 @@ function formatReviewsGoogleStats(template, rating, count, locale) {
   return template.replace("{rating}", r).replace("{count}", c);
 }
 
-const GALLERY_SRC = [
-  "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=900&q=80",
-  "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=900&q=80",
-  "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=900&q=80",
-  "https://images.unsplash.com/photo-1544148103-0773bf10d330?w=900&q=80",
-];
-
 /**
- * Marketing shell: header, hero, story, gallery, reviews, visit block.
+ * Marketing shell: header, hero, story, reviews, visit block.
  * Uses site yellow (#facc15) + dark (#1a1a1a) to match the ordering UI.
  */
 export default function PublicRestaurantExperience({
@@ -81,11 +72,6 @@ export default function PublicRestaurantExperience({
     if (placeStats.rating == null && placeStats.userRatingsTotal == null) return null;
     return formatReviewsGoogleStats(t.reviewsGoogleStats, placeStats.rating, placeStats.userRatingsTotal, locale);
   }, [locale, placeStats, t.reviewsGoogleStats]);
-
-  const galleryImages = useMemo(
-    () => GALLERY_SRC.map((src, i) => ({ src, alt: t.galleryAlts[i] ?? "" })),
-    [t.galleryAlts],
-  );
 
   return (
     <>
@@ -304,7 +290,7 @@ export default function PublicRestaurantExperience({
           >
             {t.heroSubtitle}
           </h2>
-          <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-yellow-500/20 bg-white/[0.02] px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.32)] sm:px-5 sm:py-5">
+          <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-yellow-500/20 bg-white/[0.02] px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.32)] sm:px-5 sm:py-5">
             <div className="grid gap-2.5" lang={locale === "es" ? "es-MX" : "en"}>
               {t.heroBodyParagraphs.map((para, i) => (
                 <article
@@ -315,7 +301,7 @@ export default function PublicRestaurantExperience({
                     aria-hidden
                     className="mt-1 inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400/90 shadow-[0_0_0_3px_rgba(250,204,21,0.15)]"
                   />
-                  <span>
+                  <span className="break-words">
                     {para}
                   </span>
                 </article>
@@ -357,52 +343,6 @@ export default function PublicRestaurantExperience({
             </Button>
           </div>
           <p className="mx-auto mt-5 max-w-xl text-[11px] text-gray-500">{t.heroFootnote}</p>
-        </div>
-      </section>
-
-      <section
-        id="about"
-        aria-labelledby="about-heading"
-        className="scroll-mt-24 border-b border-yellow-500/20 bg-[#1a1a1a] px-4 py-12 sm:px-6 sm:py-16"
-      >
-        <div className="mx-auto max-w-3xl">
-          <h2 id="about-heading" className="text-2xl font-bold text-white sm:text-3xl">
-            {t.aboutTitle}
-          </h2>
-          <p className="mt-2 text-sm text-yellow-400/80">{t.aboutSubtitle}</p>
-          <p
-            className="mt-8 leading-relaxed text-gray-300 sm:text-lg"
-            lang={locale === "es" ? "es-MX" : "en"}
-          >
-            {t.aboutBody}
-          </p>
-        </div>
-      </section>
-
-      <section
-        id="gallery"
-        aria-labelledby="gallery-heading"
-        className="scroll-mt-24 border-b border-yellow-500/20 bg-[#111111] px-4 py-12 sm:px-6 sm:py-16"
-      >
-        <div className="mx-auto max-w-6xl">
-          <h2 id="gallery-heading" className="text-2xl font-bold text-white sm:text-3xl">
-            {t.galleryTitle}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-gray-400">{t.gallerySubtitle}</p>
-          <ul className="mt-10 grid list-none grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-            {galleryImages.map((img) => (
-              <li key={img.src}>
-                <figure className="group relative aspect-square overflow-hidden rounded-2xl border border-yellow-500/20 sm:aspect-[4/5]">
-                  <img
-                    src={img.src}
-                    alt={img.alt}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                    loading="lazy"
-                  />
-                </figure>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 
@@ -503,96 +443,6 @@ export default function PublicRestaurantExperience({
         </div>
       </section>
 
-      <section
-        id="visit"
-        aria-labelledby="visit-heading"
-        className="scroll-mt-24 border-t border-yellow-500/15 bg-[#0a0a0a] px-4 py-14 sm:px-6 sm:py-16"
-      >
-        <div className="mx-auto max-w-6xl">
-          <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <h2 id="visit-heading" className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {t.visitTitle}
-              </h2>
-              <p className="mt-2 text-base text-gray-400">{t.visitIntro}</p>
-            </div>
-            <div className="flex flex-col gap-2.5 sm:flex-row lg:justify-end">
-              <a
-                href={WA_HREF}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-yellow-400/55 bg-yellow-400/10 px-4 text-sm font-semibold text-yellow-300 transition hover:border-yellow-300 hover:bg-yellow-400/15 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
-              >
-                <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                {t.ctaWhatsApp}
-              </a>
-              <a
-                href={GOOGLE_MAPS_PLACE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-white/25 bg-white/[0.03] px-4 text-sm font-semibold text-gray-100 transition hover:border-yellow-300/70 hover:bg-yellow-400/10 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
-              >
-                <MapPin className="h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
-                {t.ctaMaps}
-              </a>
-            </div>
-          </header>
-
-          <div className="mt-8 grid gap-6 lg:grid-cols-12 lg:gap-6 lg:items-stretch">
-            <div className="flex h-full flex-col gap-4 lg:col-span-5">
-              <div className="flex-1 rounded-2xl border border-white/10 bg-[#141414] p-5 sm:p-6">
-                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">{t.addressLabel}</h3>
-                <address className="mt-4 not-italic">
-                  <p className="text-lg font-semibold leading-snug text-white">{restaurantName}</p>
-                  <p className="mt-3 text-base leading-relaxed text-gray-200">
-                    Av. Oaxaca 305, Centro
-                    <br />
-                    71980 Puerto Escondido, Oax., México
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-yellow-400/90">Plaza Monte Albán</p>
-                </address>
-              </div>
-
-              <div className="flex-1 rounded-2xl border border-white/10 bg-[#161616] p-5 sm:p-6">
-                <div className="flex gap-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-yellow-400/12 text-yellow-400">
-                    <Clock className="h-4 w-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-white">{t.hoursLead}</h3>
-                    <p className="mt-2 text-base font-medium leading-snug text-gray-100">{t.hoursSchedule}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-col lg:col-span-7">
-              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a1a1a]">
-                <iframe
-                  title={t.mapIframeTitle}
-                  width="100%"
-                  height="320"
-                  className="h-full min-h-[260px] w-full flex-1 bg-[#1a1a1a] sm:min-h-[320px]"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={MAP_EMBED}
-                />
-                <a
-                  href={GOOGLE_MAPS_PLACE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-h-[46px] items-center justify-center gap-2 border-t border-white/10 bg-[#0f0f0f] px-4 py-3 text-center text-sm font-medium text-yellow-400 transition hover:bg-black hover:text-yellow-300"
-                >
-                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-                  {t.mapLarger}
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </>
   );
 }

@@ -43,7 +43,6 @@ export function getPublicRestaurantCopy(locale) {
     mobileNav: [
       ["#menu", "Menú"],
       ["#about", "Nuestra historia"],
-      ["#gallery", "Galería"],
       ["#reviews", "Reseñas"],
       ["#visit", "Ubicación y horario"],
       ["#eventos", "Eventos"],
@@ -69,14 +68,6 @@ export function getPublicRestaurantCopy(locale) {
     aboutSubtitle: "Los Tíos, Puerto Escondido",
     aboutBody:
       "Los Tíos es una pizzería con alma de playa en Puerto Escondido: pizza estilo napolitano, ambiente relajado y un horno híbrido de leña y gas. Cuatro tíos con raíces en México, Francia, Italia y Suecia; servimos masa trabajada con paciencia, ingredientes honestos y la energía tranquila de la costa oaxaqueña.",
-    galleryTitle: "Ambiente",
-    gallerySubtitle: "Síguenos en @lostios.pxm para mesas del día y promos.",
-    galleryAlts: [
-      "Pizza recién salida del horno en Los Tíos",
-      "Pizza estilo napolitano con borde dorado",
-      "Pizza recién horneada, primer plano",
-      "Los tíos compartiendo pizza en el restaurante",
-    ],
     reviewsTitle: "Lo que dice la gente",
     reviewsSubtitle: "Una selección de reseñas de Google y TripAdvisor.",
     reviewsGoogleStats: "★ {rating} en Google · {count} reseñas",
@@ -126,7 +117,6 @@ export function getPublicRestaurantCopy(locale) {
     mobileNav: [
       ["#menu", "Menu"],
       ["#about", "Our story"],
-      ["#gallery", "Gallery"],
       ["#reviews", "Reviews"],
       ["#visit", "Location & hours"],
       ["#eventos", "Events"],
@@ -152,14 +142,6 @@ export function getPublicRestaurantCopy(locale) {
     aboutSubtitle: "Los Tíos, Puerto Escondido",
     aboutBody:
       "Los Tíos is a beach town pizzeria in Puerto Escondido: Neapolitan inspired pies, relaxed room energy, and a hybrid wood and gas oven we invested in. Four uncles with roots across Mexico, France, Italy, and Sweden. We ferment with care and welcome you like family off Oaxaca’s coast.",
-    galleryTitle: "The room",
-    gallerySubtitle: "Follow @lostios.pxm for tables and specials.",
-    galleryAlts: [
-      "Fresh pizza from the oven at Los Tíos",
-      "Neapolitan style pizza with a blistered crust",
-      "Wood fired style pizza, close up",
-      "Los Tíos sharing pizza in the restaurant",
-    ],
     reviewsTitle: "What guests say",
     reviewsSubtitle: "A selection of reviews from Google and TripAdvisor.",
     reviewsGoogleStats: "★ {rating} on Google · {count} reviews",

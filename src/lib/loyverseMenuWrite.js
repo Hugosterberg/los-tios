@@ -6,9 +6,9 @@ import {
   hasLoyverseApiConfig,
 } from "@/api/loyverse";
 
-/** Set VITE_LOYVERSE_WRITE_MENU=false to disable pushing menu changes to Loyverse. */
+/** Set VITE_LOYVERSE_WRITE_MENU=true to enable pushing menu changes to Loyverse. */
 export function isLoyverseMenuWriteEnabled() {
-  return import.meta.env.VITE_LOYVERSE_WRITE_MENU !== "false";
+  return import.meta.env.VITE_LOYVERSE_WRITE_MENU === "true";
 }
 
 export function shouldSyncMenuToLoyverse(appSettingsRecord) {
