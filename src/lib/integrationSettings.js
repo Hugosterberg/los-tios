@@ -1,5 +1,8 @@
 const INTEGRATION_SETTINGS_STORAGE_KEY = "los_tios_integration_settings_v1";
 
+/** Server-backed JSON blobs — never mirror these in the browser integration overlay. */
+const INTEGRATION_LOCALSTORAGE_EXCLUDE = new Set(["daily_cash_store_json", "customer_events_json"]);
+
 const isBrowser = typeof window !== "undefined";
 
 function parseStoredSettings() {
@@ -81,13 +84,11 @@ export function saveStoredIntegrationSettings(settings) {
   }
 
   const current = parseStoredSettings();
-  window.localStorage.setItem(
-    INTEGRATION_SETTINGS_STORAGE_KEY,
-    JSON.stringify({
-      ...current,
-      ...settings,
-    }),
-  );
+  const merged = { ...current, ...settings };
+  for (const key of INTEGRATION_LOCALSTORAGE_EXCLUDE) {
+    delete merged[key];
+  }
+  window.localStorage.setItem(INTEGRATION_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
 }
 
 export function buildClipResolvedConfig(settings = {}) {

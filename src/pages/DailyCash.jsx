@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addDays,
@@ -48,11 +48,15 @@ import {
 import { expectedLaborEntriesForDate, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import {
   addManualLine,
+  disposeDailyCashPersistence,
+  flushDailyCashPersistImmediate,
   getDetailOverrides,
   getEarliestOpeningInMexicoMonth,
   getManualLines,
   getOpeningBalance,
   getOpeningCountMeta,
+  initDailyCashPersistenceLocal,
+  initDailyCashPersistenceRemote,
   listOpeningCountDiffs,
   recordOpeningCountDiff,
   removeOpeningCountDiff,
@@ -526,7 +530,7 @@ function buildLoyverseRowsForWindow(overview, rangeStart, rangeEnd) {
 export default function DailyCash() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(() => dateFromMexicoDateKey(getMexicoNowDateKey()));
-  const [periodMode, setPeriodMode] = useState(/** @type {"today" | "month"} */ ("today"));
+  const [periodMode, setPeriodMode] = useState(/** @type {"today" | "month" | "history"} */ ("today"));
   const prevPeriodMode = useRef(periodMode);
 
   useEffect(() => {
@@ -563,6 +567,7 @@ export default function DailyCash() {
     queryFn: () => base44.entities.AppSettings.list(),
     enabled: !isLocalOnlyMode,
   });
+  const settingsRowId = settings[0]?.id;
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const loyverseQuery = useQuery({
@@ -618,6 +623,65 @@ export default function DailyCash() {
 
   /** @type {null | { kind: 'legacy'; dayStr: string; line: object } | { kind: 'registered'; snapshot: object }} */
   const [lastRemovedManual, setLastRemovedManual] = useState(null);
+
+  useLayoutEffect(() => {
+    if (isLocalOnlyMode) {
+      disposeDailyCashPersistence();
+      initDailyCashPersistenceLocal();
+      setStoreTick((t) => t + 1);
+      return () => {
+        void flushDailyCashPersistImmediate();
+        disposeDailyCashPersistence();
+      };
+    }
+    if (!settingsRowId) {
+      disposeDailyCashPersistence();
+      return;
+    }
+    const rows = queryClient.getQueryData(["appSettings"]);
+    const row = Array.isArray(rows) ? rows.find((r) => r?.id === settingsRowId) : null;
+    const serverJson = typeof row?.daily_cash_store_json === "string" ? row.daily_cash_store_json : "";
+
+    const persist = async (json) => {
+      await base44.entities.AppSettings.update(settingsRowId, { daily_cash_store_json: json });
+      queryClient.setQueryData(["appSettings"], (prev) => {
+        if (!prev?.length) return prev;
+        const first = prev[0];
+        if (first?.id !== settingsRowId) return prev;
+        return [{ ...first, daily_cash_store_json: json }, ...prev.slice(1)];
+      });
+    };
+
+    disposeDailyCashPersistence();
+    const { migrated } = initDailyCashPersistenceRemote(serverJson, persist);
+    if (migrated) {
+      void flushDailyCashPersistImmediate().catch((err) => {
+        console.error("[dailyCash] migration persist failed", err);
+      });
+    }
+    setStoreTick((t) => t + 1);
+
+    return () => {
+      void flushDailyCashPersistImmediate();
+      disposeDailyCashPersistence();
+    };
+  }, [isLocalOnlyMode, settingsRowId, queryClient]);
+
+  useEffect(() => {
+    if (isLocalOnlyMode || !settingsRowId) return undefined;
+    const flush = () => {
+      void flushDailyCashPersistImmediate();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [isLocalOnlyMode, settingsRowId]);
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -764,6 +828,30 @@ export default function DailyCash() {
   }, [formDayStr, storeTick, periodMode, monthEarliestOpening]);
 
   const openingCountDiffHistory = useMemo(() => listOpeningCountDiffs(), [storeTick]);
+
+  /** Ledger rows for any Mexico day — used when Today row cache is empty (e.g. Difference history tab). */
+  const buildLedgerRowsForMexicoDay = useCallback(
+    (dayStr) => {
+      const manualCount = latestManualCountForDay(openingCountDiffHistory, dayStr);
+      const lv = loyverseByDay.get(dayStr) || [];
+      const baseRows = mergeLaborCashLedgerRows(
+        dayStr,
+        buildDayTableRows(dayStr, {
+          orders,
+          transactions,
+          expenses,
+          loyverseRows: lv,
+          manualLines: getManualLines(dayStr),
+        }),
+        employees,
+        shifts,
+        expenses,
+      );
+      return withManualCountResetRow(dayStr, baseRows, manualCount);
+    },
+    [loyverseByDay, orders, transactions, expenses, employees, shifts, openingCountDiffHistory, storeTick],
+  );
+
   const selectedDayManualCount = useMemo(
     () => latestManualCountForDay(openingCountDiffHistory, formDayStr),
     [openingCountDiffHistory, formDayStr],
@@ -813,7 +901,7 @@ export default function DailyCash() {
   }, [periodMode, priorDrawerClose, persistedOpening]);
 
   const tableRows = useMemo(() => {
-    if (periodMode === "month") return [];
+    if (periodMode === "month" || periodMode === "history") return [];
     const lv = loyverseByDay.get(formDayStr) || [];
     const rows = mergeLaborCashLedgerRows(
       formDayStr,
@@ -907,6 +995,42 @@ export default function DailyCash() {
     const end = opening !== null && Number.isFinite(opening) ? opening + t.net : null;
     return { ...t, opening, end };
   }, [periodMode, monthDrawerTotals, tableRows, formDayStr, storeTick, selectedDayManualCount]);
+
+  /**
+   * Expected physical drawer cash (manual count + ledger net).
+   * On Difference history: always **Mexico today** (live). On Today / Month: **selected** calendar day.
+   */
+  const expectedCashHeroDayStr = periodMode === "history" ? todayStr : formDayStr;
+
+  const expectedDrawerEndHero = useMemo(() => {
+    const dayStr = expectedCashHeroDayStr;
+    const manualCount = latestManualCountForDay(openingCountDiffHistory, dayStr);
+    let rows;
+    if (periodMode === "month") {
+      const section = monthLedgerSections.find((s) => s.dateStr === dayStr);
+      if (!section) return null;
+      rows = section.rows;
+    } else if (periodMode === "today" && dayStr === formDayStr) {
+      rows = tableRows;
+    } else {
+      rows = buildLedgerRowsForMexicoDay(dayStr);
+    }
+    const resetTime = manualCount ? rowSortTime(manualCount.ts, dayStr) : null;
+    const t = sumDrawerCashTotals(rows, resetTime);
+    const opening = manualCount ? Number(manualCount.enteredOpening) : getOpeningBalance(dayStr);
+    if (opening === null || !Number.isFinite(opening)) return null;
+    return opening + t.net;
+  }, [
+    periodMode,
+    expectedCashHeroDayStr,
+    formDayStr,
+    todayStr,
+    tableRows,
+    monthLedgerSections,
+    openingCountDiffHistory,
+    storeTick,
+    buildLedgerRowsForMexicoDay,
+  ]);
 
   const goPrevMonth = () => setSelectedDate((d) => subMonths(d, 1));
   const goNextMonth = () => setSelectedDate((d) => addMonths(d, 1));
@@ -1183,6 +1307,111 @@ export default function DailyCash() {
     });
   };
 
+  const differenceHistoryPanel = (
+    <div className="rounded-xl border border-amber-500/20 bg-[#14120c] p-4 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-black/30 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+          <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-400/90">
+            Table scope
+          </span>
+          <span>
+            Every row is <span className="font-medium text-gray-300">one saved count</span> for one Mexico day — not filtered by the
+            month you might have open elsewhere.
+          </span>
+        </div>
+      </div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">All logged manual counts</p>
+      <p className="mt-1 text-xs text-gray-500">
+        Each row is a saved physical count (Mexico calendar day) with the calculated expected drawer total, your actual count, and
+        the <span className="text-gray-400">± difference</span> (green = over expected, red = under). Optional comment for variance
+        notes.{" "}
+        {isLocalOnlyMode ? (
+          <>Stored in this browser in local dev — switch to </>
+        ) : (
+          <>Synced to your workspace — switch to </>
+        )}
+        <strong className="text-gray-300">Today</strong> to add entries.
+      </p>
+      <div className="mt-3 max-h-[min(75vh,880px)] overflow-auto rounded-lg border border-yellow-500/15">
+        <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
+          <thead>
+            <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
+              <th className="px-2 py-2">Updated</th>
+              <th className="px-2 py-2">Count day</th>
+              <th className="px-2 py-2">Expected source</th>
+              <th className="px-2 py-2">Comment</th>
+              <th className="px-2 py-2 text-right">Expected</th>
+              <th className="px-2 py-2 text-right">Actual manual</th>
+              <th className="px-2 py-2 text-right">Diff</th>
+              <th className="w-10 px-1 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {openingCountDiffHistory.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-14 text-center text-sm text-gray-500">
+                  No manual counts yet. Open <strong className="text-gray-300">Today</strong>, enter the MXN in the drawer, leave the
+                  field (blur) to save — each save appears here with expected vs actual and the difference.
+                </td>
+              </tr>
+            ) : (
+              openingCountDiffHistory.map((ev) => (
+                <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
+                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-500">
+                    {formatMexicoDateShort(ev.ts || "")}{" "}
+                    <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
+                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
+                    {ev.priorCloseDayStr || "No prior close"}
+                  </td>
+                  <td className="max-w-[240px] px-2 py-1.5">
+                    <Input
+                      defaultValue={ev.comment || ""}
+                      onBlur={(e) => handleManualCountCommentCommit(ev.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
+                      placeholder="Why?"
+                      className="h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
+                    {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
+                    {formatMx(ev.enteredOpening)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-2 py-1.5 text-right font-mono font-medium tabular-nums",
+                      ev.diff == null ? "text-gray-500" : ev.diff > 0 ? "text-emerald-400/90" : "text-rose-400/90",
+                    )}
+                  >
+                    {ev.diff == null ? "-" : `${ev.diff > 0 ? "+" : ""}${formatMx(ev.diff)}`}
+                  </td>
+                  <td className="px-1 py-1.5 text-right">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-gray-600 hover:bg-rose-950/40 hover:text-rose-300"
+                      onClick={() => handleRemoveManualCountDiff(ev.id)}
+                      aria-label="Delete logged manual count"
+                      title="Delete logged manual count"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#0f0f0c] text-white">
       <div className="relative overflow-hidden border-b border-yellow-500/15 bg-gradient-to-br from-[#1a1810] via-[#14120c] to-[#0c0c0a]">
@@ -1201,18 +1430,39 @@ export default function DailyCash() {
                   Register & movement
                 </h1>
                 <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-400 sm:text-[0.9375rem] sm:leading-relaxed">
-                  <strong className="font-medium text-gray-200">Cash in/out</strong> follows the physical drawer (Loyverse cash,
-                  cash orders, manual cash, and Finance expenses paid from <strong className="font-medium text-gray-200">Cash</strong>
-                  ). <strong className="font-medium text-gray-200">All other expenses</strong> for the same day (account, card,
-                  individual) also appear in muted amounts so nothing is hidden — they do not change drawer math.{" "}
-                  <strong className="font-medium text-gray-200">Today</strong> is one day at a time — use the arrows (Mexico
-                  dates, not past today). <strong className="font-medium text-gray-200">Month</strong> lists every day in the month
-                  with the same rows. Start balance is stored in this browser only.
+                  {periodMode === "history" ? (
+                    <>
+                      <strong className="font-medium text-gray-200">Difference history</strong> is a read-only audit of every
+                      saved manual cash count: timestamp, optional comment, <strong className="font-medium text-gray-200">expected</strong>{" "}
+                      drawer from calculations, your <strong className="font-medium text-gray-200">actual</strong> count, and{" "}
+                      <strong className="font-medium text-gray-200">± difference</strong>. Add new counts on{" "}
+                      <strong className="font-medium text-gray-200">Today</strong>.{" "}
+                      {isLocalOnlyMode ? (
+                        <>In this local dev session, counts stay in the browser only.</>
+                      ) : (
+                        <>Counts sync to your workspace so they survive clearing browser data.</>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <strong className="font-medium text-gray-200">Cash in/out</strong> follows the physical drawer (Loyverse cash,
+                      cash orders, manual cash, and Finance expenses paid from <strong className="font-medium text-gray-200">Cash</strong>
+                      ). <strong className="font-medium text-gray-200">All other expenses</strong> for the same day (account, card,
+                      individual) also appear in muted amounts so nothing is hidden — they do not change drawer math.{" "}
+                      <strong className="font-medium text-gray-200">Today</strong> is one Mexico calendar day at a time (not past
+                      today). <strong className="font-medium text-gray-200">Month</strong> lists each day in the month.{" "}
+                      {isLocalOnlyMode ? (
+                        <>Manual counts and drawer data stay in this browser in local dev.</>
+                      ) : (
+                        <>Manual counts and drawer totals sync to app settings when you are signed in.</>
+                      )}
+                    </>
+                  )}
                 </p>
                 <div
                   className="mt-4 inline-flex rounded-xl border border-yellow-500/40 bg-[#0c0c0a]/90 p-1 shadow-inner shadow-black/40"
                   role="group"
-                  aria-label="Ledger period"
+                  aria-label="Daily cash view: Today, Month, or Difference history"
                 >
                   <Button
                     type="button"
@@ -1242,12 +1492,56 @@ export default function DailyCash() {
                   >
                     Month
                   </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPeriodMode("history")}
+                    className={cn(
+                      "h-9 rounded-lg px-3 text-xs font-semibold transition-all sm:px-4 sm:text-sm",
+                      periodMode === "history"
+                        ? "bg-yellow-400 text-black shadow-sm hover:bg-yellow-300"
+                        : "text-gray-200 hover:bg-yellow-500/15 hover:text-yellow-50"
+                    )}
+                  >
+                    Difference history
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/25 px-3 py-2 text-[11px] text-gray-400">
+                  <span className="shrink-0 rounded border border-yellow-500/25 bg-yellow-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-yellow-500/90">
+                    View scope
+                  </span>
+                  <span>
+                    {periodMode === "history" ? (
+                      <>
+                        <span className="font-medium text-gray-300">All saved counts</span> — any Mexico day, newest first in the
+                        table. <span className="text-gray-500">Live drawer expectation stays on the right (always Mexico today).</span>
+                      </>
+                    ) : periodMode === "month" ? (
+                      <>
+                        <span className="font-medium text-gray-300">Whole month</span>{" "}
+                        <span className="tabular-nums text-yellow-200/70">{format(selectedDate, "MMMM yyyy", { locale: enUS })}</span>
+                        {" — "}
+                        ledger lists each day ≤ today; manual count box uses the day you pick in the header.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-gray-300">Single day</span>{" "}
+                        <span className="tabular-nums text-yellow-200/70">{formDayStr}</span> — cards, labor callout, and ledger below
+                        all match this Mexico date.
+                      </>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-0.5 sm:pb-1">
-              {periodMode === "month" ? (
+              {periodMode === "history" ? (
+                <p className="max-w-[16rem] pb-1 text-right text-[11px] leading-snug text-gray-500 sm:max-w-[22rem]">
+                  Audit log only — switch to <span className="text-gray-400">Today</span> to add counts
+                </p>
+              ) : periodMode === "month" ? (
                 <>
                   <Button
                     type="button"
@@ -1359,7 +1653,7 @@ export default function DailyCash() {
             </div>
           </div>
 
-          <div className="relative rounded-2xl border border-yellow-500/20 bg-black/25 px-6 py-8 shadow-[inset_0_1px_0_rgba(250,204,21,0.06)] sm:px-10 sm:py-10">
+          <div className="relative rounded-2xl border border-yellow-500/20 bg-black/25 px-6 py-8 shadow-[inset_0_1px_0_rgba(250,204,21,0.06)] sm:px-10 sm:py-10 sm:pr-40">
             {periodMode === "today" && viewingToday && (
               <span className="absolute right-6 top-6 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-yellow-300">
                 Today
@@ -1370,26 +1664,100 @@ export default function DailyCash() {
                 This month
               </span>
             )}
-            <p
-              className="text-4xl font-extralight tracking-[-0.04em] text-yellow-50 sm:text-5xl md:text-6xl"
-              style={{ fontFeatureSettings: '"ss01", "cv02"' }}
-            >
-              {periodMode === "month" ? format(selectedDate, "MMMM yyyy", { locale: enUS }) : weekday}
-            </p>
-            <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">
-              {periodMode === "month" ? "All days · incomes & expenses in the list below" : longDate}
-            </p>
-            {laborCalendarHeroTitle != null && (
-              <div className="mt-5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/20 px-3 py-2 text-xs sm:text-sm">
-                <span className="font-medium text-yellow-200/90">{laborCalendarHeroTitle}</span>
-                <span className="text-gray-500">Expected cash wages from employee calendar</span>
-              </div>
+            {periodMode === "history" && (
+              <span className="absolute right-6 top-6 rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-200/90">
+                Audit log
+              </span>
             )}
+            <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-4xl font-extralight tracking-[-0.04em] text-yellow-50 sm:text-5xl md:text-6xl"
+                  style={{ fontFeatureSettings: '"ss01", "cv02"' }}
+                >
+                  {periodMode === "history"
+                    ? "Difference history"
+                    : periodMode === "month"
+                      ? format(selectedDate, "MMMM yyyy", { locale: enUS })
+                      : weekday}
+                </p>
+                <p className="mt-2 text-lg font-medium text-yellow-500/90 sm:text-xl">
+                  {periodMode === "history"
+                    ? "Expected drawer vs manual count · every save with timestamp"
+                    : periodMode === "month"
+                      ? "All days · incomes & expenses in the list below"
+                      : longDate}
+                </p>
+                {laborCalendarHeroTitle != null && (
+                  <div className="mt-5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/20 px-3 py-2 text-xs sm:text-sm">
+                    <span className="font-medium text-yellow-200/90">{laborCalendarHeroTitle}</span>
+                    <span className="text-gray-500">Expected cash wages from employee calendar</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0 border-t border-yellow-500/15 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-yellow-500/75">
+                  Expected company cash
+                </p>
+                <p className="mt-1.5 max-w-[19rem] text-[11px] leading-relaxed text-gray-500">
+                  {periodMode === "history" ? (
+                    <>
+                      <span className="font-medium text-yellow-600/85">Live · Mexico today</span>{" "}
+                      <span className="tabular-nums text-gray-400">({todayStr})</span> — physical drawer: manual count + cash in/out
+                      through the drawer. The audit table below covers <span className="text-gray-400">all days</span>, not only
+                      today.
+                    </>
+                  ) : periodMode === "month" ? (
+                    <>
+                      <span className="font-medium text-gray-300">Selected header day</span>{" "}
+                      <span className="tabular-nums text-gray-400">{formDayStr}</span> — same as{" "}
+                      <span className="text-yellow-600/90">End cash</span> for that day. Month ledger further down lists every day in
+                      the month separately.
+                    </>
+                  ) : (
+                    <>
+                      Physical drawer for Mexico day{" "}
+                      <span className="font-medium tabular-nums text-gray-400">{formDayStr}</span>: manual count + cash in/out
+                      through the drawer. Same as <span className="text-yellow-600/90">End cash</span> below — updates live.
+                    </>
+                  )}
+                </p>
+                <p
+                  className="mt-4 text-4xl font-light tabular-nums tracking-tight text-yellow-100 sm:text-5xl md:text-6xl"
+                  style={{ fontFeatureSettings: '"tnum", "ss01"' }}
+                  aria-live="polite"
+                >
+                  {expectedDrawerEndHero != null ? formatMx(expectedDrawerEndHero) : "—"}
+                </p>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-widest text-gray-600">MXN · in drawer</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {periodMode === "history" ? (
+          differenceHistoryPanel
+        ) : (
+        <>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-[#14120c] px-3 py-2 text-[11px] text-gray-400">
+          <span className="rounded border border-yellow-500/25 bg-yellow-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-yellow-600/90">
+            Block scope
+          </span>
+          {periodMode === "month" ? (
+            <span>
+              Manual count, net, end cash, register cash, labor, and ledger below follow{" "}
+              <span className="font-medium text-yellow-200/80">this month + header day {formDayStr}</span> (see View scope above).
+            </span>
+          ) : (
+            <span>
+              Everything in this section is for <span className="font-medium tabular-nums text-yellow-200/80">{formDayStr}</span>{" "}
+              only (Mexico).
+            </span>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-yellow-500/15 bg-[#161612] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
@@ -1521,90 +1889,6 @@ export default function DailyCash() {
           </div>
         </div>
 
-        {openingCountDiffHistory.length > 0 && (
-          <div className="rounded-xl border border-amber-500/20 bg-[#14120c] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">
-              Manual counting difference history
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Each row is a saved manual cash count with the calculated expected value, the actual count entered, and the
-              difference. Add an optional comment when you want to explain why it differs. Stored in this browser only.
-            </p>
-            <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-yellow-500/15">
-              <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
-                <thead>
-                  <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
-                    <th className="px-2 py-2">Updated</th>
-                    <th className="px-2 py-2">Count day</th>
-                    <th className="px-2 py-2">Expected source</th>
-                    <th className="px-2 py-2">Comment</th>
-                    <th className="px-2 py-2 text-right">Expected</th>
-                    <th className="px-2 py-2 text-right">Actual manual</th>
-                    <th className="px-2 py-2 text-right">Diff</th>
-                    <th className="w-10 px-1 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {openingCountDiffHistory.map((ev) => (
-                    <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
-                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-500">
-                        {formatMexicoDateShort(ev.ts || "")}{" "}
-                        <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
-                        {ev.priorCloseDayStr || "No prior close"}
-                      </td>
-                      <td className="max-w-[240px] px-2 py-1.5">
-                        <Input
-                          defaultValue={ev.comment || ""}
-                          onBlur={(e) => handleManualCountCommentCommit(ev.id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") e.currentTarget.blur();
-                          }}
-                          placeholder="Why?"
-                          className="h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
-                        {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
-                        {formatMx(ev.enteredOpening)}
-                      </td>
-                      <td
-                        className={cn(
-                          "px-2 py-1.5 text-right font-mono font-medium tabular-nums",
-                          ev.diff == null
-                            ? "text-gray-500"
-                            : ev.diff > 0
-                              ? "text-emerald-400/90"
-                              : "text-rose-400/90",
-                        )}
-                      >
-                        {ev.diff == null ? "-" : `${ev.diff > 0 ? "+" : ""}${formatMx(ev.diff)}`}
-                      </td>
-                      <td className="px-1 py-1.5 text-right">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-gray-600 hover:bg-rose-950/40 hover:text-rose-300"
-                          onClick={() => handleRemoveManualCountDiff(ev.id)}
-                          aria-label="Delete logged manual count"
-                          title="Delete logged manual count"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         <div className="rounded-xl border border-sky-500/25 bg-[#101820] p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-500/90">Labor (employees)</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1634,7 +1918,8 @@ export default function DailyCash() {
                 <strong className="text-yellow-200/80">{formDayStr}</strong>
                 {periodMode === "month"
                   ? " (pick the day with the calendar in the header). Visible under Finance / Company account."
-                  : " (visible under Finance / Company account). In local dev, rows are stored in this browser."}
+                  : " (visible under Finance / Company account)."}
+                {useLocalFinance ? " In local finance dev mode, rows stay in this browser." : ""}
               </p>
             </div>
             <Button
@@ -1709,7 +1994,12 @@ export default function DailyCash() {
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-600/90">
               {periodMode === "month" ? "Month ledger (day by day)" : "Day ledger"}
             </h2>
-            <p className="text-[11px] leading-relaxed text-gray-400">
+            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-500">
+              {periodMode === "month"
+                ? `Each section is one Mexico day in ${format(selectedDate, "MMMM yyyy", { locale: enUS })} · days after today hidden`
+                : `Mexico day ${formDayStr} · totals row matches the cards above`}
+            </p>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
               Every <strong className="font-medium text-gray-300">Finance expense</strong> is listed.{" "}
               <strong className="font-medium text-rose-300/80">Out</strong> in full color hits the cash drawer;{" "}
               <strong className="font-medium text-gray-400">muted Out</strong> is non-drawer (card/account/individual). Includes
@@ -1790,6 +2080,8 @@ export default function DailyCash() {
             </table>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
