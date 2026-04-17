@@ -28,6 +28,7 @@ import { Calendar as DayPickerCalendar } from "@/components/ui/calendar";
 import { parseISO } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { MexicoWallTimePicker } from "@/components/daily-cash/MexicoWallTimePicker";
 import { listMenuItems } from "@/lib/local-dev-menu";
 import { collectShoppingIngredientPillLabels, ingredientMatchKey } from "@/lib/menuIngredients";
 import {
@@ -47,7 +48,10 @@ import {
   formatMexicoMonthYearLabelEn,
   getMexicoDateKey,
   getMexicoNowDateKey,
+  getMexicoNowTimeHHmm,
   getMexicoNowYearMonth,
+  mexicoWallDateTimeToUtcIso,
+  normalizeHHmm,
   withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
 
@@ -127,6 +131,8 @@ export default function ShoppingList() {
   const [quickShoppingLabel, setQuickShoppingLabel] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
   const [quickPurchaseDate, setQuickPurchaseDate] = useState(() => getMexicoNowDateKey());
+  /** HH:mm on the Mexico business clock (same as Daily Cash / Finance). */
+  const [quickPurchaseTime, setQuickPurchaseTime] = useState(() => getMexicoNowTimeHHmm());
   /** "cash" → company_cash, "card" → company_account (same as Finance expenses) */
   const [quickPurchasePayment, setQuickPurchasePayment] = useState("cash");
   const [purchaseDateOpen, setPurchaseDateOpen] = useState(false);
@@ -254,10 +260,17 @@ export default function ShoppingList() {
   });
 
   const createExpense = useMutation({
-    mutationFn: (data) =>
-      useLocalFinance
-        ? localCreateExpense(data)
-        : base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
+    mutationFn: (data) => {
+      if (useLocalFinance) {
+        return localCreateExpense(data);
+      }
+      const { created_date: explicitCreated, ...rest } = data;
+      const base = withMexicoCreatedDateForPayload(rest);
+      if (explicitCreated != null && String(explicitCreated).trim() !== "") {
+        return base44.entities.Expense.create({ ...base, created_date: String(explicitCreated).trim() });
+      }
+      return base44.entities.Expense.create(base);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
@@ -535,6 +548,7 @@ export default function ShoppingList() {
     }
 
     const dateStr = quickPurchaseDate || getMexicoNowDateKey();
+    const createdIso = mexicoWallDateTimeToUtcIso(dateStr, normalizeHHmm(quickPurchaseTime));
 
     const listPayload = {
       item_name: itemName,
@@ -569,6 +583,7 @@ export default function ShoppingList() {
         shopping_list_id: createdList.id,
         is_recurring: false,
         contributors: [],
+        ...(createdIso ? { created_date: createdIso } : {}),
       };
       const createdExpense = await createExpense.mutateAsync(expensePayload);
       const expenseId = createdExpense?.id;
@@ -653,6 +668,7 @@ export default function ShoppingList() {
     }
 
     const today = getMexicoNowDateKey();
+    const createdIso = mexicoWallDateTimeToUtcIso(today, getMexicoNowTimeHHmm());
 
     try {
       await updateItem.mutateAsync({
@@ -678,6 +694,7 @@ export default function ShoppingList() {
         paid_by_company: paymentSource === "company_cash" || paymentSource === "company_account",
         from_shopping_list: true,
         shopping_list_id: item.id,
+        ...(createdIso ? { created_date: createdIso } : {}),
       };
 
       const createdExpense = await createExpense.mutateAsync(expenseData);
@@ -1277,7 +1294,8 @@ export default function ShoppingList() {
               <h2 className="text-sm font-bold text-yellow-400">Register purchase</h2>
               <p className="mt-1 text-xs text-gray-400">
                 Pick <strong className="text-gray-300">Shopping</strong> for a custom name, or any menu line below. Then enter
-                amount, whether you paid <strong className="text-gray-300">cash</strong> or <strong className="text-gray-300">card</strong>, and the date. Use one date for several lines from the same trip.
+                amount, whether you paid <strong className="text-gray-300">cash</strong> or <strong className="text-gray-300">card</strong>, the
+                Mexico <strong className="text-gray-300">date and time</strong> of the purchase, then save. Use one date/time for several lines from the same trip.
               </p>
             </div>
 
@@ -1429,6 +1447,17 @@ export default function ShoppingList() {
                         />
                       </PopoverContent>
                     </Popover>
+                    <div className="mt-2 space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-400">Purchase time (Mexico)</Label>
+                      <MexicoWallTimePicker
+                        value={quickPurchaseTime}
+                        onChange={(v) => setQuickPurchaseTime(v)}
+                        className="w-full justify-center sm:justify-start"
+                      />
+                      <p className="text-[10px] text-gray-600">
+                        Uses America/Mexico_City — same clock as Daily Cash and Finance.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

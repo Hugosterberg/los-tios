@@ -129,6 +129,13 @@ export function getMexicoDateAndTimePartsForInput(isoLike) {
   return { dateKey, timeHHmm: `${h.padStart(2, "0")}:${m.padStart(2, "0")}` };
 }
 
+/** Normalize time strings (e.g. 9:05 → 09:05) for Mexico wall inputs. */
+export function normalizeHHmm(raw) {
+  const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return "";
+  return `${String(Number(m[1])).padStart(2, "0")}:${String(Number(m[2])).padStart(2, "0")}`;
+}
+
 /**
  * UTC instant from a Mexico wall date + time (America/Mexico_City, fixed −06:00).
  * @param {string} dateKey yyyy-MM-dd

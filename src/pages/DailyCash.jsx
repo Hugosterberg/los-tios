@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Loader2,
   Plus,
   Trash2,
   Undo2,
@@ -87,20 +88,15 @@ import {
   getMexicoDateKey,
   getMexicoNowDateKey,
   getMexicoYearMonthKey,
+  isPlainDateKey,
   matchesMexicoCalendarDay,
   mexicoWallDateTimeToUtcIso,
+  normalizeHHmm,
   withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
 
 /** Marks rows created from Daily Cash so they can be removed / undone from this page */
 const DAILY_CASH_TX_MARKER = "los_tios:daily_cash";
-
-/** Normalize HTML time input (e.g. 9:05 → 09:05) for comparisons. */
-function normalizeHHmm(raw) {
-  const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return "";
-  return `${String(Number(m[1])).padStart(2, "0")}:${String(Number(m[2])).padStart(2, "0")}`;
-}
 
 /** Mexico wall date + time for a saved manual count — fixes sort vs register purchases when you log late. */
 function ManualCountWhenCell({ ev, onCommit }) {
@@ -140,10 +136,19 @@ function ManualCountWhenCell({ ev, onCommit }) {
   );
 }
 
-/** Editable TIME for ledger rows — persists to Finance entities when possible; Loyverse uses AppSettings overrides. */
-function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
+/**
+ * Editable TIME for ledger rows — stages changes until “Save time changes” below.
+ * Loyverse / labor rows still use AppSettings overrides on save.
+ */
+function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onReset }) {
   const overrideIso = getLedgerTimeOverrides(ledgerDay)[row.id];
-  const refIso = overrideIso ?? new Date(row.sortTime).toISOString();
+  const refIso = (() => {
+    if (pendingEdit) {
+      const iso = mexicoWallDateTimeToUtcIso(pendingEdit.dateKeyMexico, normalizeHHmm(pendingEdit.timeHHmm));
+      if (iso) return iso;
+    }
+    return overrideIso ?? new Date(row.sortTime).toISOString();
+  })();
   const initParts = () => getMexicoDateAndTimePartsForInput(refIso);
   const [dateKey, setDateKey] = useState(() => initParts().dateKey);
   const [timeHHmm, setTimeHHmm] = useState(() => initParts().timeHHmm);
@@ -158,13 +163,19 @@ function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
   }, [timeHHmm]);
 
   useLayoutEffect(() => {
-    const ri = overrideIso ?? new Date(row.sortTime).toISOString();
+    const ri = (() => {
+      if (pendingEdit) {
+        const iso = mexicoWallDateTimeToUtcIso(pendingEdit.dateKeyMexico, normalizeHHmm(pendingEdit.timeHHmm));
+        if (iso) return iso;
+      }
+      return overrideIso ?? new Date(row.sortTime).toISOString();
+    })();
     const p = getMexicoDateAndTimePartsForInput(ri);
     setDateKey(p.dateKey);
     setTimeHHmm(p.timeHHmm);
-  }, [row.id, row.sortTime, ledgerDay, overrideIso]);
+  }, [row.id, row.sortTime, ledgerDay, overrideIso, pendingEdit]);
 
-  const tryCommit = useCallback(
+  const stageIfChanged = useCallback(
     (dRaw, tRaw) => {
       const d = String(dRaw ?? "").trim();
       const t = normalizeHHmm(tRaw);
@@ -173,34 +184,37 @@ function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
       if (!iso) return;
       const compareIso = overrideIso ?? new Date(row.sortTime).toISOString();
       const wall = getMexicoDateAndTimePartsForInput(compareIso);
-      if (wall.dateKey === d && wall.timeHHmm === t) return;
-      void Promise.resolve(onCommit(row.id, d, t)).catch((err) => {
-        console.error("[ledgerTime]", err);
-      });
+      if (wall.dateKey === d && wall.timeHHmm === t) {
+        onClearPending?.(ledgerDay, row.id);
+        return;
+      }
+      onStageChange?.(ledgerDay, row.id, d, t);
     },
-    [row.id, row.sortTime, onCommit, overrideIso],
+    [row.id, row.sortTime, ledgerDay, overrideIso, onStageChange, onClearPending],
   );
 
   const commitIfChanged = useCallback(
     (overrideDateKey) => {
       const d = (overrideDateKey ?? dateKeyRef.current ?? "").trim();
       const t = normalizeHHmm(timeHHmmRef.current);
-      tryCommit(d, t);
+      stageIfChanged(d, t);
     },
-    [tryCommit],
+    [stageIfChanged],
   );
 
   if (row.isManualCountReset) {
     return <span className="tabular-nums text-gray-500">{row.timeLabel}</span>;
   }
 
+  const showReset = Boolean(overrideIso || pendingEdit);
+
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {overrideIso ? (
+      {showReset ? (
         <button
           type="button"
           className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-amber-400/90 underline-offset-2 hover:text-amber-300 hover:underline"
-          title="Restore Loyverse / original time"
+          title="Restore original time and clear unsaved edits"
           onClick={() => onReset(row.id)}
         >
           Reset
@@ -223,7 +237,7 @@ function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
         onInteractiveCommit={(next) => {
           timeHHmmRef.current = next;
           setTimeHHmm(next);
-          tryCommit(dateKeyRef.current, next);
+          stageIfChanged(dateKeyRef.current, next);
         }}
         onPopoverClose={() => commitIfChanged()}
       />
@@ -247,6 +261,31 @@ function applyLedgerTimeOverrides(dayStr, rows) {
   });
   next.sort((a, b) => b.sortTime - a.sortTime);
   return next;
+}
+
+/** Unsaved TIME edits (before "Save") — preview sort using staged Mexico wall time. */
+function applyPendingLedgerSort(dayStr, rows, pendingMap) {
+  if (!pendingMap || Object.keys(pendingMap).length === 0) {
+    const copy = [...rows];
+    copy.sort((a, b) => b.sortTime - a.sortTime);
+    return copy;
+  }
+  const next = rows.map((r) => {
+    const key = `${dayStr}::${r.id}`;
+    const p = pendingMap[key];
+    if (!p) return r;
+    const iso = mexicoWallDateTimeToUtcIso(p.dateKeyMexico, normalizeHHmm(p.timeHHmm));
+    if (!iso) return r;
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return r;
+    return { ...r, sortTime: t, timeLabel: rowTimeLabel(iso) };
+  });
+  next.sort((a, b) => b.sortTime - a.sortTime);
+  return next;
+}
+
+function ledgerPendingKey(ledgerDay, rowId) {
+  return `${ledgerDay}::${rowId}`;
 }
 
 function dayKey(d) {
@@ -405,7 +444,11 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const amt = Number(t.amount || 0);
     const isDailyCashRegistered =
       String(t.notes || "") === DAILY_CASH_TX_MARKER || String(t.notes || "").includes(DAILY_CASH_TX_MARKER);
-    const whenIso = t.created_date || `${String(t.date).slice(0, 10)}T12:00:00`;
+    const txDateKey = isPlainDateKey(String(t.date)) ? String(t.date).trim().slice(0, 10) : dayStr;
+    const whenIso =
+      t.created_date ||
+      mexicoWallDateTimeToUtcIso(txDateKey, "12:00") ||
+      new Date(`${dayStr}T12:00:00-06:00`).toISOString();
     if (t.type === "contribution") {
       rows.push({
         _ledgerDay: dayStr,
@@ -441,9 +484,11 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const fromShopping = Boolean(e.from_shopping_list);
     const ps = String(e.payment_source || "company_cash");
     const fromCashDrawer = ps === "company_cash";
+    const exDateKey = isPlainDateKey(String(e.date)) ? String(e.date).trim().slice(0, 10) : dayStr;
     const whenIso =
       e.created_date ||
-      (e.date ? `${String(e.date).slice(0, 10)}T12:00:00` : `${dayStr}T12:00:00`);
+      mexicoWallDateTimeToUtcIso(exDateKey, "12:00") ||
+      new Date(`${dayStr}T12:00:00-06:00`).toISOString();
     let sourceLabel;
     if (fromCashDrawer) {
       sourceLabel = fromShopping ? "Register purchase" : "Expense (cash drawer)";
@@ -789,6 +834,13 @@ export default function DailyCash() {
   /** @type {null | { kind: 'legacy'; dayStr: string; line: object } | { kind: 'registered'; snapshot: object }} */
   const [lastRemovedManual, setLastRemovedManual] = useState(null);
 
+  /** Staged ledger TIME edits — key `${ledgerDay}::${rowId}` until user clicks “Save time changes”. */
+  const [pendingLedgerTimes, setPendingLedgerTimes] = useState(
+    /** @type {Record<string, { ledgerDay: string; rowId: string; dateKeyMexico: string; timeHHmm: string }>} */ ({}),
+  );
+  const [savingLedgerTimes, setSavingLedgerTimes] = useState(false);
+  const pendingLedgerCount = Object.keys(pendingLedgerTimes).length;
+
   useLayoutEffect(() => {
     if (isLocalOnlyMode) {
       disposeDailyCashPersistence();
@@ -1088,11 +1140,27 @@ export default function DailyCash() {
       shifts,
       expenses,
     );
-    return applyLedgerTimeOverrides(
+    return applyPendingLedgerSort(
       formDayStr,
-      withManualCountResetRow(formDayStr, rows, selectedDayManualCount),
+      applyLedgerTimeOverrides(
+        formDayStr,
+        withManualCountResetRow(formDayStr, rows, selectedDayManualCount),
+      ),
+      pendingLedgerTimes,
     );
-  }, [periodMode, formDayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick, selectedDayManualCount]);
+  }, [
+    periodMode,
+    formDayStr,
+    orders,
+    transactions,
+    expenses,
+    loyverseByDay,
+    employees,
+    shifts,
+    storeTick,
+    selectedDayManualCount,
+    pendingLedgerTimes,
+  ]);
 
   const monthLedgerSections = useMemo(() => {
     if (periodMode !== "month") return [];
@@ -1116,7 +1184,11 @@ export default function DailyCash() {
           expenses,
         );
         const reset = latestManualCountForDay(openingCountDiffHistory, ds);
-        const rows = applyLedgerTimeOverrides(ds, withManualCountResetRow(ds, baseRows, reset));
+        const rows = applyPendingLedgerSort(
+          ds,
+          applyLedgerTimeOverrides(ds, withManualCountResetRow(ds, baseRows, reset)),
+          pendingLedgerTimes,
+        );
         const t = sumDrawerCashTotals(rows, reset ? rowSortTime(reset.ts, ds) : null);
         const labor = totalExpectedLaborForDate(ds, employees, shifts);
         return {
@@ -1129,7 +1201,20 @@ export default function DailyCash() {
       })
       .filter((s) => s.dateStr <= todayStr)
       .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
-  }, [periodMode, selectedDate, todayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick, openingCountDiffHistory]);
+  }, [
+    periodMode,
+    selectedDate,
+    todayStr,
+    orders,
+    transactions,
+    expenses,
+    loyverseByDay,
+    employees,
+    shifts,
+    storeTick,
+    openingCountDiffHistory,
+    pendingLedgerTimes,
+  ]);
 
   const monthDrawerTotals = useMemo(() => {
     if (periodMode !== "month") return null;
@@ -1273,10 +1358,28 @@ export default function DailyCash() {
     setStoreTick((t) => t + 1);
   }, []);
 
-  const handleLedgerTimeCommit = useCallback(
+  const handleStageLedgerTime = useCallback((ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
+    const key = ledgerPendingKey(ledgerDay, rowId);
+    setPendingLedgerTimes((prev) => ({
+      ...prev,
+      [key]: { ledgerDay, rowId, dateKeyMexico, timeHHmm },
+    }));
+  }, []);
+
+  const handleClearPendingLedgerTime = useCallback((ledgerDay, rowId) => {
+    const key = ledgerPendingKey(ledgerDay, rowId);
+    setPendingLedgerTimes((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const persistLedgerTimeCommit = useCallback(
     async (ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
       const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
-      if (!iso) return;
+      if (!iso) throw new Error("Invalid date or time");
 
       const clearOverridesForRow = () => {
         setLedgerTimeOverride(ledgerDay, rowId, null);
@@ -1291,71 +1394,98 @@ export default function DailyCash() {
         void flushDailyCashPersistImmediate();
       };
 
-      try {
-        if (rowId.startsWith("loyverse-") || rowId.startsWith("labor-cash-")) {
-          persistOverrideOnly();
-          return;
-        }
-
-        if (rowId.startsWith("manual-count-reset-")) {
-          return;
-        }
-
-        if (rowId.startsWith("man-")) {
-          const manualId = rowId.slice("man-".length);
-          moveManualLineToDay(ledgerDay, dateKeyMexico, manualId, { createdAt: iso });
-          clearOverridesForRow();
-          setStoreTick((t) => t + 1);
-          void flushDailyCashPersistImmediate();
-          return;
-        }
-
-        if (rowId.startsWith("exp-")) {
-          const id = rowId.slice("exp-".length);
-          if (useLocalFinance) {
-            await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
-          } else {
-            await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
-          }
-          queryClient.invalidateQueries({ queryKey: ["expenses"] });
-          clearOverridesForRow();
-          setStoreTick((t) => t + 1);
-          return;
-        }
-
-        if (rowId.startsWith("tx-in-") || rowId.startsWith("tx-out-")) {
-          const id = rowId.startsWith("tx-in-") ? rowId.slice("tx-in-".length) : rowId.slice("tx-out-".length);
-          if (useLocalFinance) {
-            await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
-          } else {
-            await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
-          }
-          queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
-          clearOverridesForRow();
-          setStoreTick((t) => t + 1);
-          return;
-        }
-
-        if (rowId.startsWith("order-")) {
-          const id = rowId.slice("order-".length);
-          const payload = { created_date: iso, updated_date: new Date().toISOString() };
-          await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
-          queryClient.invalidateQueries({ queryKey: ["orders"] });
-          clearOverridesForRow();
-          setStoreTick((t) => t + 1);
-          return;
-        }
-
+      if (rowId.startsWith("loyverse-") || rowId.startsWith("labor-cash-")) {
         persistOverrideOnly();
-      } catch (e) {
-        console.error(e);
-        alert("Could not save time. Try again.");
+        return;
       }
+
+      if (rowId.startsWith("manual-count-reset-")) {
+        return;
+      }
+
+      if (rowId.startsWith("man-")) {
+        const manualId = rowId.slice("man-".length);
+        moveManualLineToDay(ledgerDay, dateKeyMexico, manualId, { createdAt: iso });
+        clearOverridesForRow();
+        setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
+        return;
+      }
+
+      if (rowId.startsWith("exp-")) {
+        const id = rowId.slice("exp-".length);
+        if (useLocalFinance) {
+          await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
+        } else {
+          await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
+        }
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        clearOverridesForRow();
+        setStoreTick((t) => t + 1);
+        return;
+      }
+
+      if (rowId.startsWith("tx-in-") || rowId.startsWith("tx-out-")) {
+        const id = rowId.startsWith("tx-in-") ? rowId.slice("tx-in-".length) : rowId.slice("tx-out-".length);
+        if (useLocalFinance) {
+          await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
+        } else {
+          await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
+        }
+        queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+        clearOverridesForRow();
+        setStoreTick((t) => t + 1);
+        return;
+      }
+
+      if (rowId.startsWith("order-")) {
+        const id = rowId.slice("order-".length);
+        const payload = { created_date: iso, updated_date: new Date().toISOString() };
+        await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        clearOverridesForRow();
+        setStoreTick((t) => t + 1);
+        return;
+      }
+
+      persistOverrideOnly();
     },
     [queryClient, useLocalFinance],
   );
 
+  const handleSavePendingLedgerTimes = useCallback(async () => {
+    const entries = Object.entries(pendingLedgerTimes);
+    if (!entries.length) return;
+    setSavingLedgerTimes(true);
+    const remaining =
+      /** @type {Record<string, { ledgerDay: string; rowId: string; dateKeyMexico: string; timeHHmm: string }>} */ ({});
+    try {
+      for (const [key, e] of entries) {
+        try {
+          await persistLedgerTimeCommit(e.ledgerDay, e.rowId, e.dateKeyMexico, e.timeHHmm);
+        } catch (err) {
+          console.error("[ledgerTime]", err);
+          remaining[key] = e;
+        }
+      }
+      setPendingLedgerTimes(remaining);
+      setStoreTick((t) => t + 1);
+      if (Object.keys(remaining).length) {
+        alert("Some rows could not be saved. Check the network and try again for the remaining edits.");
+      }
+    } finally {
+      setSavingLedgerTimes(false);
+    }
+  }, [pendingLedgerTimes, persistLedgerTimeCommit]);
+
   const handleLedgerTimeReset = useCallback((ledgerDay, rowId) => {
+    const key = ledgerPendingKey(ledgerDay, rowId);
+    setPendingLedgerTimes((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     setLedgerTimeOverride(ledgerDay, rowId, null);
     setStoreTick((t) => t + 1);
     void flushDailyCashPersistImmediate();
@@ -1500,7 +1630,9 @@ export default function DailyCash() {
             <LedgerTimeCell
               row={r}
               ledgerDay={sectionDayStr}
-              onCommit={(rowId, d, t) => handleLedgerTimeCommit(sectionDayStr, rowId, d, t)}
+              pendingEdit={pendingLedgerTimes[ledgerPendingKey(sectionDayStr, r.id)]}
+              onStageChange={handleStageLedgerTime}
+              onClearPending={handleClearPendingLedgerTime}
               onReset={(rowId) => handleLedgerTimeReset(sectionDayStr, rowId)}
             />
           </td>
@@ -2143,7 +2275,7 @@ export default function DailyCash() {
             </p>
             {laborInNet > 0 && (
               <p className="mt-1 text-[11px] text-sky-400/80">
-                Varav lön: {formatMx(laborInNet)}
+                Of which salary: {formatMx(laborInNet)}
               </p>
             )}
           </div>
@@ -2355,6 +2487,31 @@ export default function DailyCash() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-yellow-500/15 bg-[#14120c] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] leading-relaxed text-gray-500">
+              {pendingLedgerCount > 0 ? (
+                <>
+                  <span className="font-medium text-amber-200/90">{pendingLedgerCount} unsaved time change(s).</span> Use{" "}
+                  <strong className="text-gray-300">Save time changes</strong> to write to the database (or app settings for
+                  Loyverse rows).
+                </>
+              ) : (
+                <>
+                  After changing date or time in the <strong className="text-gray-400">Time</strong> column, click{" "}
+                  <strong className="text-gray-300">Save time changes</strong> so updates persist and the list stays sorted.
+                </>
+              )}
+            </p>
+            <Button
+              type="button"
+              disabled={pendingLedgerCount === 0 || savingLedgerTimes}
+              onClick={() => void handleSavePendingLedgerTimes()}
+              className="h-9 shrink-0 gap-2 bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40"
+            >
+              {savingLedgerTimes ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              {savingLedgerTimes ? "Saving…" : "Save time changes"}
+            </Button>
           </div>
         </div>
         </>

@@ -63,7 +63,7 @@ export function MexicoWallDatePicker({ value, onChange, onPopoverClose, classNam
         <button
           type="button"
           disabled={disabled}
-          aria-label={value ? `Datum ${value}` : "Välj datum"}
+          aria-label={value ? `Date ${value}` : "Pick date"}
           className={cn(
             "inline-flex h-7 min-w-[6.75rem] items-center justify-center gap-1 rounded border border-yellow-500/25 bg-black/35 px-1.5 text-[10px] font-medium tabular-nums text-gray-200 transition hover:border-yellow-400/35 hover:bg-yellow-500/[0.06] focus-visible:outline focus-visible:ring-1 focus-visible:ring-yellow-500/45 disabled:opacity-50",
             className,
