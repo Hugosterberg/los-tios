@@ -1414,37 +1414,67 @@ export default function DailyCash() {
 
       if (rowId.startsWith("exp-")) {
         const id = rowId.slice("exp-".length);
-        if (useLocalFinance) {
-          await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
+        try {
+          if (useLocalFinance) {
+            await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
+          } else {
+            await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
+          }
+        } catch (e) {
+          console.error("[ledger] Expense.update (time)", e);
+        }
+        if (dateKeyMexico === ledgerDay) {
+          setLedgerTimeOverride(ledgerDay, rowId, iso);
         } else {
-          await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
+          setLedgerTimeOverride(ledgerDay, rowId, null);
+          setLedgerTimeOverride(dateKeyMexico, rowId, iso);
         }
         queryClient.invalidateQueries({ queryKey: ["expenses"] });
-        clearOverridesForRow();
         setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
         return;
       }
 
       if (rowId.startsWith("tx-in-") || rowId.startsWith("tx-out-")) {
         const id = rowId.startsWith("tx-in-") ? rowId.slice("tx-in-".length) : rowId.slice("tx-out-".length);
-        if (useLocalFinance) {
-          await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
+        try {
+          if (useLocalFinance) {
+            await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
+          } else {
+            await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
+          }
+        } catch (e) {
+          console.error("[ledger] CompanyTransaction.update (time)", e);
+        }
+        if (dateKeyMexico === ledgerDay) {
+          setLedgerTimeOverride(ledgerDay, rowId, iso);
         } else {
-          await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
+          setLedgerTimeOverride(ledgerDay, rowId, null);
+          setLedgerTimeOverride(dateKeyMexico, rowId, iso);
         }
         queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
-        clearOverridesForRow();
         setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
         return;
       }
 
       if (rowId.startsWith("order-")) {
         const id = rowId.slice("order-".length);
         const payload = { created_date: iso, updated_date: new Date().toISOString() };
-        await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+        try {
+          await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+        } catch (e) {
+          console.error("[ledger] Order.update (time)", e);
+        }
+        if (dateKeyMexico === ledgerDay) {
+          setLedgerTimeOverride(ledgerDay, rowId, iso);
+        } else {
+          setLedgerTimeOverride(ledgerDay, rowId, null);
+          setLedgerTimeOverride(dateKeyMexico, rowId, iso);
+        }
         queryClient.invalidateQueries({ queryKey: ["orders"] });
-        clearOverridesForRow();
         setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
         return;
       }
 
@@ -1470,13 +1500,16 @@ export default function DailyCash() {
       }
       setPendingLedgerTimes(remaining);
       setStoreTick((t) => t + 1);
+      await queryClient.refetchQueries({ queryKey: ["expenses"] });
+      await queryClient.refetchQueries({ queryKey: ["companyTransactions"] });
+      await queryClient.refetchQueries({ queryKey: ["orders"] });
       if (Object.keys(remaining).length) {
         alert("Some rows could not be saved. Check the network and try again for the remaining edits.");
       }
     } finally {
       setSavingLedgerTimes(false);
     }
-  }, [pendingLedgerTimes, persistLedgerTimeCommit]);
+  }, [pendingLedgerTimes, persistLedgerTimeCommit, queryClient]);
 
   const handleLedgerTimeReset = useCallback((ledgerDay, rowId) => {
     const key = ledgerPendingKey(ledgerDay, rowId);
@@ -2423,6 +2456,13 @@ export default function DailyCash() {
               line items. In <strong className="text-gray-300">Month</strong>, each date is a section (newest day first; future
               days hidden) with subtotals + labor (header). Click detail to edit (blur or Enter).
             </p>
+            <p className="mt-2 rounded-md border border-amber-500/25 bg-amber-950/30 px-2.5 py-2 text-[11px] leading-relaxed text-amber-100/90">
+              <strong className="text-amber-200">Time edits:</strong> change date/time, then click{" "}
+              <strong className="text-gray-100">Save time changes</strong> at the bottom (stored for this ledger even if Finance API
+              ignores <span className="tabular-nums">created_date</span>). To exclude rows from the total{" "}
+              <em>after</em> a manual count, set their time <strong className="text-gray-100">earlier</strong> than the manual count so they
+              sort below it (dimmed).
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
@@ -2488,7 +2528,7 @@ export default function DailyCash() {
               </tfoot>
             </table>
           </div>
-          <div className="flex flex-col gap-2 border-t border-yellow-500/15 bg-[#14120c] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="sticky bottom-0 z-20 flex flex-col gap-2 border-t border-yellow-500/20 bg-[#14120c]/98 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[11px] leading-relaxed text-gray-500">
               {pendingLedgerCount > 0 ? (
                 <>
