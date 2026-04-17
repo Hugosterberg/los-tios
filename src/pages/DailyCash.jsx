@@ -568,6 +568,8 @@ export default function DailyCash() {
     enabled: !isLocalOnlyMode,
   });
   const settingsRowId = settings[0]?.id;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const loyverseQuery = useQuery({
@@ -638,8 +640,12 @@ export default function DailyCash() {
       disposeDailyCashPersistence();
       return;
     }
-    const rows = queryClient.getQueryData(["appSettings"]);
-    const row = Array.isArray(rows) ? rows.find((r) => r?.id === settingsRowId) : null;
+    const cached = queryClient.getQueryData(["appSettings"]);
+    const rowFromCache = Array.isArray(cached) ? cached.find((r) => r?.id === settingsRowId) : null;
+    const rowFromRender = Array.isArray(settingsRef.current)
+      ? settingsRef.current.find((r) => r?.id === settingsRowId)
+      : null;
+    const row = rowFromCache ?? rowFromRender;
     const serverJson = typeof row?.daily_cash_store_json === "string" ? row.daily_cash_store_json : "";
 
     const persist = async (json) => {
@@ -772,8 +778,6 @@ export default function DailyCash() {
     if (periodMode !== "month") return null;
     return getEarliestOpeningInMexicoMonth(getMexicoYearMonthKey(selectedDate));
   }, [periodMode, selectedDate, storeTick]);
-
-  const manualLines = useMemo(() => getManualLines(formDayStr), [formDayStr, storeTick]);
 
   const loyverseByDay = useMemo(
     () => buildLoyverseRowsForWindow(loyverseOverview, loyverseWindow.start, loyverseWindow.end),
