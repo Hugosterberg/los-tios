@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock, MessageCircle, UtensilsCrossed, Star, ChevronRight, ChevronLeft } from "lucide-react";
 import { getPublicRestaurantCopy } from "@/lib/restaurantPublicLocale";
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_PLACE_URL, GOOGLE_PLACE_ID } from "@/lib/mapsPlace";
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_PLACE_URL, GOOGLE_PLACE_ID, TRIPADVISOR_URL } from "@/lib/mapsPlace";
 import { fetchGooglePlaceReviewStats } from "@/lib/googlePlaceStats";
 import { FEATURED_GOOGLE_REVIEWS } from "@/data/featuredGoogleReviews";
 
@@ -29,15 +27,12 @@ const GALLERY_SRC = [
 ];
 
 /**
- * Marketing shell: header, hero, featured preview, story, gallery, reviews, visit block.
+ * Marketing shell: header, hero, story, gallery, reviews, visit block.
  * Uses site yellow (#facc15) + dark (#1a1a1a) to match the ordering UI.
  */
 export default function PublicRestaurantExperience({
   logoSrc,
   restaurantName,
-  featuredItems,
-  isLoadingMenu,
-  onAddToCart,
   mobileNavOpen,
   setMobileNavOpen,
   pizzaPatternStyle,
@@ -366,82 +361,6 @@ export default function PublicRestaurantExperience({
       </section>
 
       <section
-        id="featured"
-        aria-labelledby="featured-heading"
-        className="scroll-mt-24 border-b border-yellow-500/20 bg-[#111111] px-4 py-12 sm:px-6 sm:py-16"
-      >
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 id="featured-heading" className="text-2xl font-bold text-white sm:text-3xl">
-                {t.featuredTitle}
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-gray-400">{t.featuredSubtitle}</p>
-            </div>
-            <a
-              href="#menu"
-              className="text-sm font-semibold text-yellow-400 underline-offset-4 hover:text-yellow-300 hover:underline"
-            >
-              {t.featuredSeeAll}
-            </a>
-          </div>
-
-          {isLoadingMenu ? (
-            <p className="mt-10 text-center text-gray-500">{t.featuredLoading}</p>
-          ) : featuredItems.length === 0 ? (
-            <p className="mt-10 text-center text-gray-500">{t.featuredEmpty}</p>
-          ) : (
-            <ul className="mt-10 grid list-none grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredItems.map((item) => {
-                const title = locale === "en" ? item.name_en || item.name : item.name;
-                const sub =
-                  locale === "en" && item.name && item.name_en && item.name !== item.name_en ? item.name : null;
-                const desc =
-                  locale === "en"
-                    ? item.description_en || item.description
-                    : item.description;
-                return (
-                  <li key={item.id}>
-                    <Card className="overflow-hidden border-yellow-500/20 bg-[#242424] shadow-lg transition hover:border-yellow-500/40">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden">
-                        <img
-                          src={item.image_url || "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80"}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        {item.is_vegetarian ? (
-                          <Badge className="absolute right-3 top-3 bg-green-600 text-white">{t.vegetarian}</Badge>
-                        ) : null}
-                      </div>
-                      <CardContent className="space-y-3 p-5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-lg font-bold text-white">{title}</h3>
-                            {sub ? <p className="text-xs text-gray-500">{sub}</p> : null}
-                          </div>
-                          <p className="shrink-0 text-lg font-bold tabular-nums text-yellow-400">
-                            ${Number(item.price).toFixed(2)}
-                          </p>
-                        </div>
-                        {desc ? <p className="line-clamp-2 text-sm text-gray-400">{desc}</p> : null}
-                        <Button
-                          type="button"
-                          onClick={() => onAddToCart(item)}
-                          className="w-full bg-yellow-500 font-semibold text-[#1a1a1a] hover:bg-yellow-400"
-                        >
-                          {t.addToCart}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      <section
         id="about"
         aria-labelledby="about-heading"
         className="scroll-mt-24 border-b border-yellow-500/20 bg-[#1a1a1a] px-4 py-12 sm:px-6 sm:py-16"
@@ -498,7 +417,6 @@ export default function PublicRestaurantExperience({
               <h2 id="reviews-heading" className="text-2xl font-bold text-white sm:text-3xl">
                 {t.reviewsTitle}
               </h2>
-              <p className="mt-2 max-w-2xl text-sm text-gray-400">{t.reviewsSubtitle}</p>
               {reviewsStatsLine ? (
                 <p className="mt-2 text-sm font-medium text-yellow-400/90">{reviewsStatsLine}</p>
               ) : null}
@@ -561,9 +479,20 @@ export default function PublicRestaurantExperience({
             {t.reviewsFooterBefore}{" "}
             <a
               href={GOOGLE_MAPS_PLACE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-yellow-400 underline-offset-2 hover:underline"
             >
               {t.reviewsFooterGoogle}
+            </a>{" "}
+            {t.reviewsFooterOr}{" "}
+            <a
+              href={TRIPADVISOR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-yellow-400 underline-offset-2 hover:underline"
+            >
+              {t.reviewsFooterTripadvisor}
             </a>{" "}
             {t.reviewsFooterOr}{" "}
             <a href="https://www.instagram.com/lostios.pxm" className="text-yellow-400 underline-offset-2 hover:underline">
@@ -585,33 +514,33 @@ export default function PublicRestaurantExperience({
               <h2 id="visit-heading" className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 {t.visitTitle}
               </h2>
-              <p className="mt-3 text-base text-gray-400">{t.visitIntro}</p>
+              <p className="mt-2 text-base text-gray-400">{t.visitIntro}</p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+            <div className="flex flex-col gap-2.5 sm:flex-row lg:justify-end">
               <a
                 href={WA_HREF}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-12 min-h-[48px] items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 text-sm font-bold text-[#1a1a1a] shadow-lg shadow-black/40 transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[220px]"
+                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-yellow-400/55 bg-yellow-400/10 px-4 text-sm font-semibold text-yellow-300 transition hover:border-yellow-300 hover:bg-yellow-400/15 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
               >
-                <MessageCircle className="h-5 w-5 shrink-0" aria-hidden />
+                <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
                 {t.ctaWhatsApp}
               </a>
               <a
                 href={GOOGLE_MAPS_PLACE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-12 min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-yellow-400/70 bg-[#1a1a1a] px-5 text-sm font-bold text-white transition hover:border-yellow-400 hover:bg-yellow-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[220px]"
+                className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border border-white/25 bg-white/[0.03] px-4 text-sm font-semibold text-gray-100 transition hover:border-yellow-300/70 hover:bg-yellow-400/10 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:min-w-[194px]"
               >
-                <MapPin className="h-5 w-5 shrink-0 text-yellow-400" aria-hidden />
+                <MapPin className="h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
                 {t.ctaMaps}
               </a>
             </div>
           </header>
 
-          <div className="mt-10 grid gap-10 lg:grid-cols-12 lg:gap-12 lg:items-stretch">
-            <div className="flex flex-col gap-6 lg:col-span-5">
-              <div className="rounded-2xl border border-yellow-500/25 bg-[#141414] p-6 shadow-[0_12px_40px_rgba(0,0,0,0.45)] sm:p-7">
+          <div className="mt-8 grid gap-6 lg:grid-cols-12 lg:gap-6 lg:items-stretch">
+            <div className="flex h-full flex-col gap-4 lg:col-span-5">
+              <div className="flex-1 rounded-2xl border border-white/10 bg-[#141414] p-5 sm:p-6">
                 <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">{t.addressLabel}</h3>
                 <address className="mt-4 not-italic">
                   <p className="text-lg font-semibold leading-snug text-white">{restaurantName}</p>
@@ -624,10 +553,10 @@ export default function PublicRestaurantExperience({
                 </address>
               </div>
 
-              <div className="rounded-2xl border border-yellow-500/20 bg-[#161616] p-6 sm:p-7">
+              <div className="flex-1 rounded-2xl border border-white/10 bg-[#161616] p-5 sm:p-6">
                 <div className="flex gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400/15 text-yellow-400">
-                    <Clock className="h-5 w-5" aria-hidden />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-yellow-400/12 text-yellow-400">
+                    <Clock className="h-4 w-4" aria-hidden />
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-base font-semibold text-white">{t.hoursLead}</h3>
@@ -635,21 +564,15 @@ export default function PublicRestaurantExperience({
                   </div>
                 </div>
               </div>
-
-              <div className="rounded-xl border border-dashed border-yellow-500/25 bg-black/30 px-4 py-3 text-center text-xs text-gray-500 sm:text-left">
-                {t.visitCtaHint}
-              </div>
-
             </div>
 
             <div className="flex min-h-0 flex-col lg:col-span-7">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{t.mapSectionLabel}</p>
-              <div className="overflow-hidden rounded-2xl border-2 border-yellow-500/30 bg-[#1a1a1a] shadow-2xl shadow-black/50">
+              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a1a1a]">
                 <iframe
                   title={t.mapIframeTitle}
                   width="100%"
                   height="320"
-                  className="min-h-[240px] w-full bg-[#1a1a1a] sm:min-h-[280px]"
+                  className="h-full min-h-[260px] w-full flex-1 bg-[#1a1a1a] sm:min-h-[320px]"
                   style={{ border: 0 }}
                   loading="lazy"
                   allowFullScreen
@@ -660,7 +583,7 @@ export default function PublicRestaurantExperience({
                   href={GOOGLE_MAPS_PLACE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex min-h-[48px] items-center justify-center gap-2 bg-[#0f0f0f] px-4 py-3.5 text-center text-sm font-semibold text-yellow-400 transition hover:bg-black hover:text-yellow-300"
+                  className="flex min-h-[46px] items-center justify-center gap-2 border-t border-white/10 bg-[#0f0f0f] px-4 py-3 text-center text-sm font-medium text-yellow-400 transition hover:bg-black hover:text-yellow-300"
                 >
                   <MapPin className="h-4 w-4 shrink-0" aria-hidden />
                   {t.mapLarger}

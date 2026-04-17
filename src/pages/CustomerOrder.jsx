@@ -27,7 +27,7 @@ import {
   persistLocale,
   readStoredLocale,
 } from "@/lib/restaurantPublicLocale";
-import { GOOGLE_MAPS_PLACE_URL } from "@/lib/mapsPlace";
+import { GOOGLE_MAPS_PLACE_URL, TRIPADVISOR_URL } from "@/lib/mapsPlace";
 
 export default function CustomerOrder() {
   const [cart, setCart] = useState([]);
@@ -96,13 +96,6 @@ export default function CustomerOrder() {
 
   const availableItems = menuItems.filter(item => item.is_available);
 
-  const featuredItems = useMemo(() => {
-    const pizzas = availableItems.filter((i) => i.category === "pizzas");
-    if (pizzas.length >= 3) return pizzas.slice(0, 6);
-    const rest = availableItems.filter((i) => i.category !== "pizzas");
-    return [...pizzas, ...rest].slice(0, 6);
-  }, [availableItems]);
-
   useEffect(() => {
     const name = (appSettings.restaurant_name && String(appSettings.restaurant_name).trim()) || "Los Tíos";
     document.title = `${name} · Pizza artesanal · Puerto Escondido, Oax.`;
@@ -141,6 +134,7 @@ export default function CustomerOrder() {
         "https://www.instagram.com/lostios.pxm",
         "https://www.facebook.com/lostios.pxm",
         "https://www.tiktok.com/@lostios.mx",
+        TRIPADVISOR_URL,
       ],
       openingHoursSpecification: [
         {
@@ -827,9 +821,6 @@ export default function CustomerOrder() {
       <PublicRestaurantExperience
         logoSrc={losTiosLogo}
         restaurantName={appSettings.restaurant_name || "Los Tíos"}
-        featuredItems={featuredItems}
-        isLoadingMenu={isLoading}
-        onAddToCart={addToCart}
         mobileNavOpen={mobileNavOpen}
         setMobileNavOpen={setMobileNavOpen}
         pizzaPatternStyle={pizzaPatternStyle}
@@ -887,27 +878,30 @@ export default function CustomerOrder() {
                             transition={{ duration: 0.2 }}
                             className="group h-full"
                           >
-                            <Card className="flex h-full flex-col overflow-hidden border border-yellow-500/20 bg-[#242424] shadow-lg transition-all duration-300 group-hover:border-yellow-500/45 group-hover:shadow-2xl">
-                              <div className="relative aspect-[4/3] overflow-hidden border-b border-yellow-500/20">
+                            <Card className="flex h-full flex-col overflow-hidden border border-yellow-500/25 bg-[#0f0f0f] shadow-lg transition-all duration-300 group-hover:border-yellow-500/45 group-hover:shadow-2xl">
+                              <div className="relative aspect-[4/3] overflow-hidden border-b border-yellow-500/15 bg-[#050505]">
+                                <div
+                                  aria-hidden
+                                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(250,204,21,0.06)_0%,rgba(0,0,0,0)_62%)]"
+                                />
                                 <img
                                   src={item.image_url || "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80"}
                                   alt={imgAlt}
-                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                                  className="h-full w-full object-contain p-3 transition-transform duration-500 group-hover:scale-[1.03]"
                                 />
-                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 to-transparent" />
                                 {item.is_vegetarian && (
                                   <Badge className="absolute right-3 top-3 bg-green-600 text-white">
                                     {publicCopy.vegetarian}
                                   </Badge>
                                 )}
                               </div>
-                              <CardContent className="flex flex-1 flex-col p-5">
+                              <CardContent className="flex flex-1 flex-col bg-[#121212] p-5">
                                 <div className="mb-3 flex items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <h4 className="text-xl font-bold leading-tight text-white">{title}</h4>
                                     {subName && <p className="mt-1 text-xs text-gray-400 italic">{subName}</p>}
                                   </div>
-                                  <span className="shrink-0 rounded-full bg-yellow-400/10 px-2.5 py-1 text-lg font-bold tabular-nums text-yellow-400">
+                                  <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-400/10 px-2.5 py-1 text-lg font-bold tabular-nums text-yellow-400">
                                     ${item.price?.toFixed(2)}
                                   </span>
                                 </div>
@@ -1481,6 +1475,10 @@ export default function CustomerOrder() {
       <footer className="relative mt-0 overflow-hidden bg-yellow-400 py-10 text-[#1a1a1a]">
         <div
           aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/30 to-transparent"
+        />
+        <div
+          aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[#fde047]/60"
         />
         <div
@@ -1491,6 +1489,10 @@ export default function CustomerOrder() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-40"
           style={pizzaPatternStyle}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/30 to-transparent"
         />
         <div className="relative max-w-7xl mx-auto px-4 text-center">
           <img 
@@ -1552,6 +1554,14 @@ export default function CustomerOrder() {
               title="TikTok">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="white">
                 <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+              </svg>
+            </a>
+            {/* TripAdvisor */}
+            <a href={TRIPADVISOR_URL} target="_blank" rel="noopener noreferrer"
+              className="bg-[#1a1a1a] rounded-full p-2.5 hover:scale-110 transition-transform"
+              title="TripAdvisor" aria-label="TripAdvisor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="white">
+                <path d="M11.99 4.5c2.17 0 4.17.63 5.85 1.7l3.16.03-1.56 1.4c.53.79.9 1.69 1.04 2.66.97.56 1.62 1.61 1.62 2.82 0 1.79-1.46 3.25-3.25 3.25-.93 0-1.77-.39-2.36-1.02l-2.73 2.43-2.73-2.43c-.59.63-1.43 1.02-2.36 1.02-1.79 0-3.25-1.46-3.25-3.25 0-1.21.65-2.26 1.62-2.82.14-.97.51-1.87 1.04-2.66L3 6.23l3.16-.03A10.43 10.43 0 0 1 11.99 4.5Zm0 1.7c-1.62 0-3.11.47-4.37 1.28.27.4.5.83.67 1.29a3.23 3.23 0 0 1 3.69 1.12 3.23 3.23 0 0 1 3.69-1.12c.17-.46.4-.89.67-1.29A8.72 8.72 0 0 0 11.99 6.2ZM8.75 10.8c-1.08 0-1.95.87-1.95 1.95s.87 1.95 1.95 1.95 1.95-.87 1.95-1.95-.87-1.95-1.95-1.95Zm6.48 0c-1.08 0-1.95.87-1.95 1.95s.87 1.95 1.95 1.95 1.95-.87 1.95-1.95-.87-1.95-1.95-1.95Zm-6.48 1.02a.93.93 0 1 1 0 1.86.93.93 0 0 1 0-1.86Zm6.48 0a.93.93 0 1 1 0 1.86.93.93 0 0 1 0-1.86Z"/>
               </svg>
             </a>
           </div>

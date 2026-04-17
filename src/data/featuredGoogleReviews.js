@@ -12,42 +12,50 @@
 export const FEATURED_GOOGLE_REVIEWS = [
   {
     id: "1",
-    author: "María G.",
+    author: "Laurent",
     textEs:
-      "La pizza está buenísima, masa liviana y bordes dorados. El ambiente en el centro es súper agradable y el pedido por WhatsApp fue rapidísimo.",
+      "Descubrí este restaurante por casualidad, ¡la pizza está muy buena! 🍕",
     textEn:
-      "The pizza is excellent, light crust and golden edges. Great vibe downtown and WhatsApp ordering was really fast.",
+      "I discovered this restaurant by chance, very good pizza! 🍕",
   },
   {
     id: "2",
-    author: "Carlos T.",
+    author: "Lara",
     textEs:
-      "Pedimos para llevar después de la playa y llegó caliente. De las mejores pizzas que he probado en Puerto Escondido.",
+      "La comida está increíble y el personal es muy amable. El panini boloñesa es mi favorito 👌🏽👌🏽👌🏽",
     textEn:
-      "We ordered takeaway after the beach and it arrived hot. Among the best pizzas I’ve tried in Puerto Escondido.",
+      "The food is amazing and the staff is very friendly. The Bolognese panini is my favorite 👌🏽👌🏽👌🏽",
   },
   {
     id: "3",
-    author: "Laura V.",
+    author: "Osiris",
     textEs:
-      "Servicio amable, buena música y pizzas con personalidad. Se nota que le invierten al horno y a la masa.",
+      "La pizza está deliciosa, ¡la salsa es increíble! Tenían muy buena música. Te recomiendo probar el agua saborizada que preparan ahí. No puedes irte de Puerto Escondido sin cenar aquí.",
     textEn:
-      "Friendly service, good music, and pizzas with personality. You can tell they care about the oven and the dough.",
+      "The pizza is delicious, the sauce is amazing! They had great music. I recommend trying the flavored water they make there. You can’t go to Puerto Escondido without having dinner here.",
   },
   {
     id: "4",
-    author: "James H.",
+    author: "Nico",
     textEs:
-      "Excelente pizza estilo napolitano en PE. La masa perfecta y ingredientes frescos. Justo lo que queríamos después de un día en el mar.",
+      "La pizza sabe increíble, los ingredientes son muy frescos y de alta calidad, y cada bocado se siente como en Italia. Además, los meseros y cocineros son súper amables y brindan un servicio perfecto. ¡La mejor pizza de Puerto!",
     textEn:
-      "Great Neapolitan style pizza in PE. Crust was perfect, toppings fresh. Exactly what we wanted after a day in the water.",
+      "The pizza tastes amazing, the ingredients are so fresh and high quality, and every bite feels like Italy. Plus, the waiters and chefs are incredibly friendly and provide perfect service. Best pizza in Puerto!",
   },
   {
     id: "5",
-    author: "Sofía M.",
+    author: "Irlanda",
     textEs:
-      "Llevamos a la familia un martes por la noche y salimos encantados. Precio justo para la calidad. Volveremos seguro.",
+      "¡Delicioso! 👌🏻 Buenos ingredientes y la entrega fue muy rápida. 👌🏻 No tomé foto porque prácticamente me lo devoré 😬😋",
     textEn:
-      "We brought the family on a Tuesday night and left really happy. Fair price for the quality. We’ll definitely come back.",
+      "Delicious! 👌🏻 Good ingredients and the delivery was very fast. 👌🏻 I didn’t take a picture because I practically devoured it 😬😋",
+  },
+  {
+    id: "6",
+    author: "Theo",
+    textEs:
+      "¡Por fin llegaron pizzas buenas y auténticas a Puerto a precios locales! Lo que lograron los chicos de Los Tíos es un verdadero placer. Ambiente increíble, buen servicio y un sabor inigualable. Recomiendo muchísimo visitar esta pizzería céntrica.",
+    textEn:
+      "Finally, some good, real pizzas have arrived in Puerto at local prices! What the guys at Los Tíos have achieved is a real treat. Amazing atmosphere, great service, and unbeatable flavor. I highly recommend visiting this centrally located pizzeria.",
   },
 ];

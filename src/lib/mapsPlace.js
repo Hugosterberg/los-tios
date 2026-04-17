@@ -1,5 +1,7 @@
 /** Google Maps short link → Los Tíos business profile (reviews, hours, photos). */
 export const GOOGLE_MAPS_PLACE_URL = "https://maps.app.goo.gl/L2BSM4MaUvnUF6TK9";
+export const TRIPADVISOR_URL =
+  "https://www.tripadvisor.com/Restaurant_Review-g153373-d34282776-Reviews-Los_Tios_Pizza-Puerto_Escondido_Southern_Mexico.html";
 
 /**
  * Place ID for Places Details (aggregate rating + total reviews). Set `VITE_GOOGLE_PLACE_ID` in `.env`.
