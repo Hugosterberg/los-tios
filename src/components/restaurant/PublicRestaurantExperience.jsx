@@ -160,12 +160,6 @@ export default function PublicRestaurantExperience({
 
           <nav aria-label="Primary" className="hidden items-center gap-0.5 md:flex lg:gap-1">
             <a
-              href="#featured"
-              className="rounded-full px-2 py-2 text-sm font-medium text-gray-200 transition hover:bg-white/5 hover:text-yellow-300 lg:px-3"
-            >
-              {t.navPizzas}
-            </a>
-            <a
               href="#menu"
               className="rounded-full px-2 py-2 text-sm font-medium text-gray-200 transition hover:bg-white/5 hover:text-yellow-300 lg:px-3"
             >

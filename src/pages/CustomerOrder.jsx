@@ -858,13 +858,14 @@ export default function CustomerOrder() {
 
               return (
                 <div key={category.id}>
-                  <div className="flex flex-col items-center mb-8">
-                    <h3 className="text-2xl font-black text-[#1a1a1a] bg-yellow-400 px-6 py-2 rounded-xl tracking-wide sm:text-3xl">
+                  <div className="mb-7 flex items-center gap-4">
+                    <h3 className="rounded-xl border border-yellow-500/40 bg-yellow-400/10 px-4 py-2 text-xl font-bold tracking-tight text-yellow-300 sm:text-2xl">
                       {category.name}
                     </h3>
+                    <div className="h-px flex-1 bg-gradient-to-r from-yellow-500/35 to-transparent" />
                   </div>
-                      <div className="flex flex-wrap justify-center gap-6">
-                        {items.map((item) => {
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {items.map((item) => {
                           const title = siteLocale === "en" ? item.name_en || item.name : item.name;
                           const subName =
                             siteLocale === "en" && item.name && item.name_en && item.name !== item.name_en
@@ -878,54 +879,52 @@ export default function CustomerOrder() {
                               : item.description;
                           const imgAlt = siteLocale === "en" ? item.name_en || item.name : item.name;
                           return (
-                          <motion.div
+                          <motion.article
                             key={item.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ scale: 1.03 }}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            whileHover={{ y: -3 }}
                             transition={{ duration: 0.2 }}
-                            className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] flex flex-col"
+                            className="group h-full"
                           >
-                             <Card className="overflow-hidden border border-yellow-500/20 shadow-lg hover:shadow-2xl transition-shadow bg-[#242424] flex flex-col h-full">
-                                             <div className="relative h-56 flex-shrink-0">
-                                               <img
-                                                 src={item.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600'}
-                                                 alt={imgAlt}
-                                                 className="w-full h-full object-cover"
-                                               />
-                            {item.is_vegetarian && (
-                              <Badge className="absolute top-3 right-3 bg-green-600">
-                                {publicCopy.vegetarian}
-                              </Badge>
-                            )}
-                          </div>
-                          <CardContent className="p-6 flex flex-col flex-1">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1">
-                                <h4 className="font-bold text-xl text-white">{title}</h4>
-                                {subName && (
-                                  <p className="text-sm text-gray-400 italic">{subName}</p>
+                            <Card className="flex h-full flex-col overflow-hidden border border-yellow-500/20 bg-[#242424] shadow-lg transition-all duration-300 group-hover:border-yellow-500/45 group-hover:shadow-2xl">
+                              <div className="relative aspect-[4/3] overflow-hidden border-b border-yellow-500/20">
+                                <img
+                                  src={item.image_url || "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80"}
+                                  alt={imgAlt}
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                                />
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 to-transparent" />
+                                {item.is_vegetarian && (
+                                  <Badge className="absolute right-3 top-3 bg-green-600 text-white">
+                                    {publicCopy.vegetarian}
+                                  </Badge>
                                 )}
                               </div>
-                              <span className="text-2xl font-bold text-yellow-400 ml-2">${item.price?.toFixed(2)}</span>
-                            </div>
+                              <CardContent className="flex flex-1 flex-col p-5">
+                                <div className="mb-3 flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-xl font-bold leading-tight text-white">{title}</h4>
+                                    {subName && <p className="mt-1 text-xs text-gray-400 italic">{subName}</p>}
+                                  </div>
+                                  <span className="shrink-0 rounded-full bg-yellow-400/10 px-2.5 py-1 text-lg font-bold tabular-nums text-yellow-400">
+                                    ${item.price?.toFixed(2)}
+                                  </span>
+                                </div>
 
-                            <div className="flex-1">
-                              {desc && (
-                                <p className="text-gray-400 text-sm mb-2 line-clamp-4">{desc}</p>
-                              )}
-                            </div>
-                            <div className="mt-auto pt-4">
-                              <Button
-                                onClick={() => addToCart(item)}
-                                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold"
-                              >
-                                {publicCopy.addToCart}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
+                                {desc ? <p className="line-clamp-3 flex-1 text-sm leading-relaxed text-gray-400">{desc}</p> : <div className="flex-1" />}
+
+                                <div className="mt-4 pt-2">
+                                  <Button
+                                    onClick={() => addToCart(item)}
+                                    className="w-full rounded-xl bg-yellow-500 font-bold text-black transition hover:bg-yellow-400"
+                                  >
+                                    {publicCopy.addToCart}
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.article>
                           );
                         })}
                   </div>

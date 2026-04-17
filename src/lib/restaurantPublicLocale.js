@@ -41,7 +41,6 @@ export function getPublicRestaurantCopy(locale) {
     navWhatsApp: "WhatsApp",
     navOpen: "Abrir menú",
     mobileNav: [
-      ["#featured", "Pizzas destacadas"],
       ["#menu", "Menú completo y pedido"],
       ["#about", "Nuestra historia"],
       ["#gallery", "Galería"],
@@ -128,7 +127,6 @@ export function getPublicRestaurantCopy(locale) {
     navWhatsApp: "WhatsApp",
     navOpen: "Open menu",
     mobileNav: [
-      ["#featured", "Featured pizzas"],
       ["#menu", "Full menu & order"],
       ["#about", "Our story"],
       ["#gallery", "Gallery"],
