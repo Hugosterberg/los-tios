@@ -86,6 +86,45 @@ function hasMeaningfulData(s) {
   return false;
 }
 
+/** Deep-merge two stores; `overlay` wins on conflicts (same keys / line ids / event ids). */
+function mergeDailyCashStores(base, overlay) {
+  const a = normalizeParsed(JSON.parse(JSON.stringify(base)));
+  const b = normalizeParsed(JSON.parse(JSON.stringify(overlay)));
+  const out = {
+    openings: { ...a.openings, ...b.openings },
+    openingCountMeta: { ...a.openingCountMeta, ...b.openingCountMeta },
+    manualLines: { ...a.manualLines },
+    detailOverrides: { ...a.detailOverrides },
+    ledgerTimeOverrides: { ...a.ledgerTimeOverrides },
+    openingDiffEvents: [],
+  };
+  for (const [dayKey, lines] of Object.entries(b.manualLines || {})) {
+    if (!Array.isArray(lines)) continue;
+    const existing = Array.isArray(out.manualLines[dayKey]) ? [...out.manualLines[dayKey]] : [];
+    const byId = new Map(existing.map((x) => [x.id, x]));
+    for (const line of lines) {
+      if (line?.id) byId.set(line.id, line);
+    }
+    out.manualLines[dayKey] = [...byId.values()];
+  }
+  for (const [dayKey, rows] of Object.entries(b.detailOverrides || {})) {
+    if (!rows || typeof rows !== "object") continue;
+    out.detailOverrides[dayKey] = { ...(out.detailOverrides[dayKey] || {}), ...rows };
+  }
+  for (const [dayKey, rows] of Object.entries(b.ledgerTimeOverrides || {})) {
+    if (!rows || typeof rows !== "object") continue;
+    out.ledgerTimeOverrides[dayKey] = { ...(out.ledgerTimeOverrides[dayKey] || {}), ...rows };
+  }
+  const byEvId = new Map();
+  for (const ev of [...(a.openingDiffEvents || []), ...(b.openingDiffEvents || [])]) {
+    if (ev?.id) byEvId.set(ev.id, ev);
+  }
+  out.openingDiffEvents = [...byEvId.values()].sort(
+    (x, y) => new Date(y.ts || 0).getTime() - new Date(x.ts || 0).getTime(),
+  );
+  return normalizeParsed(out);
+}
+
 function parseServerJson(str) {
   const t = String(str || "").trim();
   if (!t) return null;
@@ -135,13 +174,16 @@ export function initDailyCashPersistenceLocal() {
  * Remote mode: hydrate from `daily_cash_store_json`, migrate legacy localStorage once if server empty.
  * @param {string} serverJson
  * @param {(json: string) => Promise<void>} persistAsync
- * @returns {{ migrated: boolean }}
+ * @returns {{ migrated: boolean, memoryMerged: boolean }}
  */
 export function initDailyCashPersistenceRemote(serverJson, persistAsync) {
   clearTimeout(persistDebounceTimer);
   persistDebounceTimer = null;
   persistenceMode = "remote";
   persistFn = persistAsync;
+
+  const memoryBefore = normalizeParsed(JSON.parse(JSON.stringify(readRaw())));
+  const memoryHadData = hasMeaningfulData(memoryBefore);
 
   const fromServer = parseServerJson(serverJson);
   const fromLs = readLocalStorageStore();
@@ -158,7 +200,13 @@ export function initDailyCashPersistenceRemote(serverJson, persistAsync) {
     clearLocalStorageStore();
   }
 
-  return { migrated };
+  let memoryMerged = false;
+  if (!hasMeaningfulData(fromServer) && memoryHadData) {
+    internalStore = mergeDailyCashStores(internalStore, memoryBefore);
+    memoryMerged = true;
+  }
+
+  return { migrated, memoryMerged };
 }
 
 /** Flush current store to the server (no debounce). Call after migration. */
@@ -176,7 +224,7 @@ export function disposeDailyCashPersistence() {
   persistDebounceTimer = null;
   persistFn = null;
   persistenceMode = "none";
-  internalStore = defaultStore();
+  /* Keep internalStore — resetting here dropped manual counts entered before remote init (settings row still loading). */
 }
 
 export function getOpeningBalance(dateKey) {

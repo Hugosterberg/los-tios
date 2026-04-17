@@ -852,7 +852,7 @@ export default function DailyCash() {
       };
     }
     if (!settingsRowId) {
-      disposeDailyCashPersistence();
+      /* Wait for AppSettings — disposing here wiped in-memory edits before remote init. */
       return;
     }
     const cached = queryClient.getQueryData(["appSettings"]);
@@ -874,8 +874,8 @@ export default function DailyCash() {
     };
 
     disposeDailyCashPersistence();
-    const { migrated } = initDailyCashPersistenceRemote(serverJson, persist);
-    if (migrated) {
+    const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
+    if (migrated || memoryMerged) {
       void flushDailyCashPersistImmediate().catch((err) => {
         console.error("[dailyCash] migration persist failed", err);
       });
@@ -1085,11 +1085,11 @@ export default function DailyCash() {
     const trimmed = openingInput.trim();
     const trimmedComment = openingComment.trim();
     const oldPersisted = getOpeningBalance(formDayStr);
+    let didWrite = false;
     if (trimmed === "") {
       setOpeningBalance(formDayStr, null);
       setOpeningComment("");
-      setStoreTick((t) => t + 1);
-      return;
+      didWrite = true;
     } else {
       const n = parseFloat(trimmed.replace(",", "."));
       if (Number.isFinite(n)) {
@@ -1108,10 +1108,12 @@ export default function DailyCash() {
             comment: trimmedComment,
           });
           setOpeningComment("");
+          didWrite = true;
         }
       }
     }
     setStoreTick((t) => t + 1);
+    if (didWrite) void flushDailyCashPersistImmediate();
   }, [formDayStr, openingComment, openingInput, periodMode, priorDrawerClose]);
 
   const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
@@ -2217,6 +2219,16 @@ export default function DailyCash() {
                 readOnly={periodMode === "month"}
                 className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600 read-only:cursor-default read-only:opacity-90"
               />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={persistOpening}
+                disabled={periodMode === "month"}
+                className="h-11 border-yellow-500/25 bg-[#0f0f0c] px-3 text-xs font-medium uppercase tracking-[0.14em] text-yellow-200 hover:bg-yellow-500/10 disabled:opacity-40"
+              >
+                Save
+              </Button>
             </div>
             <div className="mt-2 space-y-2 text-[11px] text-gray-600">
               {periodMode === "month" ? (
