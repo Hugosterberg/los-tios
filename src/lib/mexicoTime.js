@@ -109,6 +109,49 @@ export function formatMexicoTime(isoLike, fallback = "—") {
   }).format(d);
 }
 
+/**
+ * Mexico civil date + HH:mm for HTML date/time inputs (ledger editing).
+ * @returns {{ dateKey: string, timeHHmm: string }}
+ */
+export function getMexicoDateAndTimePartsForInput(isoLike) {
+  const d = toDate(isoLike);
+  if (!d) return { dateKey: "", timeHHmm: "" };
+  const dateKey = getMexicoDateKey(isoLike);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return { dateKey, timeHHmm: `${h.padStart(2, "0")}:${m.padStart(2, "0")}` };
+}
+
+/**
+ * UTC instant from a Mexico wall date + time (America/Mexico_City, fixed −06:00).
+ * @param {string} dateKey yyyy-MM-dd
+ * @param {string} timeHHmm HH:mm (24h)
+ * @returns {string | null} ISO string
+ */
+export function mexicoWallDateTimeToUtcIso(dateKey, timeHHmm) {
+  if (!isPlainDateKey(dateKey)) return null;
+  const m = String(timeHHmm).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(min) || hh < 0 || hh > 23 || min < 0 || min > 59) {
+    return null;
+  }
+  const [y, mo, d] = dateKey.split("-").map(Number);
+  const pad = (n) => String(n).padStart(2, "0");
+  const s = `${String(y).padStart(4, "0")}-${pad(mo)}-${pad(d)}T${pad(hh)}:${pad(min)}:00`;
+  const inst = new Date(`${s}-06:00`);
+  if (Number.isNaN(inst.getTime())) return null;
+  return inst.toISOString();
+}
+
 export function formatMexicoDateTimeSlashed(isoLike, fallback = "—") {
   const d = toDate(isoLike);
   if (!d) return fallback;

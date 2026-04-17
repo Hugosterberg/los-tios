@@ -3,6 +3,8 @@
  * In production this syncs to AppSettings.daily_cash_store_json; local dev can use localStorage only.
  */
 
+import { isPlainDateKey, mexicoWallDateTimeToUtcIso } from "@/lib/mexicoTime";
+
 const isBrowser = typeof window !== "undefined";
 const STORAGE_KEY = "los_tios_daily_cash_store_v1";
 const PERSIST_DEBOUNCE_MS = 650;
@@ -18,6 +20,7 @@ const defaultStore = () => ({
   openingCountMeta: {},
   manualLines: {},
   detailOverrides: {},
+  ledgerTimeOverrides: {},
   openingDiffEvents: [],
 });
 
@@ -33,6 +36,8 @@ function normalizeParsed(p) {
     manualLines: typeof p.manualLines === "object" && p.manualLines !== null ? p.manualLines : {},
     detailOverrides:
       typeof p.detailOverrides === "object" && p.detailOverrides !== null ? p.detailOverrides : {},
+    ledgerTimeOverrides:
+      typeof p.ledgerTimeOverrides === "object" && p.ledgerTimeOverrides !== null ? p.ledgerTimeOverrides : {},
     openingDiffEvents: Array.isArray(p.openingDiffEvents) ? p.openingDiffEvents : [],
   };
 }
@@ -74,6 +79,9 @@ function hasMeaningfulData(s) {
     if (Array.isArray(v) && v.length > 0) return true;
   }
   if (Object.keys(s.detailOverrides || {}).length > 0) return true;
+  for (const v of Object.values(s.ledgerTimeOverrides || {})) {
+    if (v && typeof v === "object" && Object.keys(v).length > 0) return true;
+  }
   if (Array.isArray(s.openingDiffEvents) && s.openingDiffEvents.length > 0) return true;
   return false;
 }
@@ -276,6 +284,34 @@ export function setDetailOverride(dateKey, rowId, value) {
   writeRaw(store);
 }
 
+/** Per-day ledger TIME overrides (ISO instant) — Loyverse/API times vs local correction. */
+export function getLedgerTimeOverrides(dateKey) {
+  const raw = readRaw().ledgerTimeOverrides?.[dateKey];
+  return raw && typeof raw === "object" ? { ...raw } : {};
+}
+
+export function setLedgerTimeOverride(dateKey, rowId, isoOrNull) {
+  const store = readRaw();
+  if (!store.ledgerTimeOverrides) {
+    store.ledgerTimeOverrides = {};
+  }
+  if (!store.ledgerTimeOverrides[dateKey]) {
+    store.ledgerTimeOverrides[dateKey] = {};
+  }
+  if (isoOrNull === null || isoOrNull === undefined || isoOrNull === "") {
+    delete store.ledgerTimeOverrides[dateKey][rowId];
+    if (Object.keys(store.ledgerTimeOverrides[dateKey]).length === 0) {
+      delete store.ledgerTimeOverrides[dateKey];
+    }
+  } else {
+    const s = String(isoOrNull).trim();
+    const t = new Date(s).getTime();
+    if (!Number.isFinite(t)) return;
+    store.ledgerTimeOverrides[dateKey][rowId] = s;
+  }
+  writeRaw(store);
+}
+
 export function updateManualLine(dateKey, lineId, patch) {
   const store = readRaw();
   const list = Array.isArray(store.manualLines[dateKey]) ? [...store.manualLines[dateKey]] : [];
@@ -361,6 +397,32 @@ export function updateOpeningCountDiffComment(id, comment) {
   if (idx === -1) return;
   list[idx] = { ...list[idx], comment: typeof comment === "string" ? comment.trim() : "" };
   store.openingDiffEvents = list;
+  writeRaw(store);
+}
+
+/**
+ * Adjust when a manual count was logged (Mexico wall date + time). Updates ledger sort order,
+ * "latest manual count" selection, and per-day opening sync.
+ * @param {string} id event id
+ * @param {string} dateKeyMexico yyyy-MM-dd (Mexico calendar day this count applies to)
+ * @param {string} timeHHmm HH:mm (24h)
+ */
+export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm) {
+  if (!isPlainDateKey(dateKeyMexico)) return;
+  const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
+  if (!iso) return;
+  const store = readRaw();
+  const list = Array.isArray(store.openingDiffEvents) ? [...store.openingDiffEvents] : [];
+  const idx = list.findIndex((ev) => ev?.id === id);
+  if (idx === -1) return;
+  const prev = list[idx];
+  const prevDateKey = prev.dateKey;
+  list[idx] = { ...prev, ts: iso, dateKey: dateKeyMexico };
+  store.openingDiffEvents = list;
+  syncOpeningFromLatestDiff(store, prevDateKey);
+  if (prevDateKey !== dateKeyMexico) {
+    syncOpeningFromLatestDiff(store, dateKeyMexico);
+  }
   writeRaw(store);
 }
 

@@ -52,6 +52,7 @@ import {
   flushDailyCashPersistImmediate,
   getDetailOverrides,
   getEarliestOpeningInMexicoMonth,
+  getLedgerTimeOverrides,
   getManualLines,
   getOpeningBalance,
   getOpeningCountMeta,
@@ -62,14 +63,18 @@ import {
   removeOpeningCountDiff,
   removeManualLine,
   setDetailOverride,
+  setLedgerTimeOverride,
   setOpeningBalance,
   updateOpeningCountDiffComment,
+  updateOpeningCountDiffDateTime,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
 import {
   AppOrderLedgerDetailPanel,
   LoyverseLedgerDetailPanel,
 } from "@/components/daily-cash/LedgerRowExpandPanels";
+import { MexicoWallDatePicker } from "@/components/daily-cash/MexicoWallDatePicker";
+import { MexicoWallTimePicker } from "@/components/daily-cash/MexicoWallTimePicker";
 import {
   dateFromMexicoDateKey,
   formatMexicoDateShort,
@@ -77,14 +82,135 @@ import {
   formatMexicoMonthShortDayYearEn,
   formatMexicoTime,
   formatMexicoWeekdayLongEn,
+  getMexicoDateAndTimePartsForInput,
   getMexicoDateKey,
   getMexicoNowDateKey,
   getMexicoYearMonthKey,
   matchesMexicoCalendarDay,
+  mexicoWallDateTimeToUtcIso,
 } from "@/lib/mexicoTime";
 
 /** Marks rows created from Daily Cash so they can be removed / undone from this page */
 const DAILY_CASH_TX_MARKER = "los_tios:daily_cash";
+
+/** Normalize HTML time input (e.g. 9:05 → 09:05) for comparisons. */
+function normalizeHHmm(raw) {
+  const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return "";
+  return `${String(Number(m[1])).padStart(2, "0")}:${String(Number(m[2])).padStart(2, "0")}`;
+}
+
+/** Mexico wall date + time for a saved manual count — fixes sort vs register purchases when you log late. */
+function ManualCountWhenCell({ ev, onCommit }) {
+  const init = () => getMexicoDateAndTimePartsForInput(ev.ts);
+  const [dateKey, setDateKey] = useState(() => init().dateKey);
+  const [timeHHmm, setTimeHHmm] = useState(() => init().timeHHmm);
+
+  useLayoutEffect(() => {
+    const p = getMexicoDateAndTimePartsForInput(ev.ts);
+    setDateKey(p.dateKey);
+    setTimeHHmm(p.timeHHmm);
+  }, [ev.id, ev.ts]);
+
+  const commitIfChanged = useCallback(
+    (overrideDateKey) => {
+      const d = (overrideDateKey ?? dateKey ?? "").trim();
+      const t = normalizeHHmm(timeHHmm);
+      if (!d || !t) return;
+      const iso = mexicoWallDateTimeToUtcIso(d, t);
+      if (!iso) return;
+      const wall = getMexicoDateAndTimePartsForInput(ev.ts);
+      if (wall.dateKey === d && wall.timeHHmm === t) return;
+      onCommit(ev.id, d, t);
+    },
+    [ev.id, ev.ts, onCommit, dateKey, timeHHmm],
+  );
+
+  return (
+    <div className="flex min-w-[11rem] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+      <MexicoWallDatePicker value={dateKey} onChange={setDateKey} onPopoverClose={commitIfChanged} />
+      <MexicoWallTimePicker
+        value={timeHHmm}
+        onChange={(v) => setTimeHHmm(v)}
+        onPopoverClose={() => commitIfChanged()}
+      />
+    </div>
+  );
+}
+
+/** Editable TIME for ledger rows (Loyverse, orders, expenses, etc.) — stored as Mexico wall → ISO in ledgerTimeOverrides. */
+function LedgerTimeCell({ row, ledgerDay, onCommit, onReset }) {
+  const overrideIso = getLedgerTimeOverrides(ledgerDay)[row.id];
+  const refIso = overrideIso ?? new Date(row.sortTime).toISOString();
+  const initParts = () => getMexicoDateAndTimePartsForInput(refIso);
+  const [dateKey, setDateKey] = useState(() => initParts().dateKey);
+  const [timeHHmm, setTimeHHmm] = useState(() => initParts().timeHHmm);
+
+  useLayoutEffect(() => {
+    const ri = overrideIso ?? new Date(row.sortTime).toISOString();
+    const p = getMexicoDateAndTimePartsForInput(ri);
+    setDateKey(p.dateKey);
+    setTimeHHmm(p.timeHHmm);
+  }, [row.id, row.sortTime, ledgerDay, overrideIso]);
+
+  const commitIfChanged = useCallback(
+    (overrideDateKey) => {
+      const d = (overrideDateKey ?? dateKey ?? "").trim();
+      const t = normalizeHHmm(timeHHmm);
+      if (!d || !t) return;
+      const iso = mexicoWallDateTimeToUtcIso(d, t);
+      if (!iso) return;
+      const compareIso = overrideIso ?? new Date(row.sortTime).toISOString();
+      const wall = getMexicoDateAndTimePartsForInput(compareIso);
+      if (wall.dateKey === d && wall.timeHHmm === t) return;
+      onCommit(row.id, d, t);
+    },
+    [row.id, row.sortTime, onCommit, overrideIso, dateKey, timeHHmm],
+  );
+
+  if (row.isManualCountReset) {
+    return <span className="tabular-nums text-gray-500">{row.timeLabel}</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {overrideIso ? (
+        <button
+          type="button"
+          className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-amber-400/90 underline-offset-2 hover:text-amber-300 hover:underline"
+          title="Restore Loyverse / original time"
+          onClick={() => onReset(row.id)}
+        >
+          Reset
+        </button>
+      ) : null}
+      <MexicoWallDatePicker value={dateKey} onChange={setDateKey} onPopoverClose={commitIfChanged} />
+      <MexicoWallTimePicker
+        value={timeHHmm}
+        onChange={(v) => setTimeHHmm(v)}
+        onPopoverClose={() => commitIfChanged()}
+      />
+    </div>
+  );
+}
+
+function applyLedgerTimeOverrides(dayStr, rows) {
+  const ov = getLedgerTimeOverrides(dayStr);
+  if (!ov || Object.keys(ov).length === 0) {
+    const copy = [...rows];
+    copy.sort((a, b) => b.sortTime - a.sortTime);
+    return copy;
+  }
+  const next = rows.map((r) => {
+    const iso = ov[r.id];
+    if (!iso) return r;
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return r;
+    return { ...r, sortTime: t, timeLabel: rowTimeLabel(iso) };
+  });
+  next.sort((a, b) => b.sortTime - a.sortTime);
+  return next;
+}
 
 function dayKey(d) {
   return getMexicoDateKey(d);
@@ -795,18 +921,21 @@ export default function DailyCash() {
         continue;
       }
       const lv = loyverseByDay.get(d) || [];
-      const rows = mergeLaborCashLedgerRows(
+      const rows = applyLedgerTimeOverrides(
         d,
-        buildDayTableRows(d, {
-          orders,
-          transactions,
+        mergeLaborCashLedgerRows(
+          d,
+          buildDayTableRows(d, {
+            orders,
+            transactions,
+            expenses,
+            loyverseRows: lv,
+            manualLines: getManualLines(d),
+          }),
+          employees,
+          shifts,
           expenses,
-          loyverseRows: lv,
-          manualLines: getManualLines(d),
-        }),
-        employees,
-        shifts,
-        expenses,
+        ),
       );
       const reset = latestManualCountForDay(listOpeningCountDiffs(), d);
       const resetTime = reset ? rowSortTime(reset.ts, d) : null;
@@ -851,7 +980,7 @@ export default function DailyCash() {
         shifts,
         expenses,
       );
-      return withManualCountResetRow(dayStr, baseRows, manualCount);
+      return applyLedgerTimeOverrides(dayStr, withManualCountResetRow(dayStr, baseRows, manualCount));
     },
     [loyverseByDay, orders, transactions, expenses, employees, shifts, openingCountDiffHistory, storeTick],
   );
@@ -920,7 +1049,10 @@ export default function DailyCash() {
       shifts,
       expenses,
     );
-    return withManualCountResetRow(formDayStr, rows, selectedDayManualCount);
+    return applyLedgerTimeOverrides(
+      formDayStr,
+      withManualCountResetRow(formDayStr, rows, selectedDayManualCount),
+    );
   }, [periodMode, formDayStr, orders, transactions, expenses, loyverseByDay, employees, shifts, storeTick, selectedDayManualCount]);
 
   const monthLedgerSections = useMemo(() => {
@@ -945,7 +1077,7 @@ export default function DailyCash() {
           expenses,
         );
         const reset = latestManualCountForDay(openingCountDiffHistory, ds);
-        const rows = withManualCountResetRow(ds, baseRows, reset);
+        const rows = applyLedgerTimeOverrides(ds, withManualCountResetRow(ds, baseRows, reset));
         const t = sumDrawerCashTotals(rows, reset ? rowSortTime(reset.ts, ds) : null);
         const labor = totalExpectedLaborForDate(ds, employees, shifts);
         return {
@@ -1097,6 +1229,23 @@ export default function DailyCash() {
     setStoreTick((t) => t + 1);
   }, []);
 
+  const handleManualCountDateTimeCommit = useCallback((eventId, dateKeyMexico, timeHHmm) => {
+    updateOpeningCountDiffDateTime(eventId, dateKeyMexico, timeHHmm);
+    setStoreTick((t) => t + 1);
+  }, []);
+
+  const handleLedgerTimeCommit = useCallback((ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
+    const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
+    if (!iso) return;
+    setLedgerTimeOverride(ledgerDay, rowId, iso);
+    setStoreTick((t) => t + 1);
+  }, []);
+
+  const handleLedgerTimeReset = useCallback((ledgerDay, rowId) => {
+    setLedgerTimeOverride(ledgerDay, rowId, null);
+    setStoreTick((t) => t + 1);
+  }, []);
+
   const handleRemoveManualCountDiff = useCallback((eventId) => {
     if (!window.confirm("Delete this logged manual count?")) return;
     removeOpeningCountDiff(eventId);
@@ -1232,7 +1381,14 @@ export default function DailyCash() {
               <span className="inline-block w-8" />
             )}
           </td>
-          <td className="whitespace-nowrap px-3 py-2 tabular-nums text-gray-500">{r.timeLabel}</td>
+          <td className="min-w-[10rem] px-2 py-1 align-top tabular-nums text-gray-500">
+            <LedgerTimeCell
+              row={r}
+              ledgerDay={sectionDayStr}
+              onCommit={(rowId, d, t) => handleLedgerTimeCommit(sectionDayStr, rowId, d, t)}
+              onReset={(rowId) => handleLedgerTimeReset(sectionDayStr, rowId)}
+            />
+          </td>
           <td className={cn("px-3 py-2 text-gray-300", r.isManualCountReset && "font-semibold text-emerald-200")}>
             {r.source}
           </td>
@@ -1327,8 +1483,11 @@ export default function DailyCash() {
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">All logged manual counts</p>
       <p className="mt-1 text-xs text-gray-500">
         Each row is a saved physical count (Mexico calendar day) with the calculated expected drawer total, your actual count, and
-        the <span className="text-gray-400">± difference</span> (green = over expected, red = under). Optional comment for variance
-        notes.{" "}
+        the <span className="text-gray-400">± difference</span> (green = over expected, red = under).{" "}
+        <span className="text-gray-400">
+          “Logged at” uses Mexico time — edit date/time if you counted after the fact so the ledger order and End cash match reality.
+        </span>{" "}
+        Optional comment for variance notes.{" "}
         {isLocalOnlyMode ? (
           <>Stored in this browser in local dev — switch to </>
         ) : (
@@ -1340,7 +1499,7 @@ export default function DailyCash() {
         <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
           <thead>
             <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
-              <th className="px-2 py-2">Updated</th>
+              <th className="px-2 py-2">Logged at (Mexico)</th>
               <th className="px-2 py-2">Count day</th>
               <th className="px-2 py-2">Expected source</th>
               <th className="px-2 py-2">Comment</th>
@@ -1361,9 +1520,8 @@ export default function DailyCash() {
             ) : (
               openingCountDiffHistory.map((ev) => (
                 <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
-                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-500">
-                    {formatMexicoDateShort(ev.ts || "")}{" "}
-                    <span className="text-gray-600">{formatMexicoTime(ev.ts)}</span>
+                  <td className="px-2 py-1.5 align-top">
+                    <ManualCountWhenCell ev={ev} onCommit={handleManualCountDateTimeCommit} />
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
