@@ -16,13 +16,11 @@ export function isPlainDateKey(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 }
 
-/** Civil noon on `dateKey` anchored to Mexico_City (−06:00) for stable weekday labels. */
+/** Civil noon on `dateKey` anchored to Mexico_City (DST-aware via mexicoWallDateTimeToUtcIso). */
 function mexicoCivilNoonInstant(dateKey) {
   if (!isPlainDateKey(dateKey)) return null;
-  const [y, m, d] = dateKey.trim().split("-").map(Number);
-  return new Date(
-    `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T12:00:00-06:00`,
-  );
+  const iso = mexicoWallDateTimeToUtcIso(dateKey, "12:00");
+  return iso ? new Date(iso) : null;
 }
 
 /** Short weekday (es-MX) for a yyyy-MM-dd calendar key. */
@@ -137,7 +135,9 @@ export function normalizeHHmm(raw) {
 }
 
 /**
- * UTC instant from a Mexico wall date + time (America/Mexico_City, fixed −06:00).
+ * UTC instant from a Mexico wall date + time (America/Mexico_City, DST-aware).
+ * Uses the Temporal-free approach: binary-search the UTC offset that Intl.DateTimeFormat
+ * would display as the given local wall time, so DST transitions are handled correctly.
  * @param {string} dateKey yyyy-MM-dd
  * @param {string} timeHHmm HH:mm (24h)
  * @returns {string | null} ISO string
@@ -151,12 +151,49 @@ export function mexicoWallDateTimeToUtcIso(dateKey, timeHHmm) {
   if (!Number.isFinite(hh) || !Number.isFinite(min) || hh < 0 || hh > 23 || min < 0 || min > 59) {
     return null;
   }
+
+  // Target wall-clock minutes since midnight in Mexico City
+  const targetWallMins = hh * 60 + min;
+
+  // Helper: given a UTC timestamp (ms), return the wall-clock minutes in Mexico City
+  const wallMinsAt = (ms) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      hourCycle: "h23",
+    }).formatToParts(new Date(ms));
+    const ph = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+    const pm = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+    return ph * 60 + pm;
+  };
+
+  // Approximate starting UTC using a fixed -06:00 anchor, then correct for actual offset
   const [y, mo, d] = dateKey.split("-").map(Number);
   const pad = (n) => String(n).padStart(2, "0");
-  const s = `${String(y).padStart(4, "0")}-${pad(mo)}-${pad(d)}T${pad(hh)}:${pad(min)}:00`;
-  const inst = new Date(`${s}-06:00`);
-  if (Number.isNaN(inst.getTime())) return null;
-  return inst.toISOString();
+  const approxUtcMs = new Date(
+    `${String(y).padStart(4, "0")}-${pad(mo)}-${pad(d)}T${pad(hh)}:${pad(min)}:00-06:00`,
+  ).getTime();
+  if (!Number.isFinite(approxUtcMs)) return null;
+
+  // Compute actual Mexico offset at this approximate time and correct
+  const actualWall = wallMinsAt(approxUtcMs);
+  const diffMins = targetWallMins - actualWall;
+  // Handle midnight wrap-around (±720 min guard)
+  const correctedMs = approxUtcMs - diffMins * 60_000;
+
+  // Verify (should be exact; DST ambiguity resolved by preferring standard time)
+  const verifyWall = wallMinsAt(correctedMs);
+  if (verifyWall !== targetWallMins) {
+    // One more correction pass for edge cases
+    const diff2 = targetWallMins - verifyWall;
+    const finalMs = correctedMs - diff2 * 60_000;
+    if (Number.isFinite(finalMs)) return new Date(finalMs).toISOString();
+  }
+
+  if (!Number.isFinite(correctedMs)) return null;
+  return new Date(correctedMs).toISOString();
 }
 
 /** Current HH:mm (24h) in America/Mexico_City — for anchoring "now" on the Mexico wall clock. */

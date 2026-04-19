@@ -448,7 +448,7 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const whenIso =
       t.created_date ||
       mexicoWallDateTimeToUtcIso(txDateKey, "12:00") ||
-      new Date(`${dayStr}T12:00:00-06:00`).toISOString();
+      mexicoWallDateTimeToUtcIso(dayStr, "12:00");
     if (t.type === "contribution") {
       rows.push({
         _ledgerDay: dayStr,
@@ -488,7 +488,7 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const whenIso =
       e.created_date ||
       mexicoWallDateTimeToUtcIso(exDateKey, "12:00") ||
-      new Date(`${dayStr}T12:00:00-06:00`).toISOString();
+      mexicoWallDateTimeToUtcIso(dayStr, "12:00");
     let sourceLabel;
     if (fromCashDrawer) {
       sourceLabel = fromShopping ? "Register purchase" : "Expense (cash drawer)";
