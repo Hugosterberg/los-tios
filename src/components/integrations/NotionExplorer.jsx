@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { invokeNotionProxy } from "@/api/notionClient";
 import { useQuery } from "@tanstack/react-query";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BookOpen, CheckSquare, FileText, Loader2, RefreshCw, Search, ChevronRight, ExternalLink, CheckCircle2, Circle } from "lucide-react";
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -596,6 +596,16 @@ export default function EmployeeCalendar() {
     const [endH, endM] = end.split(":").map(Number);
     return ((endH * 60 + endM) - (startH * 60 + startM)) / 60;
   };
+
+  /* Projected wage for a template workday that has no saved shift yet. Kept in sync with
+     applyWeekTemplate() so the preview matches what "Create shifts for workdays" would record. */
+  const templateHours = (() => {
+    const h = calculateHours(templateStart, templateEnd);
+    return h > 0 ? h : 8;
+  })();
+  const templateProjectedAmount = templateEmployee
+    ? shiftAmountForEmployee(templateEmployee, templateHours) || 0
+    : 0;
 
   const handleTimeChange = (field, value) => {
     const newForm = { ...shiftForm, [field]: value };
@@ -1251,6 +1261,11 @@ export default function EmployeeCalendar() {
                             <p className="text-[10px] font-medium tabular-nums text-gray-200">
                               {formatShiftClock(templateStart)}–{formatShiftClock(templateEnd)}
                             </p>
+                            {templateProjectedAmount > 0 && (
+                              <p className="text-[10px] font-bold tabular-nums text-yellow-200/80">
+                                {formatMx(templateProjectedAmount)}
+                              </p>
+                            )}
                           </button>
                         )}
                         <div className="space-y-1.5">
@@ -1391,6 +1406,11 @@ export default function EmployeeCalendar() {
                               <span className="tabular-nums text-gray-500">
                                 {formatShiftClock(templateStart)}–{formatShiftClock(templateEnd)}
                               </span>
+                              {templateProjectedAmount > 0 && (
+                                <span className="tabular-nums text-yellow-500/70">
+                                  {formatMx(templateProjectedAmount)}
+                                </span>
+                              )}
                             </span>
                           ) : isScheduledWeekday ? (
                             <span className="mt-auto text-[10px] font-semibold uppercase tracking-wide text-yellow-500/95 sm:text-[11px]">

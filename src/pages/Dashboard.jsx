@@ -33,11 +33,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { subDays, format, isValid, addDays, eachDayOfInterval } from "date-fns";
+import { subDays, format, isValid, addDays, eachDayOfInterval, formatDistanceToNowStrict } from "date-fns";
+import { enUS } from "date-fns/locale";
 import {
   formatMexicoDateTimeNumeric,
   formatMexicoTime,
   getMexicoDateKey,
+  getMexicoNowDateKey,
   isPlainDateKey,
   MEXICO_DISPLAY_TIMEZONE,
 } from "@/lib/mexicoTime";
@@ -46,7 +48,15 @@ import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
-import { buildMergedCanonicalEvents } from "@/lib/mergedSales";
+import { aggregateTopReceiptLineItems, buildMergedCanonicalEvents, sumEventAmounts } from "@/lib/mergedSales";
+import {
+  getOpeningBalance,
+  getOpeningCountMeta,
+  listOpeningCountDiffs,
+} from "@/lib/dailyCashLocal";
+import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
+import { useMonthUrlSync, isValidMonthKey, appendMonthParam } from "@/hooks/useMonthUrlSync";
+import { formatMxn, formatCount } from "@/lib/format";
 import { listOrders } from "@/lib/local-dev-orders";
 import {
   isLocalFinanceMode,
@@ -84,15 +94,8 @@ import { createPageUrl } from "@/utils";
 const managementInsightView = (view) =>
   `${createPageUrl("ManagementInsight")}?view=${view}`;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    currencyDisplay: "code",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-
-const formatNumber = (value) => new Intl.NumberFormat("es-MX").format(value || 0);
+const formatCurrency = formatMxn;
+const formatNumber = formatCount;
 
 function formatDateSafe(value, pattern, fallback = "N/A") {
   const date = value instanceof Date ? value : new Date(value);
@@ -932,6 +935,9 @@ export default function Dashboard() {
   const [selectedDedupeWindow, setSelectedDedupeWindow] = React.useState(DEDUPE_WINDOW_OPTIONS[2]);
   const [selectedDedupePriority, setSelectedDedupePriority] = React.useState(DEDUPE_PRIORITY_OPTIONS[0]);
   const [kpiDetailItem, setKpiDetailItem] = React.useState(null);
+  /* Bumped by useDailyCashStoreSync onStoreChange so the "Money at a glance" KPIs re-read
+     opening balances / diff events after the DailyCash store migrates from AppSettings. */
+  const [cashStoreTick, setCashStoreTick] = React.useState(0);
   const isLocalOnlyMode =
     import.meta.env.DEV &&
     (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
@@ -939,6 +945,20 @@ export default function Dashboard() {
     () => buildDashboardFilterWindow(calendarMonth, selectedDateRange),
     [calendarMonth, selectedDateRange],
   );
+
+  /* Bidirectional sync of Dashboard's calendar-month picker with ?month=YYYY-MM.
+     Active only when a calendar month is actually selected, so the rolling ranges
+     ("1 day", "7 days", etc.) never broadcast a misleading month to other tabs. */
+  const calendarMonthKey = calendarMonth
+    ? `${calendarMonth.y}-${String(calendarMonth.m + 1).padStart(2, "0")}`
+    : "";
+  const setCalendarMonthFromKey = React.useCallback((key) => {
+    if (!isValidMonthKey(key)) return;
+    const [y, m] = key.split("-").map(Number);
+    setCalendarMonth({ y, m: m - 1 });
+    setCalendarBrowseYear(y);
+  }, []);
+  useMonthUrlSync(calendarMonthKey, setCalendarMonthFromKey, { active: !!calendarMonth });
   const queryWindowStart = React.useMemo(() => {
     if (calendarMonth) {
       return new Date(calendarMonth.y, calendarMonth.m, 1);
@@ -957,6 +977,13 @@ export default function Dashboard() {
   );
 
   const useLocalFinance = isLocalFinanceMode();
+
+  /* Bootstraps the Daily Cash store so opening counts + diff events are readable on this page.
+     Dashboard is read-only against the store, but the same persistence is shared with DailyCash/
+     Shopping — keeping it in sync lets "Cash in drawer" and the variance chart render correctly. */
+  useDailyCashStoreSync({
+    onStoreChange: () => setCashStoreTick((t) => t + 1),
+  });
 
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],
@@ -1033,6 +1060,100 @@ export default function Dashboard() {
   const receipts = loyverseOverview?.receipts || [];
   const clipPayments = clipOverview?.payments || [];
   const clipSettlements = clipOverview?.settlements || [];
+
+  /* ---------------- Money at a glance (today, Mexico-local) ----------------
+     These KPIs intentionally ignore the filter/date-range UI above so they always
+     represent "what's true right now". Sales use the same buildMergedCanonicalEvents
+     pipeline as the main Sales panel, just scoped to the current Mexico calendar day.
+  */
+  const todayMexicoKey = getMexicoNowDateKey();
+
+  const todayCanonicalEvents = React.useMemo(() => {
+    const start = getStartOfToday();
+    const end = getEndOfToday();
+    const inTodayWindow = (record) => {
+      const d = getRecordDate(record);
+      return d >= start && d <= end;
+    };
+    const { canonicalEvents } = buildMergedCanonicalEvents({
+      receipts: receipts.filter(inTodayWindow),
+      clipPayments: clipPayments.filter(inTodayWindow),
+      contributionTransactions: transactions
+        .filter((t) => t?.type === "contribution")
+        .filter(inTodayWindow),
+      stores: loyverseOverview?.stores || [],
+      dedupeWindowMs,
+      priorityMode: selectedDedupePriority,
+    });
+    return canonicalEvents;
+  }, [receipts, clipPayments, transactions, loyverseOverview, dedupeWindowMs, selectedDedupePriority]);
+
+  const todaySales = sumEventAmounts(todayCanonicalEvents);
+
+  const todayExpensesTotal = expenses
+    .filter((e) => String(e?.date || "").slice(0, 10) === todayMexicoKey)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const todayWithdrawalsTotal = transactions
+    .filter((t) => t?.type === "withdrawal" && String(t?.date || "").slice(0, 10) === todayMexicoKey)
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const todayNet = todaySales - todayExpensesTotal - todayWithdrawalsTotal;
+
+  /* "Cash in drawer" uses the most recent manual count we have locally. cashStoreTick is
+     read so the memo re-evaluates after the remote store hydrates. */
+  const cashInDrawerSnapshot = React.useMemo(() => {
+    void cashStoreTick;
+    const diffs = listOpeningCountDiffs();
+    const latest = diffs.length > 0 ? diffs[0] : null;
+    const latestDateKey = latest?.dateKey || todayMexicoKey;
+    const amount = Number(getOpeningBalance(latestDateKey));
+    const meta = getOpeningCountMeta(latestDateKey);
+    const countedAtIso = latest?.ts || meta?.updatedAt || null;
+    return {
+      amount: Number.isFinite(amount) ? amount : null,
+      dateKey: latestDateKey,
+      countedAtIso,
+      diff: latest?.diff ?? null,
+    };
+  }, [cashStoreTick, todayMexicoKey]);
+
+  /* Cash variance over the last 30 Mexico-calendar days. One bar per day; only days where a
+     manual count was actually performed produce a bar (zero-days are omitted — otherwise the chart
+     would be mostly empty when the shop is not counting daily). */
+  const cashVariance30d = React.useMemo(() => {
+    void cashStoreTick;
+    const diffs = listOpeningCountDiffs();
+    const now = new Date();
+    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const byDay = new Map();
+    for (const ev of diffs) {
+      if (!ev?.dateKey) continue;
+      if (typeof ev.diff !== "number" || !Number.isFinite(ev.diff)) continue;
+      const ts = ev.ts ? new Date(ev.ts) : null;
+      if (!ts || Number.isNaN(ts.getTime())) continue;
+      if (ts < start || ts > now) continue;
+      const prev = byDay.get(ev.dateKey);
+      /* Keep the latest count per day (list is newest-first so "first seen" wins). */
+      if (!prev) byDay.set(ev.dateKey, { dateKey: ev.dateKey, diff: ev.diff, ts });
+    }
+    return Array.from(byDay.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  }, [cashStoreTick]);
+
+  const cashVarianceTotal = cashVariance30d.reduce((sum, d) => sum + d.diff, 0);
+  const cashVarianceBiggest = cashVariance30d.reduce(
+    (worst, d) => (Math.abs(d.diff) > Math.abs(worst?.diff ?? 0) ? d : worst),
+    null,
+  );
+
+  const cashInDrawerAgeLabel = React.useMemo(() => {
+    const iso = cashInDrawerSnapshot.countedAtIso;
+    if (!iso) return "Never counted";
+    try {
+      return `Counted ${formatDistanceToNowStrict(new Date(iso), { addSuffix: true, locale: enUS })}`;
+    } catch {
+      return "Counted recently";
+    }
+  }, [cashInDrawerSnapshot.countedAtIso]);
+  /* ------------------------------------------------------------------------ */
   const clipPaymentsPayload = clipOverview?.raw?.paymentsPayload || null;
   const clipSettlementsPayload = clipOverview?.raw?.settlementsPayload || null;
   const filteredOrders = filterByDashboardWindow(orders, dashboardFilterWindow);
@@ -1178,6 +1299,56 @@ export default function Dashboard() {
     branch: selectedBranch,
     channel: selectedChannel,
   });
+  /* Top 10 best-selling dishes in the selected filter window. Uses Loyverse receipt line items
+     only because line-level data isn't available for Clip/manual yet. */
+  const topDishesInPeriod = React.useMemo(
+    () => aggregateTopReceiptLineItems(filteredCanonicalSalesEvents, 10),
+    [filteredCanonicalSalesEvents],
+  );
+  const topDishesRevenue = topDishesInPeriod.reduce((sum, r) => sum + (r.revenue || 0), 0);
+
+  /* Top 10 cost centers in the same window — groups expenses by name (case-insensitive, trimmed)
+     across all categories so "Harina" and "Water" show up alongside "Rent" / "Electricity". */
+  const topExpensesByName = React.useMemo(() => {
+    const byKey = new Map();
+    for (const e of filteredExpenses) {
+      const raw = (e?.name || "").trim();
+      const key = raw.toLowerCase();
+      if (!key) continue;
+      const prev = byKey.get(key);
+      const amount = Number(e?.amount || 0);
+      if (prev) {
+        prev.total += amount;
+        prev.count += 1;
+        prev.names.set(raw, (prev.names.get(raw) || 0) + 1);
+        if (!prev.category) prev.category = getExpenseCategory(e) || "";
+      } else {
+        byKey.set(key, {
+          key,
+          total: amount,
+          count: 1,
+          category: getExpenseCategory(e) || "",
+          names: new Map([[raw, 1]]),
+        });
+      }
+    }
+    return Array.from(byKey.values())
+      .map((g) => {
+        let bestName = "";
+        let bestCount = -1;
+        for (const [n, c] of g.names) {
+          if (c > bestCount || (c === bestCount && n.length > bestName.length)) {
+            bestName = n;
+            bestCount = c;
+          }
+        }
+        return { key: g.key, name: bestName, total: g.total, count: g.count, category: g.category };
+      })
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  }, [filteredExpenses]);
+  const topExpensesTotal = topExpensesByName.reduce((sum, r) => sum + r.total, 0);
+
   const currentDaySalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= todayStart);
   const currentWeekSalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= weekStart);
   const currentMonthSalesEvents = filteredCanonicalSalesEvents.filter((event) => event.timestamp >= monthStart);
@@ -2172,6 +2343,314 @@ export default function Dashboard() {
       </div>
 
       <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+        <section id="money-at-a-glance" className="mb-8">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Right now</p>
+              <h2 className="mt-1 text-2xl font-bold text-yellow-400">Money at a glance</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Ignores the filters above — always shows today in Mexico and the most recent cash count.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="hidden sm:inline-flex border-yellow-500/25 bg-[#242424] text-gray-200 hover:bg-[#2b2b2b]">
+              <Link to={createPageUrl("DailyCash")}>
+                Open Daily Cash
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
+                  Cash in drawer
+                </p>
+                <SourceBadge source="manual" />
+              </div>
+              <p className="mt-3 text-3xl font-bold tabular-nums text-yellow-300 sm:text-4xl">
+                {cashInDrawerSnapshot.amount !== null ? formatCurrency(cashInDrawerSnapshot.amount) : "—"}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+                <span>{cashInDrawerAgeLabel}</span>
+                {cashInDrawerSnapshot.diff !== null && cashInDrawerSnapshot.diff !== 0 && (
+                  <span
+                    className={`tabular-nums ${cashInDrawerSnapshot.diff > 0 ? "text-yellow-200" : "text-red-300"}`}
+                  >
+                    Last diff {cashInDrawerSnapshot.diff > 0 ? "+" : ""}
+                    {formatCurrency(cashInDrawerSnapshot.diff)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
+                  Sales today
+                </p>
+                <SourceBadge source={salesPipelineDataSource} />
+              </div>
+              <p className="mt-3 text-3xl font-bold tabular-nums text-yellow-300 sm:text-4xl">
+                {formatCurrency(todaySales)}
+              </p>
+              <p className="mt-3 text-xs text-gray-400">
+                {formatNumber(todayCanonicalEvents.length)} {todayCanonicalEvents.length === 1 ? "sale" : "sales"} recorded so far
+              </p>
+            </div>
+
+            <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
+                  Net today
+                </p>
+                <SourceBadge source="finance_ledger" />
+              </div>
+              <p
+                className={`mt-3 text-3xl font-bold tabular-nums sm:text-4xl ${todayNet < 0 ? "text-red-300" : "text-yellow-300"}`}
+              >
+                {formatCurrency(todayNet)}
+              </p>
+              <p className="mt-3 text-xs text-gray-400">
+                Sales − expenses ({formatCurrency(todayExpensesTotal)}) − withdrawals ({formatCurrency(todayWithdrawalsTotal)})
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="cash-variance" className="mb-8">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Cash health</p>
+              <h2 className="mt-1 text-2xl font-bold text-yellow-400">Cash variance — last 30 days</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Difference between expected end-of-day cash and what was actually counted. Green = extra,
+                red = missing.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="hidden sm:inline-flex border-yellow-500/25 bg-[#242424] text-gray-200 hover:bg-[#2b2b2b]">
+              <Link to={createPageUrl("DailyCash") + "?focus=manual-counting-history"}>
+                Open counting history
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="rounded-2xl border border-yellow-500/20 bg-[#1e1e1e] p-5">
+            <div className="mb-4 grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Counts logged</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-white">{cashVariance30d.length}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Cumulative diff</p>
+                <p
+                  className={`mt-1 text-2xl font-bold tabular-nums ${cashVarianceTotal < 0 ? "text-red-300" : "text-yellow-300"}`}
+                >
+                  {cashVarianceTotal > 0 ? "+" : ""}
+                  {formatCurrency(cashVarianceTotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Biggest swing</p>
+                <p
+                  className={`mt-1 text-2xl font-bold tabular-nums ${(cashVarianceBiggest?.diff ?? 0) < 0 ? "text-red-300" : "text-yellow-300"}`}
+                >
+                  {cashVarianceBiggest
+                    ? `${cashVarianceBiggest.diff > 0 ? "+" : ""}${formatCurrency(cashVarianceBiggest.diff)}`
+                    : "—"}
+                </p>
+                <p className="mt-0.5 text-[10px] text-gray-500">
+                  {cashVarianceBiggest?.dateKey || "No counts yet"}
+                </p>
+              </div>
+            </div>
+            {cashVariance30d.length === 0 ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                No manual counts logged in the last 30 days. Run a count from{" "}
+                <Link to={createPageUrl("DailyCash")} className="text-yellow-300 hover:underline">
+                  Daily Cash
+                </Link>{" "}
+                to populate this chart.
+              </p>
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={cashVariance30d} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                    <XAxis
+                      dataKey="dateKey"
+                      stroke="#6b7280"
+                      tickFormatter={(k) => (typeof k === "string" ? k.slice(5) : k)}
+                      tick={{ fontSize: 11 }}
+                    />
+                    <YAxis
+                      stroke="#6b7280"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(250,204,21,0.06)" }}
+                      contentStyle={{
+                        background: "#1a1a1a",
+                        border: "1px solid rgba(250,204,21,0.2)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      formatter={(value) => [formatCurrency(Number(value)), "Diff"]}
+                      labelFormatter={(label) => label}
+                    />
+                    <Bar dataKey="diff" radius={[4, 4, 0, 0]}>
+                      {cashVariance30d.map((entry) => (
+                        <Cell
+                          key={entry.dateKey}
+                          fill={entry.diff >= 0 ? "#facc15" : "#f87171"}
+                          fillOpacity={entry.diff >= 0 ? 0.85 : 0.9}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="product-mix-ranking" className="mb-8">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Where money flows</p>
+              <h2 className="mt-1 text-2xl font-bold text-yellow-400">Top spend &amp; top sales</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Uses the filter window above ({displayPeriodLabel}). Spend groups expense rows by
+                name; sales use Loyverse receipt line items.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
+              <div className="flex items-center justify-between gap-2 border-b border-yellow-500/15 px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-yellow-200">Top spend by item</h3>
+                  <SourceBadge source="finance_ledger" />
+                </div>
+                <Button asChild variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-yellow-200">
+                  <Link to={appendMonthParam(createPageUrl("ShoppingList"), calendarMonthKey)}>
+                    Open Shopping
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+              {topExpensesByName.length === 0 ? (
+                <p className="px-5 py-6 text-center text-sm text-gray-500">
+                  No expenses in {displayPeriodLabel.toLowerCase()}.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-yellow-500/15 bg-black/25 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/80">
+                        <th className="px-4 py-2">#</th>
+                        <th className="px-4 py-2">Item</th>
+                        <th className="px-4 py-2 text-right">Total</th>
+                        <th className="px-4 py-2 text-right">Rows</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topExpensesByName.map((row, idx) => {
+                        const share = topExpensesTotal > 0 ? (row.total / topExpensesTotal) * 100 : 0;
+                        return (
+                          <tr
+                            key={row.key}
+                            className={`border-b border-yellow-500/10 ${idx % 2 === 1 ? "bg-black/20" : ""}`}
+                          >
+                            <td className="px-4 py-2 tabular-nums text-gray-500">{idx + 1}</td>
+                            <td className="px-4 py-2 font-medium text-yellow-50">
+                              {row.name}
+                              {row.category && row.category !== "other" && (
+                                <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-gray-500">
+                                  {row.category}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right font-mono tabular-nums text-amber-200/90">
+                              {formatCurrency(row.total)}
+                              {share > 0 && (
+                                <span className="ml-2 text-[10px] font-normal text-gray-500">
+                                  {share.toFixed(1)}%
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums text-gray-400">{row.count}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
+              <div className="flex items-center justify-between gap-2 border-b border-yellow-500/15 px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-yellow-200">Top sales by dish</h3>
+                  <SourceBadge source="loyverse" />
+                </div>
+                <Button asChild variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-yellow-200">
+                  <Link to={appendMonthParam(createPageUrl("Statistics"), calendarMonthKey)}>
+                    Open Stats
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+              {topDishesInPeriod.length === 0 ? (
+                <p className="px-5 py-6 text-center text-sm text-gray-500">
+                  {hasLoyverseApiConfig(appSettings)
+                    ? `No Loyverse receipts in ${displayPeriodLabel.toLowerCase()}.`
+                    : "Connect Loyverse in Integrations to populate this list."}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-yellow-500/15 bg-black/25 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/80">
+                        <th className="px-4 py-2">#</th>
+                        <th className="px-4 py-2">Dish</th>
+                        <th className="px-4 py-2 text-right">Revenue</th>
+                        <th className="px-4 py-2 text-right">Units</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topDishesInPeriod.map((row, idx) => {
+                        const share = topDishesRevenue > 0 ? (row.revenue / topDishesRevenue) * 100 : 0;
+                        return (
+                          <tr
+                            key={row.name}
+                            className={`border-b border-yellow-500/10 ${idx % 2 === 1 ? "bg-black/20" : ""}`}
+                          >
+                            <td className="px-4 py-2 tabular-nums text-gray-500">{idx + 1}</td>
+                            <td className="px-4 py-2 font-medium text-yellow-50">{row.name}</td>
+                            <td className="px-4 py-2 text-right font-mono tabular-nums text-amber-200/90">
+                              {formatCurrency(row.revenue)}
+                              {share > 0 && (
+                                <span className="ml-2 text-[10px] font-normal text-gray-500">
+                                  {share.toFixed(1)}%
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums text-gray-400">
+                              {formatNumber(row.count)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section id="executive-summary">
 
           <details className="mb-4 group">

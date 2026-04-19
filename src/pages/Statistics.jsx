@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
+import { useMonthUrlSync } from "@/hooks/useMonthUrlSync";
+import { formatMxn, formatCount } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -109,14 +111,11 @@ function expenseCalendarMonthKey(e) {
   return d.length >= 7 ? d.slice(0, 7) : "";
 }
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    currencyDisplay: "code",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
+const formatCurrency = formatMxn;
+const formatNumber = formatCount;
 
+/* Keeps 2 decimals even for round numbers (used in CSV exports + payroll where trailing
+   .00 matters). The shared formatMxnDetailed rounds trailing zeros, so we can't reuse it. */
 const formatCurrencyDetailed = (value) =>
   new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -125,8 +124,6 @@ const formatCurrencyDetailed = (value) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value || 0);
-
-const formatNumber = (value) => new Intl.NumberFormat("es-MX").format(value || 0);
 
 function escapeCsvField(value) {
   const s = String(value);
@@ -194,6 +191,9 @@ export default function Statistics() {
   const [selectedYear, setSelectedYear] = useState(() => getMexicoNowYearMonth().slice(0, 4));
   const [selectedDay, setSelectedDay] = useState(() => getMexicoNowDateKey());
   const [statsView, setStatsView] = useState("monthly");
+  /* Keep ?month=YYYY-MM in the URL while on the Monthly view so other admin tabs
+     (Dashboard, Shopping) can land on the same period when the user follows a link. */
+  useMonthUrlSync(selectedMonth, setSelectedMonth, { active: statsView === "monthly" });
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
     queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),

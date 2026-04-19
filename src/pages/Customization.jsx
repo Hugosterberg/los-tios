@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Palette, Upload, Save, RefreshCw, Image as ImageIcon, CreditCard, Banknote } from "lucide-react"; // Added CreditCard and Banknote
+import { Palette, Save, RefreshCw, Image as ImageIcon, CreditCard, Banknote } from "lucide-react"; // Added CreditCard and Banknote
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";

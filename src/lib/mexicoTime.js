@@ -228,6 +228,11 @@ export function mexicoBusinessDayCreatedAtIso(dateKey) {
  */
 export function withMexicoCreatedDateForPayload(data, { dateField = "date" } = {}) {
   if (!data || typeof data !== "object") return data;
+  const explicit = data.created_date;
+  if (explicit != null && String(explicit).trim() !== "") {
+    /* Caller already set created_date (e.g. from a picked wall time) — never overwrite. */
+    return data;
+  }
   const raw = data[dateField];
   const dk = isPlainDateKey(raw) ? String(raw).trim().slice(0, 10) : getMexicoNowDateKey();
   return { ...data, created_date: mexicoBusinessDayCreatedAtIso(dk) };

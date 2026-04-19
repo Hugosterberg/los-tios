@@ -241,6 +241,11 @@ const DEFAULT_PRIORITY = "Prefer Loyverse";
  * @param {Array} params.clipPayments - raw Clip payments
  * @param {Array} params.contributionTransactions - CompanyTransaction rows with type contribution
  * @param {Array} [params.stores] - Loyverse stores for branch names
+ * @param {number} [params.dedupeWindowMs] - sliding window for cross-source dedupe
+ * @param {string} [params.priorityMode] - one of the priority strings used by resolveDedupePriority
+ * @param {string} [params.paymentSource] - "All sources" or a specific payment source filter
+ * @param {string} [params.branch] - "All branches" or a specific branch name
+ * @param {string} [params.channel] - "All channels" or a specific channel name
  */
 export function buildMergedCanonicalEvents({
   receipts = [],

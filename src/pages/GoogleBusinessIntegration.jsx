@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Building2, ExternalLink, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";

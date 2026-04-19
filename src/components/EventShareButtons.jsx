@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 export default function EventShareButtons({ title, text, url, lang = "es" }) {
   const [copied, setCopied] = useState(false);

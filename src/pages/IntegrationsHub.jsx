@@ -1,4 +1,3 @@
-import React from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KeyRound, CreditCard, Store, Wallet, StickyNote, Mail, Cloud, MapPin, Building2 } from "lucide-react";

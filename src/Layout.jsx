@@ -1,6 +1,7 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { appendMonthParam, isValidMonthKey } from "@/hooks/useMonthUrlSync";
 import {
 LayoutDashboard,
 UtensilsCrossed,
@@ -24,21 +25,32 @@ import losTiosLogo from "@/assets/los-tios-logo.png";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const { logout } = useAuth();
 
+  /* Propagate ?month=YYYY-MM across every sidebar link so the selected period persists
+     through any navigation path (even via pages that don't themselves use the param).
+     Pages that don't care about `month` simply ignore it. */
+  const currentMonthParam = searchParams.get("month");
+  const activeMonth = isValidMonthKey(currentMonthParam) ? currentMonthParam : null;
+  const withMonth = React.useCallback(
+    (pageName) => appendMonthParam(createPageUrl(pageName), activeMonth),
+    [activeMonth],
+  );
+
   const navItems = [
-    { name: "Daily Cash", shortName: "Cash", url: createPageUrl("DailyCash"), icon: DollarSign },
-    { name: "Dashboard", shortName: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
-    { name: "Orders", shortName: "Orders", url: createPageUrl("Orders"), icon: ShoppingBag },
-    { name: "Notion", shortName: "Notion", url: createPageUrl("Notion"), icon: BookOpen },
-    { name: "Statistics", shortName: "Stats", url: createPageUrl("Statistics"), icon: BarChart3 },
-    { name: "Menu", shortName: "Menu", url: createPageUrl("MenuManagement"), icon: UtensilsCrossed },
-    { name: "Finance", shortName: "Finance", url: createPageUrl("Finance"), icon: Wallet },
-    { name: "Shopping List", shortName: "Shopping", url: createPageUrl("ShoppingList"), icon: ShoppingCart },
-    { name: "Employees", shortName: "Employees", url: createPageUrl("EmployeeCalendar"), icon: Users },
-    { name: "Events", shortName: "Events", url: createPageUrl("Events"), icon: CalendarDays },
-    { name: "Customer Page", shortName: "Customers", url: createPageUrl("CustomerOrder"), icon: Globe, highlight: true },
+    { name: "Daily Cash", shortName: "Cash", url: withMonth("DailyCash"), icon: DollarSign },
+    { name: "Dashboard", shortName: "Dashboard", url: withMonth("Dashboard"), icon: LayoutDashboard },
+    { name: "Orders", shortName: "Orders", url: withMonth("Orders"), icon: ShoppingBag },
+    { name: "Notion", shortName: "Notion", url: withMonth("Notion"), icon: BookOpen },
+    { name: "Statistics", shortName: "Stats", url: withMonth("Statistics"), icon: BarChart3 },
+    { name: "Menu", shortName: "Menu", url: withMonth("MenuManagement"), icon: UtensilsCrossed },
+    { name: "Finance", shortName: "Finance", url: withMonth("Finance"), icon: Wallet },
+    { name: "Shopping List", shortName: "Shopping", url: withMonth("ShoppingList"), icon: ShoppingCart },
+    { name: "Employees", shortName: "Employees", url: withMonth("EmployeeCalendar"), icon: Users },
+    { name: "Events", shortName: "Events", url: withMonth("Events"), icon: CalendarDays },
+    { name: "Customer Page", shortName: "Customers", url: withMonth("CustomerOrder"), icon: Globe, highlight: true },
   ];
 
   const handleLogout = () => {
@@ -91,7 +103,7 @@ export default function Layout({ children, currentPageName }) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-10 items-center justify-between gap-2.5" lang="en">
             <div className="flex shrink-0 items-center gap-2">
-              <Link to={createPageUrl("Dashboard")} className="shrink-0">
+              <Link to={withMonth("Dashboard")} className="shrink-0">
                 <img
                   src={losTiosLogo}
                   alt="Los Tios"
@@ -99,7 +111,7 @@ export default function Layout({ children, currentPageName }) {
                 />
               </Link>
               <Link
-                to={createPageUrl("IntegrationsHub")}
+                to={withMonth("IntegrationsHub")}
                 title="Settings & Integrations"
                 className={`hidden xl:inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-all ${
                   location.pathname === createPageUrl("IntegrationsHub")
@@ -159,7 +171,7 @@ export default function Layout({ children, currentPageName }) {
               <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
                 <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Settings</p>
                 <Link
-                  to={createPageUrl("IntegrationsHub")}
+                  to={withMonth("IntegrationsHub")}
                   className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
                     location.pathname === createPageUrl("IntegrationsHub")
                       ? "bg-yellow-400/10 text-yellow-400"

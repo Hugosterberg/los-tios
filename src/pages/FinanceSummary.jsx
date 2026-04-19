@@ -21,13 +21,9 @@ import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { isLocalFinanceMode, localListExpenses, localListCompanyTransactions } from "@/lib/localDevFinance";
+import { formatMxn } from "@/lib/format";
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value || 0);
+const formatCurrency = formatMxn;
 
 function SourceCard({ title, icon: Icon, value, hint }) {
   return (

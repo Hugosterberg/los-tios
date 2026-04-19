@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pizza, ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, Copy, MapPin, Clock, MessageCircle } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, Check, CreditCard, Banknote, AlertCircle, MapPin, Clock, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EventShareButtons from "@/components/EventShareButtons";
 import { listMenuItems } from "@/lib/local-dev-menu";

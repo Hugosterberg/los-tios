@@ -54,6 +54,12 @@ import {
   normalizeHHmm,
   withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
+import {
+  flushDailyCashPersistImmediate,
+  setLedgerTimeOverride,
+} from "@/lib/dailyCashLocal";
+import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
+import { useMonthUrlSync } from "@/hooks/useMonthUrlSync";
 
 function escapeCsvField(value) {
   const s = String(value);
@@ -127,6 +133,9 @@ export default function ShoppingList() {
   const quickAmountInputRef = useRef(null);
   const quickShoppingNameInputRef = useRef(null);
 
+  /** Share the Daily Cash store so expense time overrides from here are visible in Cash. */
+  useDailyCashStoreSync();
+
   const [quickMenuIngredient, setQuickMenuIngredient] = useState("");
   const [quickShoppingLabel, setQuickShoppingLabel] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
@@ -197,6 +206,8 @@ export default function ShoppingList() {
   }, [expenses]);
 
   const [registeredPurchasesMonth, setRegisteredPurchasesMonth] = useState(() => getMexicoNowYearMonth());
+  /* Shares ?month=YYYY-MM with Dashboard/Statistics so hopping between admin tabs keeps the period. */
+  useMonthUrlSync(registeredPurchasesMonth, setRegisteredPurchasesMonth);
 
   const registeredPurchasesForMonth = useMemo(() => {
     const prefix = registeredPurchasesMonth;
@@ -207,6 +218,41 @@ export default function ShoppingList() {
     () => registeredPurchasesForMonth.reduce((sum, r) => sum + r.amount, 0),
     [registeredPurchasesForMonth],
   );
+
+  /** "rows" shows individual purchases, "products" shows totals grouped by product name. */
+  const [registeredView, setRegisteredView] = useState(/** @type {"rows" | "products"} */ ("rows"));
+
+  /* Group by normalized name (case-insensitive, trimmed) so "Water" and "water " collapse.
+     Keep the longest/most-frequent display name to avoid showing a blank or lowercase version. */
+  const registeredProductsForMonth = useMemo(() => {
+    const byKey = new Map();
+    for (const r of registeredPurchasesForMonth) {
+      const raw = (r.name || "").trim();
+      const key = raw.toLowerCase();
+      if (!key) continue;
+      const prev = byKey.get(key);
+      if (prev) {
+        prev.total += r.amount;
+        prev.count += 1;
+        prev.names.set(raw, (prev.names.get(raw) || 0) + 1);
+      } else {
+        byKey.set(key, { key, total: r.amount, count: 1, names: new Map([[raw, 1]]) });
+      }
+    }
+    return Array.from(byKey.values())
+      .map((g) => {
+        let bestName = "";
+        let bestCount = -1;
+        for (const [n, c] of g.names) {
+          if (c > bestCount || (c === bestCount && n.length > bestName.length)) {
+            bestName = n;
+            bestCount = c;
+          }
+        }
+        return { key: g.key, name: bestName, total: g.total, count: g.count };
+      })
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  }, [registeredPurchasesForMonth]);
 
   const registeredMonthLabel = useMemo(
     () => formatMexicoMonthYearLabelEn(registeredPurchasesMonth),
@@ -590,6 +636,10 @@ export default function ShoppingList() {
       if (!expenseId) {
         throw new Error("Expense did not return an id.");
       }
+      if (createdIso) {
+        setLedgerTimeOverride(dateStr, `exp-${expenseId}`, createdIso);
+        void flushDailyCashPersistImmediate();
+      }
       // Patch only link fields — spreading the full record often breaks API validation.
       await updateItem.mutateAsync({
         id: createdList.id,
@@ -698,6 +748,11 @@ export default function ShoppingList() {
       };
 
       const createdExpense = await createExpense.mutateAsync(expenseData);
+
+      if (createdIso && createdExpense?.id) {
+        setLedgerTimeOverride(today, `exp-${createdExpense.id}`, createdIso);
+        void flushDailyCashPersistImmediate();
+      }
 
       await updateItem.mutateAsync({
         id: item.id,
@@ -1546,7 +1601,7 @@ export default function ShoppingList() {
                 Open in Excel
               </Button>
             </div>
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-medium text-yellow-200/85">Month</Label>
                 <Popover open={registeredMonthPopoverOpen} onOpenChange={setRegisteredMonthPopoverOpen}>
@@ -1614,6 +1669,41 @@ export default function ShoppingList() {
                   </PopoverContent>
                 </Popover>
               </div>
+
+              <div
+                role="tablist"
+                aria-label="Registered purchases view"
+                className="inline-flex h-9 shrink-0 items-center rounded-lg border border-yellow-500/25 bg-[#1a1a1a] p-0.5"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={registeredView === "rows"}
+                  onClick={() => setRegisteredView("rows")}
+                  className={cn(
+                    "h-8 rounded-md px-3 text-xs font-medium transition-colors",
+                    registeredView === "rows"
+                      ? "bg-yellow-400 text-black shadow-sm"
+                      : "text-gray-300 hover:bg-yellow-500/10 hover:text-yellow-50",
+                  )}
+                >
+                  By purchase
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={registeredView === "products"}
+                  onClick={() => setRegisteredView("products")}
+                  className={cn(
+                    "h-8 rounded-md px-3 text-xs font-medium transition-colors",
+                    registeredView === "products"
+                      ? "bg-yellow-400 text-black shadow-sm"
+                      : "text-gray-300 hover:bg-yellow-500/10 hover:text-yellow-50",
+                  )}
+                >
+                  By product
+                </button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -1655,6 +1745,59 @@ export default function ShoppingList() {
                   <p className="border-t border-yellow-500/15 px-4 py-8 text-center text-sm text-gray-400">
                     No purchases in {registeredMonthLabel}. Choose another month or register a purchase for this period.
                   </p>
+                ) : registeredView === "products" ? (
+                  <div className="overflow-x-auto border-t border-yellow-500/15">
+                    <table className="w-full min-w-[480px] border-collapse text-left text-[11px] sm:text-xs">
+                      <thead>
+                        <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
+                          <th className="border-r border-yellow-500/30 px-3 py-2.5">Product</th>
+                          <th className="border-r border-yellow-500/20 px-3 py-2.5 text-right">Total (MXN)</th>
+                          <th className="px-3 py-2.5 text-right">Purchases</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registeredProductsForMonth.map((p, i) => {
+                          const share =
+                            registeredPurchasesMonthTotal > 0
+                              ? (p.total / registeredPurchasesMonthTotal) * 100
+                              : 0;
+                          return (
+                            <tr
+                              key={p.key}
+                              className={cn(
+                                "border-b border-yellow-500/15 transition-colors hover:bg-yellow-500/[0.06]",
+                                i % 2 === 1 && "bg-black/20",
+                              )}
+                            >
+                              <td className="border-r border-yellow-500/15 px-3 py-2 font-medium text-yellow-100/95">
+                                {p.name}
+                              </td>
+                              <td className="border-r border-yellow-500/15 px-3 py-2 text-right font-mono tabular-nums text-amber-200/90">
+                                ${formatMoneyCompact(p.total)}
+                                {share > 0 && (
+                                  <span className="ml-2 text-[10px] font-normal text-gray-500">
+                                    {share.toFixed(1)}%
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums text-gray-300">{p.count}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-yellow-500/30 bg-yellow-500/[0.08] text-sm font-semibold text-yellow-100">
+                          <td className="border-r border-yellow-500/20 px-3 py-2.5">Month total</td>
+                          <td className="border-r border-yellow-500/20 px-3 py-2.5 text-right font-mono tabular-nums">
+                            ${formatMoneyCompact(registeredPurchasesMonthTotal)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-gray-300">
+                            {registeredPurchasesForMonth.length}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 ) : (
                   <div className="overflow-x-auto border-t border-yellow-500/15">
                     <table className="w-full min-w-[560px] border-collapse text-left text-[11px] sm:text-xs">

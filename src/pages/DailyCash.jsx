@@ -25,7 +25,6 @@ import {
   Undo2,
 } from "lucide-react";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
-import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { getRecordDate, getReceiptPaymentMethod, getReceiptTotal } from "@/lib/mergedSales";
 import { Button } from "@/components/ui/button";
@@ -49,7 +48,6 @@ import {
 import { expectedLaborEntriesForDate, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import {
   addManualLine,
-  disposeDailyCashPersistence,
   flushDailyCashPersistImmediate,
   getDetailOverrides,
   getEarliestOpeningInMexicoMonth,
@@ -57,8 +55,6 @@ import {
   getManualLines,
   getOpeningBalance,
   getOpeningCountMeta,
-  initDailyCashPersistenceLocal,
-  initDailyCashPersistenceRemote,
   listOpeningCountDiffs,
   recordOpeningCountDiff,
   removeOpeningCountDiff,
@@ -71,6 +67,7 @@ import {
   moveManualLineToDay,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
+import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
 import {
   AppOrderLedgerDetailPanel,
   LoyverseLedgerDetailPanel,
@@ -90,6 +87,7 @@ import {
   getMexicoYearMonthKey,
   isPlainDateKey,
   matchesMexicoCalendarDay,
+  mexicoBusinessDayCreatedAtIso,
   mexicoWallDateTimeToUtcIso,
   normalizeHHmm,
   withMexicoCreatedDateForPayload,
@@ -140,7 +138,7 @@ function ManualCountWhenCell({ ev, onCommit }) {
  * Editable TIME for ledger rows — stages changes until “Save time changes” below.
  * Loyverse / labor rows still use AppSettings overrides on save.
  */
-function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onReset }) {
+function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onCommit, onReset }) {
   const overrideIso = getLedgerTimeOverrides(ledgerDay)[row.id];
   const refIso = (() => {
     if (pendingEdit) {
@@ -197,9 +195,19 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
     (overrideDateKey) => {
       const d = (overrideDateKey ?? dateKeyRef.current ?? "").trim();
       const t = normalizeHHmm(timeHHmmRef.current);
-      stageIfChanged(d, t);
+      if (!d || !t) return;
+      const iso = mexicoWallDateTimeToUtcIso(d, t);
+      if (!iso) return;
+      const compareIso = overrideIso ?? new Date(row.sortTime).toISOString();
+      const wall = getMexicoDateAndTimePartsForInput(compareIso);
+      if (wall.dateKey === d && wall.timeHHmm === t) {
+        onClearPending?.(ledgerDay, row.id);
+        return;
+      }
+      onStageChange?.(ledgerDay, row.id, d, t);
+      onCommit?.(ledgerDay, row.id, d, t);
     },
-    [stageIfChanged],
+    [row.id, row.sortTime, ledgerDay, overrideIso, onStageChange, onClearPending, onCommit],
   );
 
   if (row.isManualCountReset) {
@@ -755,9 +763,6 @@ export default function DailyCash() {
   const viewingToday = formDayStr === todayStr;
 
   const useLocalFinance = isLocalFinanceMode();
-  const isLocalOnlyMode =
-    import.meta.env.DEV &&
-    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" || !appParams.appId || !appParams.serverUrl);
 
   /** Full calendar month so day-to-day navigation still has Loyverse rows + prior-close math. */
   const loyverseWindow = useMemo(
@@ -770,14 +775,11 @@ export default function DailyCash() {
 
   const loyverseWindowKey = `${format(loyverseWindow.start, "yyyy-MM-dd")}_${format(loyverseWindow.end, "yyyy-MM-dd")}`;
 
-  const { data: settings = [] } = useQuery({
-    queryKey: ["appSettings"],
-    queryFn: () => base44.entities.AppSettings.list(),
-    enabled: !isLocalOnlyMode,
+  const [storeTick, setStoreTick] = useState(0);
+  const bumpStoreTick = useCallback(() => setStoreTick((t) => t + 1), []);
+  const { settings, isLocalOnlyMode } = useDailyCashStoreSync({
+    onStoreChange: bumpStoreTick,
   });
-  const settingsRowId = settings[0]?.id;
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const loyverseQuery = useQuery({
@@ -823,13 +825,12 @@ export default function DailyCash() {
   }, [formDayStr, periodMode, loyverseWindowKey]);
 
   const [openingInput, setOpeningInput] = useState("");
-  const [openingComment, setOpeningComment] = useState("");
-  const [storeTick, setStoreTick] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [manualNote, setManualNote] = useState("");
   const [manualAmount, setManualAmount] = useState("");
-  const [manualDir, setManualDir] = useState("in");
+  /** Default to "out": users register cash leaving the drawer far more often than cash in. */
+  const [manualDir, setManualDir] = useState("out");
 
   /** @type {null | { kind: 'legacy'; dayStr: string; line: object } | { kind: 'registered'; snapshot: object }} */
   const [lastRemovedManual, setLastRemovedManual] = useState(null);
@@ -840,69 +841,6 @@ export default function DailyCash() {
   );
   const [savingLedgerTimes, setSavingLedgerTimes] = useState(false);
   const pendingLedgerCount = Object.keys(pendingLedgerTimes).length;
-
-  useLayoutEffect(() => {
-    if (isLocalOnlyMode) {
-      disposeDailyCashPersistence();
-      initDailyCashPersistenceLocal();
-      setStoreTick((t) => t + 1);
-      return () => {
-        void flushDailyCashPersistImmediate();
-        disposeDailyCashPersistence();
-      };
-    }
-    if (!settingsRowId) {
-      /* Wait for AppSettings — disposing here wiped in-memory edits before remote init. */
-      return;
-    }
-    const cached = queryClient.getQueryData(["appSettings"]);
-    const rowFromCache = Array.isArray(cached) ? cached.find((r) => r?.id === settingsRowId) : null;
-    const rowFromRender = Array.isArray(settingsRef.current)
-      ? settingsRef.current.find((r) => r?.id === settingsRowId)
-      : null;
-    const row = rowFromCache ?? rowFromRender;
-    const serverJson = typeof row?.daily_cash_store_json === "string" ? row.daily_cash_store_json : "";
-
-    const persist = async (json) => {
-      await base44.entities.AppSettings.update(settingsRowId, { daily_cash_store_json: json });
-      queryClient.setQueryData(["appSettings"], (prev) => {
-        if (!prev?.length) return prev;
-        const first = prev[0];
-        if (first?.id !== settingsRowId) return prev;
-        return [{ ...first, daily_cash_store_json: json }, ...prev.slice(1)];
-      });
-    };
-
-    disposeDailyCashPersistence();
-    const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
-    if (migrated || memoryMerged) {
-      void flushDailyCashPersistImmediate().catch((err) => {
-        console.error("[dailyCash] migration persist failed", err);
-      });
-    }
-    setStoreTick((t) => t + 1);
-
-    return () => {
-      void flushDailyCashPersistImmediate();
-      disposeDailyCashPersistence();
-    };
-  }, [isLocalOnlyMode, settingsRowId, queryClient]);
-
-  useEffect(() => {
-    if (isLocalOnlyMode || !settingsRowId) return undefined;
-    const flush = () => {
-      void flushDailyCashPersistImmediate();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") flush();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", flush);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", flush);
-    };
-  }, [isLocalOnlyMode, settingsRowId]);
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -1038,7 +976,6 @@ export default function DailyCash() {
   }, [periodMode, formDayStr, loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick]);
 
   useEffect(() => {
-    setOpeningComment("");
     if (periodMode === "month") {
       setOpeningInput(monthEarliestOpening === null ? "" : String(monthEarliestOpening.value));
       return;
@@ -1053,7 +990,7 @@ export default function DailyCash() {
 
   const openingCountDiffHistory = useMemo(() => listOpeningCountDiffs(), [storeTick]);
 
-  /** Ledger rows for any Mexico day — used when Today row cache is empty (e.g. Difference history tab). */
+  /** Ledger rows for any Mexico day — used when Today row cache is empty (e.g. Manual counting history tab). */
   const buildLedgerRowsForMexicoDay = useCallback(
     (dayStr) => {
       const manualCount = latestManualCountForDay(openingCountDiffHistory, dayStr);
@@ -1083,38 +1020,33 @@ export default function DailyCash() {
 
   const persistOpening = useCallback(() => {
     const trimmed = openingInput.trim();
-    const trimmedComment = openingComment.trim();
     const oldPersisted = getOpeningBalance(formDayStr);
     let didWrite = false;
     if (trimmed === "") {
       setOpeningBalance(formDayStr, null);
-      setOpeningComment("");
       didWrite = true;
     } else {
       const n = parseFloat(trimmed.replace(",", "."));
-      if (Number.isFinite(n)) {
+      if (Number.isFinite(n) && oldPersisted !== n) {
         const expectedEnd =
           periodMode === "today" && priorDrawerClose != null && Number.isFinite(priorDrawerClose.end)
             ? priorDrawerClose.end
             : null;
         const diff = expectedEnd === null ? null : n - expectedEnd;
-        if (oldPersisted !== n || trimmedComment !== "") {
-          recordOpeningCountDiff({
-            dateKey: formDayStr,
-            priorCloseDayStr: priorDrawerClose?.closeDayStr || null,
-            expectedEnd,
-            enteredOpening: n,
-            diff,
-            comment: trimmedComment,
-          });
-          setOpeningComment("");
-          didWrite = true;
-        }
+        recordOpeningCountDiff({
+          dateKey: formDayStr,
+          priorCloseDayStr: priorDrawerClose?.closeDayStr || null,
+          expectedEnd,
+          enteredOpening: n,
+          diff,
+          comment: "",
+        });
+        didWrite = true;
       }
     }
     setStoreTick((t) => t + 1);
     if (didWrite) void flushDailyCashPersistImmediate();
-  }, [formDayStr, openingComment, openingInput, periodMode, priorDrawerClose]);
+  }, [formDayStr, openingInput, periodMode, priorDrawerClose]);
 
   const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
   const openingCountMeta = useMemo(() => getOpeningCountMeta(formDayStr), [formDayStr, storeTick]);
@@ -1260,7 +1192,7 @@ export default function DailyCash() {
 
   /**
    * Expected physical drawer cash (manual count + ledger net).
-   * On Difference history: always **Mexico today** (live). On Today / Month: **selected** calendar day.
+   * On Manual counting history: always **Mexico today** (live). On Today / Month: **selected** calendar day.
    */
   const expectedCashHeroDayStr = periodMode === "history" ? todayStr : formDayStr;
 
@@ -1308,6 +1240,9 @@ export default function DailyCash() {
   const handleRegisterManualCash = async () => {
     const n = parseFloat(String(manualAmount).replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) return;
+    /* Anchor the row's time to Mexico wall time (now if today, else noon) — server-side created_date can
+       drift with the caller's UTC offset, so we also write a local ledger time override below. */
+    const createdIso = mexicoBusinessDayCreatedAtIso(formDayStr);
     const payload = {
       type: manualDir === "in" ? "contribution" : "withdrawal",
       contributor_name: "Manual cash",
@@ -1318,9 +1253,17 @@ export default function DailyCash() {
         manualNote.trim() || (manualDir === "in" ? "Cash in (manual)" : "Cash out (manual)"),
       notes: DAILY_CASH_TX_MARKER,
       reference_number: "",
+      created_date: createdIso,
     };
     try {
-      await createCompanyTx.mutateAsync(payload);
+      const created = await createCompanyTx.mutateAsync(payload);
+      const txId = created?.id;
+      if (txId && createdIso) {
+        const direction = payload.type === "contribution" ? "in" : "out";
+        setLedgerTimeOverride(formDayStr, `tx-${direction}-${txId}`, createdIso);
+        setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
+      }
       setManualNote("");
       setManualAmount("");
       setLastRemovedManual(null);
@@ -1462,7 +1405,9 @@ export default function DailyCash() {
 
       if (rowId.startsWith("order-")) {
         const id = rowId.slice("order-".length);
-        const payload = { created_date: iso, updated_date: new Date().toISOString() };
+        /* Align updated_date with the picked wall time — ledger uses `updated_date || created_date`
+           for the day match, so using `now` would push cross-day edits to today. */
+        const payload = { created_date: iso, updated_date: iso };
         try {
           await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
         } catch (e) {
@@ -1483,6 +1428,27 @@ export default function DailyCash() {
       persistOverrideOnly();
     },
     [queryClient, useLocalFinance],
+  );
+
+  const handleCommitLedgerTime = useCallback(
+    async (ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
+      const key = ledgerPendingKey(ledgerDay, rowId);
+      try {
+        await persistLedgerTimeCommit(ledgerDay, rowId, dateKeyMexico, timeHHmm);
+        setPendingLedgerTimes((prev) => {
+          if (!prev[key]) return prev;
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      } catch (err) {
+        console.error("[ledgerTime] popover commit failed", err);
+      }
+    },
+    [persistLedgerTimeCommit, queryClient],
   );
 
   const handleSavePendingLedgerTimes = useCallback(async () => {
@@ -1541,9 +1507,22 @@ export default function DailyCash() {
       return;
     }
     if (lastRemovedManual.kind === "registered" && lastRemovedManual.snapshot) {
-      const { id: _id, created_date: _c, ...rest } = lastRemovedManual.snapshot;
+      const { id: _id, ...rest } = lastRemovedManual.snapshot;
+      const originalCreated =
+        typeof rest.created_date === "string" && rest.created_date.trim() !== ""
+          ? rest.created_date.trim()
+          : null;
+      const payload = originalCreated ? { ...rest, created_date: originalCreated } : rest;
       try {
-        await createCompanyTx.mutateAsync(rest);
+        const created = await createCompanyTx.mutateAsync(payload);
+        const newId = created?.id;
+        if (newId && originalCreated) {
+          const direction = payload.type === "contribution" ? "in" : "out";
+          const dayKeyForOverride = payload.date || formDayStr;
+          setLedgerTimeOverride(dayKeyForOverride, `tx-${direction}-${newId}`, originalCreated);
+          setStoreTick((t) => t + 1);
+          void flushDailyCashPersistImmediate();
+        }
         setLastRemovedManual(null);
       } catch (e) {
         console.error(e);
@@ -1668,6 +1647,7 @@ export default function DailyCash() {
               pendingEdit={pendingLedgerTimes[ledgerPendingKey(sectionDayStr, r.id)]}
               onStageChange={handleStageLedgerTime}
               onClearPending={handleClearPendingLedgerTime}
+              onCommit={handleCommitLedgerTime}
               onReset={(rowId) => handleLedgerTimeReset(sectionDayStr, rowId)}
             />
           </td>
@@ -1876,7 +1856,7 @@ export default function DailyCash() {
                 <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-400 sm:text-[0.9375rem] sm:leading-relaxed">
                   {periodMode === "history" ? (
                     <>
-                      <strong className="font-medium text-gray-200">Difference history</strong> is a read-only audit of every
+                      <strong className="font-medium text-gray-200">Manual counting history</strong> is a read-only audit of every
                       saved manual cash count: timestamp, optional comment, <strong className="font-medium text-gray-200">expected</strong>{" "}
                       drawer from calculations, your <strong className="font-medium text-gray-200">actual</strong> count, and{" "}
                       <strong className="font-medium text-gray-200">± difference</strong>. Add new counts on{" "}
@@ -1906,7 +1886,7 @@ export default function DailyCash() {
                 <div
                   className="mt-4 inline-flex rounded-xl border border-yellow-500/40 bg-[#0c0c0a]/90 p-1 shadow-inner shadow-black/40"
                   role="group"
-                  aria-label="Daily cash view: Today, Month, or Difference history"
+                  aria-label="Daily cash view: Today, Month, or Manual counting history"
                 >
                   <Button
                     type="button"
@@ -1948,7 +1928,7 @@ export default function DailyCash() {
                         : "text-gray-200 hover:bg-yellow-500/15 hover:text-yellow-50"
                     )}
                   >
-                    Difference history
+                    Manual counting history
                   </Button>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/25 px-3 py-2 text-[11px] text-gray-400">
@@ -2120,7 +2100,7 @@ export default function DailyCash() {
                   style={{ fontFeatureSettings: '"ss01", "cv02"' }}
                 >
                   {periodMode === "history"
-                    ? "Difference history"
+                    ? "Manual counting history"
                     : periodMode === "month"
                       ? format(selectedDate, "MMMM yyyy", { locale: enUS })
                       : weekday}
@@ -2285,19 +2265,10 @@ export default function DailyCash() {
                       {formatMx(openingDiffVsPriorClose)}
                     </p>
                   ) : null}
-                  <div className="pt-1">
-                    <Label className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-                      Comment (optional)
-                    </Label>
-                    <Input
-                      type="text"
-                      value={openingComment}
-                      onChange={(e) => setOpeningComment(e.target.value)}
-                      onBlur={persistOpening}
-                      placeholder="Why does it differ?"
-                      className="mt-1 h-9 border-yellow-500/15 bg-[#0f0f0c] text-xs text-gray-200 placeholder:text-gray-600"
-                    />
-                  </div>
+                  <p className="pt-1 text-[10px] text-gray-600">
+                    Differences can be annotated afterwards from{" "}
+                    <strong className="text-gray-400">Manual counting history</strong>.
+                  </p>
                 </>
               )}
             </div>

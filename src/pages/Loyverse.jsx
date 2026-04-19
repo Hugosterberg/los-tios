@@ -15,9 +15,10 @@ import { getLoyverseOverview, hasLoyverseApiConfig, LOYVERSE_API_BASE_URL, saveL
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
 import { listOrders } from "@/lib/local-dev-orders";
+import { formatMxnDetailed, formatCount } from "@/lib/format";
 
-const formatCurrency = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value || 0);
-const formatNumber = (value) => new Intl.NumberFormat("en-US").format(value || 0);
+const formatCurrency = formatMxnDetailed;
+const formatNumber = formatCount;
 const formatRelativeDate = (value) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: enUS }) : "Unknown time";
 const formatDateTime = (value) =>
   value

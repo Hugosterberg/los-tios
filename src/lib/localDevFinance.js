@@ -207,10 +207,14 @@ export async function localListCompanyTransactions() {
 export async function localCreateCompanyTransaction(data) {
   const items = readCompanyTransactions();
   const dateKey = isPlainDateKey(data?.date) ? String(data.date).trim().slice(0, 10) : getMexicoNowDateKey();
+  const explicitCd = data?.created_date;
   const row = {
     ...clone(data),
     id: createId("ctx"),
-    created_date: mexicoBusinessDayCreatedAtIso(dateKey),
+    created_date:
+      explicitCd != null && String(explicitCd).trim() !== ""
+        ? String(explicitCd).trim()
+        : mexicoBusinessDayCreatedAtIso(dateKey),
   };
   items.push(row);
   writeCompanyTransactions(items);
