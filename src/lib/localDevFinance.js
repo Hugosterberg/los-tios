@@ -13,6 +13,7 @@ const EMPLOYEE_KEY = "los_tios_local_employees_v1";
 const SHIFT_KEY = "los_tios_local_shifts_v1";
 
 import { getMexicoNowDateKey, isPlainDateKey, mexicoBusinessDayCreatedAtIso } from "@/lib/mexicoTime";
+import { withOptionalIsoTimestampForPayload } from "@/lib/businessTimestamps";
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -158,15 +159,20 @@ export async function localDeleteShoppingList(id) {
 
 export async function localListExpenses() {
   const items = readExpenses();
-  return [...items].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  return [...items].sort((a, b) =>
+    String(b.recorded_at || b.created_date || b.date || "").localeCompare(
+      String(a.recorded_at || a.created_date || a.date || ""),
+    ),
+  );
 }
 
 export async function localCreateExpense(data) {
   const items = readExpenses();
-  const dateKey = isPlainDateKey(data?.date) ? String(data.date).trim().slice(0, 10) : getMexicoNowDateKey();
-  const explicitCd = data?.created_date;
+  const payload = withOptionalIsoTimestampForPayload(data, { dateField: "date", timestampField: "recorded_at" });
+  const dateKey = isPlainDateKey(payload?.date) ? String(payload.date).trim().slice(0, 10) : getMexicoNowDateKey();
+  const explicitCd = payload?.created_date;
   const row = {
-    ...clone(data),
+    ...clone(payload),
     id: createId("exp"),
     created_date:
       explicitCd != null && String(explicitCd).trim() !== ""
@@ -201,15 +207,20 @@ export async function localDeleteExpense(id) {
 /** Local CompanyTransaction rows when API is offline. */
 export async function localListCompanyTransactions() {
   const items = readCompanyTransactions();
-  return [...items].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  return [...items].sort((a, b) =>
+    String(b.recorded_at || b.created_date || b.date || "").localeCompare(
+      String(a.recorded_at || a.created_date || a.date || ""),
+    ),
+  );
 }
 
 export async function localCreateCompanyTransaction(data) {
   const items = readCompanyTransactions();
-  const dateKey = isPlainDateKey(data?.date) ? String(data.date).trim().slice(0, 10) : getMexicoNowDateKey();
-  const explicitCd = data?.created_date;
+  const payload = withOptionalIsoTimestampForPayload(data, { dateField: "date", timestampField: "recorded_at" });
+  const dateKey = isPlainDateKey(payload?.date) ? String(payload.date).trim().slice(0, 10) : getMexicoNowDateKey();
+  const explicitCd = payload?.created_date;
   const row = {
-    ...clone(data),
+    ...clone(payload),
     id: createId("ctx"),
     created_date:
       explicitCd != null && String(explicitCd).trim() !== ""

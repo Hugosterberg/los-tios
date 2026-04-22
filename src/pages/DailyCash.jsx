@@ -90,8 +90,22 @@ import {
   mexicoBusinessDayCreatedAtIso,
   mexicoWallDateTimeToUtcIso,
   normalizeHHmm,
-  withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
+import {
+  createEntityWithOptionalTimestamp,
+  resolveRecordIsoTimestamp,
+  updateEntityWithOptionalTimestamp,
+} from "@/lib/businessTimestamps";
+import {
+  buildDayTableRows as buildDayTableRowsCalc,
+  formatManualCountSourceLabel as formatManualCountSourceLabelCalc,
+  latestManualCountBefore as latestManualCountBeforeCalc,
+  latestManualCountForDay as latestManualCountForDayCalc,
+  mergeLaborCashLedgerRows as mergeLaborCashLedgerRowsCalc,
+  rowSortTime as rowSortTimeCalc,
+  sumDrawerCashTotals as sumDrawerCashTotalsCalc,
+  withManualCountResetRow as withManualCountResetRowCalc,
+} from "@/lib/dailyCashCalculations";
 
 /** Marks rows created from Daily Cash so they can be removed / undone from this page */
 const DAILY_CASH_TX_MARKER = "los_tios:daily_cash";
@@ -452,11 +466,11 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const amt = Number(t.amount || 0);
     const isDailyCashRegistered =
       String(t.notes || "") === DAILY_CASH_TX_MARKER || String(t.notes || "").includes(DAILY_CASH_TX_MARKER);
-    const txDateKey = isPlainDateKey(String(t.date)) ? String(t.date).trim().slice(0, 10) : dayStr;
-    const whenIso =
-      t.created_date ||
-      mexicoWallDateTimeToUtcIso(txDateKey, "12:00") ||
-      mexicoWallDateTimeToUtcIso(dayStr, "12:00");
+    const whenIso = resolveRecordIsoTimestamp(t, {
+      timestampFields: ["recorded_at", "created_date", "created_at"],
+      dateField: "date",
+      fallbackDateKey: dayStr,
+    });
     if (t.type === "contribution") {
       rows.push({
         _ledgerDay: dayStr,
@@ -492,11 +506,11 @@ function buildDayTableRows(dayStr, { orders, transactions, expenses, loyverseRow
     const fromShopping = Boolean(e.from_shopping_list);
     const ps = String(e.payment_source || "company_cash");
     const fromCashDrawer = ps === "company_cash";
-    const exDateKey = isPlainDateKey(String(e.date)) ? String(e.date).trim().slice(0, 10) : dayStr;
-    const whenIso =
-      e.created_date ||
-      mexicoWallDateTimeToUtcIso(exDateKey, "12:00") ||
-      mexicoWallDateTimeToUtcIso(dayStr, "12:00");
+    const whenIso = resolveRecordIsoTimestamp(e, {
+      timestampFields: ["recorded_at", "created_date", "created_at"],
+      dateField: "date",
+      fallbackDateKey: dayStr,
+    });
     let sourceLabel;
     if (fromCashDrawer) {
       sourceLabel = fromShopping ? "Register purchase" : "Expense (cash drawer)";
@@ -600,6 +614,21 @@ function latestManualCountForDay(events, dayStr) {
   );
 }
 
+function latestManualCountBefore(events, iso, excludeId = null) {
+  const target = new Date(iso || 0).getTime();
+  if (!Number.isFinite(target)) return null;
+  return (
+    (Array.isArray(events) ? events : [])
+      .filter((ev) => {
+        if (!ev || (excludeId && ev.id === excludeId)) return false;
+        if (!Number.isFinite(Number(ev.enteredOpening))) return false;
+        const t = new Date(ev.ts || 0).getTime();
+        return Number.isFinite(t) && t < target;
+      })
+      .sort((a, b) => new Date(b.ts || 0).getTime() - new Date(a.ts || 0).getTime())[0] || null
+  );
+}
+
 function withManualCountResetRow(dayStr, rows, manualCount) {
   if (!manualCount) return rows;
   const amount = Number(manualCount.enteredOpening);
@@ -633,6 +662,16 @@ function sumDrawerCashTotals(rows, resetAfterTime = null) {
     if (r.outAmount) cashOut += r.outAmount;
   }
   return { cashIn, cashOut, net: cashIn - cashOut };
+}
+
+function formatManualCountSourceLabel(previousManualCount, priorClose) {
+  if (previousManualCount?.ts) {
+    return `Manual count ${previousManualCount.dateKey} ${rowTimeLabel(previousManualCount.ts)}`;
+  }
+  if (priorClose?.closeDayStr) {
+    return `Prior close ${priorClose.closeDayStr}`;
+  }
+  return "No prior count";
 }
 
 function normalizeLedgerPayLabel(value) {
@@ -859,7 +898,10 @@ export default function DailyCash() {
     mutationFn: (data) =>
       useLocalFinance
         ? localCreateCompanyTransaction(data)
-        : base44.entities.CompanyTransaction.create(withMexicoCreatedDateForPayload(data)),
+        : createEntityWithOptionalTimestamp(base44.entities.CompanyTransaction, data, {
+            dateField: "date",
+            timestampField: "recorded_at",
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
     },
@@ -939,41 +981,53 @@ export default function DailyCash() {
     [loyverseOverview, loyverseWindow.start, loyverseWindow.end],
   );
 
-  /** Most recent day before `formDayStr` with a saved opening — its drawer end is the implied prior close. */
-  const priorDrawerClose = useMemo(() => {
-    if (periodMode !== "today") return null;
-    let d = offsetMexicoDateKey(formDayStr, -1);
+  const buildRawLedgerRowsForMexicoDay = useCallback(
+    (dayStr) => {
+      const lv = loyverseByDay.get(dayStr) || [];
+      const rows = mergeLaborCashLedgerRowsCalc(
+        dayStr,
+        buildDayTableRowsCalc(dayStr, {
+          orders,
+          transactions,
+          expenses,
+          loyverseRows: lv,
+          manualLines: getManualLines(dayStr),
+          dailyCashTxMarker: DAILY_CASH_TX_MARKER,
+        }),
+        employees,
+        shifts,
+        expenses,
+        { totalExpectedLaborForDate, expectedLaborEntriesForDate },
+      );
+      return applyLedgerTimeOverrides(dayStr, rows);
+    },
+    [loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick],
+  );
+
+  /** Most recent day before `targetDayStr` with a saved opening — its drawer end is the implied prior close. */
+  const getPriorDrawerCloseForDay = useCallback((targetDayStr) => {
+    let d = offsetMexicoDateKey(targetDayStr, -1);
     for (let i = 0; i < 120; i++) {
       const opening = getOpeningBalance(d);
       if (opening === null) {
         d = offsetMexicoDateKey(d, -1);
         continue;
       }
-      const lv = loyverseByDay.get(d) || [];
-      const rows = applyLedgerTimeOverrides(
-        d,
-        mergeLaborCashLedgerRows(
-          d,
-          buildDayTableRows(d, {
-            orders,
-            transactions,
-            expenses,
-            loyverseRows: lv,
-            manualLines: getManualLines(d),
-          }),
-          employees,
-          shifts,
-          expenses,
-        ),
-      );
-      const reset = latestManualCountForDay(listOpeningCountDiffs(), d);
-      const resetTime = reset ? rowSortTime(reset.ts, d) : null;
-      const t = sumDrawerCashTotals(rows, resetTime);
+      const rows = buildRawLedgerRowsForMexicoDay(d);
+      const reset = latestManualCountForDayCalc(listOpeningCountDiffs(), d);
+      const resetTime = reset ? rowSortTimeCalc(reset.ts, d) : null;
+      const t = sumDrawerCashTotalsCalc(rows, resetTime);
       const anchor = reset ? Number(reset.enteredOpening) : opening;
       return { closeDayStr: d, priorOpening: anchor, net: t.net, end: anchor + t.net };
     }
     return null;
-  }, [periodMode, formDayStr, loyverseByDay, orders, transactions, expenses, employees, shifts, storeTick]);
+  }, [buildRawLedgerRowsForMexicoDay]);
+
+  /** Most recent day before `formDayStr` with a saved opening — its drawer end is the implied prior close. */
+  const priorDrawerClose = useMemo(() => {
+    if (periodMode !== "today") return null;
+    return getPriorDrawerCloseForDay(formDayStr);
+  }, [periodMode, formDayStr, getPriorDrawerCloseForDay]);
 
   useEffect(() => {
     if (periodMode === "month") {
@@ -993,32 +1047,77 @@ export default function DailyCash() {
   /** Ledger rows for any Mexico day — used when Today row cache is empty (e.g. Manual counting history tab). */
   const buildLedgerRowsForMexicoDay = useCallback(
     (dayStr) => {
-      const manualCount = latestManualCountForDay(openingCountDiffHistory, dayStr);
-      const lv = loyverseByDay.get(dayStr) || [];
-      const baseRows = mergeLaborCashLedgerRows(
+      const manualCount = latestManualCountForDayCalc(openingCountDiffHistory, dayStr);
+      const baseRows = buildRawLedgerRowsForMexicoDay(dayStr);
+      return applyLedgerTimeOverrides(
         dayStr,
-        buildDayTableRows(dayStr, {
-          orders,
-          transactions,
-          expenses,
-          loyverseRows: lv,
-          manualLines: getManualLines(dayStr),
-        }),
-        employees,
-        shifts,
-        expenses,
+        withManualCountResetRowCalc(dayStr, baseRows, manualCount, { formatMx }),
       );
-      return applyLedgerTimeOverrides(dayStr, withManualCountResetRow(dayStr, baseRows, manualCount));
     },
-    [loyverseByDay, orders, transactions, expenses, employees, shifts, openingCountDiffHistory, storeTick],
+    [buildRawLedgerRowsForMexicoDay, openingCountDiffHistory, storeTick],
   );
 
   const selectedDayManualCount = useMemo(
-    () => latestManualCountForDay(openingCountDiffHistory, formDayStr),
+    () => latestManualCountForDayCalc(openingCountDiffHistory, formDayStr),
     [openingCountDiffHistory, formDayStr],
   );
 
-  const persistOpening = useCallback(() => {
+  const sumDrawerCashBetweenInstants = useCallback(
+    (startIsoExclusive, endIsoInclusive) => {
+      const startMs = new Date(startIsoExclusive || 0).getTime();
+      const endMs = new Date(endIsoInclusive || 0).getTime();
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+        return { cashIn: 0, cashOut: 0, net: 0 };
+      }
+      const startDay = getMexicoDateKey(startIsoExclusive);
+      const endDay = getMexicoDateKey(endIsoInclusive);
+      if (!startDay || !endDay) {
+        return { cashIn: 0, cashOut: 0, net: 0 };
+      }
+      let cursor = startDay;
+      let cashIn = 0;
+      let cashOut = 0;
+      for (let i = 0; i < 370; i++) {
+        const rows = buildRawLedgerRowsForMexicoDay(cursor);
+        for (const row of rows) {
+          const t = Number(row.sortTime);
+          if (!Number.isFinite(t)) continue;
+          if (t <= startMs || t > endMs) continue;
+          if (row.inAmount) cashIn += row.inAmount;
+          if (row.outAmount) cashOut += row.outAmount;
+        }
+        if (cursor === endDay) break;
+        cursor = offsetMexicoDateKey(cursor, 1);
+      }
+      return { cashIn, cashOut, net: cashIn - cashOut };
+    },
+    [buildRawLedgerRowsForMexicoDay],
+  );
+
+  const deriveManualCountExpectation = useCallback(
+    (dateKey, tsIso, excludeEventId = null) => {
+      const previousManualCount = latestManualCountBeforeCalc(openingCountDiffHistory, tsIso, excludeEventId);
+      if (previousManualCount) {
+        const delta = sumDrawerCashBetweenInstants(previousManualCount.ts, tsIso);
+        return {
+          expectedEnd: Number(previousManualCount.enteredOpening) + delta.net,
+          expectedSourceLabel: formatManualCountSourceLabelCalc(previousManualCount, null),
+          priorCloseDayStr: previousManualCount.dateKey || null,
+          previousManualCount,
+        };
+      }
+      const priorClose = getPriorDrawerCloseForDay(dateKey);
+      return {
+        expectedEnd: priorClose != null && Number.isFinite(priorClose.end) ? priorClose.end : null,
+        expectedSourceLabel: formatManualCountSourceLabelCalc(null, priorClose),
+        priorCloseDayStr: priorClose?.closeDayStr || null,
+        previousManualCount: null,
+      };
+    },
+    [openingCountDiffHistory, sumDrawerCashBetweenInstants, getPriorDrawerCloseForDay],
+  );
+
+  const persistOpening = useCallback((forceRecord = false) => {
     const trimmed = openingInput.trim();
     const oldPersisted = getOpeningBalance(formDayStr);
     let didWrite = false;
@@ -1027,18 +1126,22 @@ export default function DailyCash() {
       didWrite = true;
     } else {
       const n = parseFloat(trimmed.replace(",", "."));
-      if (Number.isFinite(n) && oldPersisted !== n) {
-        const expectedEnd =
-          periodMode === "today" && priorDrawerClose != null && Number.isFinite(priorDrawerClose.end)
-            ? priorDrawerClose.end
-            : null;
+      if (Number.isFinite(n) && (forceRecord || oldPersisted !== n)) {
+        const eventTs = mexicoBusinessDayCreatedAtIso(formDayStr);
+        const expectedInfo = deriveManualCountExpectation(formDayStr, eventTs);
+        const expectedEnd = expectedInfo.expectedEnd;
         const diff = expectedEnd === null ? null : n - expectedEnd;
         recordOpeningCountDiff({
           dateKey: formDayStr,
-          priorCloseDayStr: priorDrawerClose?.closeDayStr || null,
+          ts: eventTs,
+          priorCloseDayStr: expectedInfo.priorCloseDayStr,
+          expectedSourceLabel: expectedInfo.expectedSourceLabel,
           expectedEnd,
           enteredOpening: n,
           diff,
+          previousManualCountId: expectedInfo.previousManualCount?.id || null,
+          previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+          previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
           comment: "",
         });
         didWrite = true;
@@ -1046,39 +1149,47 @@ export default function DailyCash() {
     }
     setStoreTick((t) => t + 1);
     if (didWrite) void flushDailyCashPersistImmediate();
-  }, [formDayStr, openingInput, periodMode, priorDrawerClose]);
+  }, [formDayStr, openingInput, deriveManualCountExpectation]);
 
   const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
   const openingCountMeta = useMemo(() => getOpeningCountMeta(formDayStr), [formDayStr, storeTick]);
 
   const openingDiffVsPriorClose = useMemo(() => {
-    if (periodMode !== "today" || priorDrawerClose == null || persistedOpening === null) return null;
+    if (periodMode !== "today" || persistedOpening === null) return null;
+    if (selectedDayManualCount && Number.isFinite(Number(selectedDayManualCount.diff))) {
+      const diff = Number(selectedDayManualCount.diff);
+      if (Math.abs(diff) < 0.005) return null;
+      return diff;
+    }
+    if (priorDrawerClose == null) return null;
     const diff = persistedOpening - priorDrawerClose.end;
     if (!Number.isFinite(diff) || Math.abs(diff) < 0.005) return null;
     return diff;
-  }, [periodMode, priorDrawerClose, persistedOpening]);
+  }, [periodMode, priorDrawerClose, persistedOpening, selectedDayManualCount]);
 
   const tableRows = useMemo(() => {
     if (periodMode === "month" || periodMode === "history") return [];
     const lv = loyverseByDay.get(formDayStr) || [];
-    const rows = mergeLaborCashLedgerRows(
+    const rows = mergeLaborCashLedgerRowsCalc(
       formDayStr,
-      buildDayTableRows(formDayStr, {
+      buildDayTableRowsCalc(formDayStr, {
         orders,
         transactions,
         expenses,
         loyverseRows: lv,
         manualLines: getManualLines(formDayStr),
+        dailyCashTxMarker: DAILY_CASH_TX_MARKER,
       }),
       employees,
       shifts,
       expenses,
+      { totalExpectedLaborForDate, expectedLaborEntriesForDate },
     );
     return applyPendingLedgerSort(
       formDayStr,
       applyLedgerTimeOverrides(
         formDayStr,
-        withManualCountResetRow(formDayStr, rows, selectedDayManualCount),
+        withManualCountResetRowCalc(formDayStr, rows, selectedDayManualCount, { formatMx }),
       ),
       pendingLedgerTimes,
     );
@@ -1104,26 +1215,28 @@ export default function DailyCash() {
       .map((d) => {
         const ds = dayKey(d);
         const lv = loyverseByDay.get(ds) || [];
-        const baseRows = mergeLaborCashLedgerRows(
+        const baseRows = mergeLaborCashLedgerRowsCalc(
           ds,
-          buildDayTableRows(ds, {
+          buildDayTableRowsCalc(ds, {
             orders,
             transactions,
             expenses,
             loyverseRows: lv,
             manualLines: getManualLines(ds),
+            dailyCashTxMarker: DAILY_CASH_TX_MARKER,
           }),
           employees,
           shifts,
           expenses,
+          { totalExpectedLaborForDate, expectedLaborEntriesForDate },
         );
-        const reset = latestManualCountForDay(openingCountDiffHistory, ds);
+        const reset = latestManualCountForDayCalc(openingCountDiffHistory, ds);
         const rows = applyPendingLedgerSort(
           ds,
-          applyLedgerTimeOverrides(ds, withManualCountResetRow(ds, baseRows, reset)),
+          applyLedgerTimeOverrides(ds, withManualCountResetRowCalc(ds, baseRows, reset, { formatMx })),
           pendingLedgerTimes,
         );
-        const t = sumDrawerCashTotals(rows, reset ? rowSortTime(reset.ts, ds) : null);
+        const t = sumDrawerCashTotalsCalc(rows, reset ? rowSortTimeCalc(reset.ts, ds) : null);
         const labor = totalExpectedLaborForDate(ds, employees, shifts);
         return {
           dateStr: ds,
@@ -1183,8 +1296,8 @@ export default function DailyCash() {
         end: null,
       };
     }
-    const resetTime = selectedDayManualCount ? rowSortTime(selectedDayManualCount.ts, formDayStr) : null;
-    const t = sumDrawerCashTotals(tableRows, resetTime);
+    const resetTime = selectedDayManualCount ? rowSortTimeCalc(selectedDayManualCount.ts, formDayStr) : null;
+    const t = sumDrawerCashTotalsCalc(tableRows, resetTime);
     const opening = selectedDayManualCount ? Number(selectedDayManualCount.enteredOpening) : getOpeningBalance(formDayStr);
     const end = opening !== null && Number.isFinite(opening) ? opening + t.net : null;
     return { ...t, opening, end };
@@ -1198,7 +1311,7 @@ export default function DailyCash() {
 
   const expectedDrawerEndHero = useMemo(() => {
     const dayStr = expectedCashHeroDayStr;
-    const manualCount = latestManualCountForDay(openingCountDiffHistory, dayStr);
+    const manualCount = latestManualCountForDayCalc(openingCountDiffHistory, dayStr);
     let rows;
     if (periodMode === "month") {
       const section = monthLedgerSections.find((s) => s.dateStr === dayStr);
@@ -1209,8 +1322,8 @@ export default function DailyCash() {
     } else {
       rows = buildLedgerRowsForMexicoDay(dayStr);
     }
-    const resetTime = manualCount ? rowSortTime(manualCount.ts, dayStr) : null;
-    const t = sumDrawerCashTotals(rows, resetTime);
+    const resetTime = manualCount ? rowSortTimeCalc(manualCount.ts, dayStr) : null;
+    const t = sumDrawerCashTotalsCalc(rows, resetTime);
     const opening = manualCount ? Number(manualCount.enteredOpening) : getOpeningBalance(dayStr);
     if (opening === null || !Number.isFinite(opening)) return null;
     return opening + t.net;
@@ -1299,9 +1412,24 @@ export default function DailyCash() {
   }, []);
 
   const handleManualCountDateTimeCommit = useCallback((eventId, dateKeyMexico, timeHHmm) => {
-    updateOpeningCountDiffDateTime(eventId, dateKeyMexico, timeHHmm);
+    const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
+    if (!iso) return;
+    const current = openingCountDiffHistory.find((ev) => ev?.id === eventId);
+    if (!current || !Number.isFinite(Number(current.enteredOpening))) return;
+    const expectedInfo = deriveManualCountExpectation(dateKeyMexico, iso, eventId);
+    const expectedEnd = expectedInfo.expectedEnd;
+    const diff = expectedEnd == null ? null : Number(current.enteredOpening) - expectedEnd;
+    updateOpeningCountDiffDateTime(eventId, dateKeyMexico, timeHHmm, {
+      priorCloseDayStr: expectedInfo.priorCloseDayStr,
+      expectedSourceLabel: expectedInfo.expectedSourceLabel,
+      expectedEnd,
+      diff,
+      previousManualCountId: expectedInfo.previousManualCount?.id || null,
+      previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+      previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+    });
     setStoreTick((t) => t + 1);
-  }, []);
+  }, [openingCountDiffHistory, deriveManualCountExpectation]);
 
   const handleStageLedgerTime = useCallback((ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
     const key = ledgerPendingKey(ledgerDay, rowId);
@@ -1325,6 +1453,8 @@ export default function DailyCash() {
     async (ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
       const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
       if (!iso) throw new Error("Invalid date or time");
+      const isCrossDayMove = dateKeyMexico !== ledgerDay;
+      const refetch = { expenses: false, companyTransactions: false, orders: false };
 
       const clearOverridesForRow = () => {
         setLedgerTimeOverride(ledgerDay, rowId, null);
@@ -1337,15 +1467,15 @@ export default function DailyCash() {
         setLedgerTimeOverride(ledgerDay, rowId, iso);
         setStoreTick((t) => t + 1);
         void flushDailyCashPersistImmediate();
+        return refetch;
       };
 
       if (rowId.startsWith("loyverse-") || rowId.startsWith("labor-cash-")) {
-        persistOverrideOnly();
-        return;
+        return persistOverrideOnly();
       }
 
       if (rowId.startsWith("manual-count-reset-")) {
-        return;
+        return refetch;
       }
 
       if (rowId.startsWith("man-")) {
@@ -1353,17 +1483,29 @@ export default function DailyCash() {
         moveManualLineToDay(ledgerDay, dateKeyMexico, manualId, { createdAt: iso });
         clearOverridesForRow();
         setStoreTick((t) => t + 1);
-        void flushDailyCashPersistImmediate();
-        return;
+        await flushDailyCashPersistImmediate();
+        return refetch;
       }
 
       if (rowId.startsWith("exp-")) {
         const id = rowId.slice("exp-".length);
         try {
           if (useLocalFinance) {
-            await localUpdateExpense(id, { date: dateKeyMexico, created_date: iso });
+            await localUpdateExpense(
+              id,
+              isCrossDayMove
+                ? { date: dateKeyMexico, created_date: iso, recorded_at: iso }
+                : { created_date: iso, recorded_at: iso },
+            );
+            refetch.expenses = true;
           } else {
-            await base44.entities.Expense.update(id, { date: dateKeyMexico, created_date: iso });
+            await updateEntityWithOptionalTimestamp(
+              base44.entities.Expense,
+              id,
+              isCrossDayMove ? { date: dateKeyMexico, recorded_at: iso } : { recorded_at: iso },
+              { timestampField: "recorded_at" },
+            );
+            if (isCrossDayMove) refetch.expenses = true;
           }
         } catch (e) {
           console.error("[ledger] Expense.update (time)", e);
@@ -1374,19 +1516,33 @@ export default function DailyCash() {
           setLedgerTimeOverride(ledgerDay, rowId, null);
           setLedgerTimeOverride(dateKeyMexico, rowId, iso);
         }
-        queryClient.invalidateQueries({ queryKey: ["expenses"] });
         setStoreTick((t) => t + 1);
-        void flushDailyCashPersistImmediate();
-        return;
+        await flushDailyCashPersistImmediate();
+        if (refetch.expenses) {
+          queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        }
+        return refetch;
       }
 
       if (rowId.startsWith("tx-in-") || rowId.startsWith("tx-out-")) {
         const id = rowId.startsWith("tx-in-") ? rowId.slice("tx-in-".length) : rowId.slice("tx-out-".length);
         try {
           if (useLocalFinance) {
-            await localUpdateCompanyTransaction(id, { date: dateKeyMexico, created_date: iso });
+            await localUpdateCompanyTransaction(
+              id,
+              isCrossDayMove
+                ? { date: dateKeyMexico, created_date: iso, recorded_at: iso }
+                : { created_date: iso, recorded_at: iso },
+            );
+            refetch.companyTransactions = true;
           } else {
-            await base44.entities.CompanyTransaction.update(id, { date: dateKeyMexico, created_date: iso });
+            await updateEntityWithOptionalTimestamp(
+              base44.entities.CompanyTransaction,
+              id,
+              isCrossDayMove ? { date: dateKeyMexico, recorded_at: iso } : { recorded_at: iso },
+              { timestampField: "recorded_at" },
+            );
+            if (isCrossDayMove) refetch.companyTransactions = true;
           }
         } catch (e) {
           console.error("[ledger] CompanyTransaction.update (time)", e);
@@ -1397,19 +1553,23 @@ export default function DailyCash() {
           setLedgerTimeOverride(ledgerDay, rowId, null);
           setLedgerTimeOverride(dateKeyMexico, rowId, iso);
         }
-        queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
         setStoreTick((t) => t + 1);
-        void flushDailyCashPersistImmediate();
-        return;
+        await flushDailyCashPersistImmediate();
+        if (refetch.companyTransactions) {
+          queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+        }
+        return refetch;
       }
 
       if (rowId.startsWith("order-")) {
         const id = rowId.slice("order-".length);
-        /* Align updated_date with the picked wall time — ledger uses `updated_date || created_date`
-           for the day match, so using `now` would push cross-day edits to today. */
-        const payload = { created_date: iso, updated_date: iso };
         try {
-          await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+          if (useLocalFinance || isCrossDayMove) {
+            /* Orders have no plain business-date field, so cross-day moves still need a real timestamp write. */
+            const payload = { created_date: iso, updated_date: iso };
+            await updateOrderEntity(id, payload, (orderId, p) => base44.entities.Order.update(orderId, p));
+            refetch.orders = true;
+          }
         } catch (e) {
           console.error("[ledger] Order.update (time)", e);
         }
@@ -1419,13 +1579,15 @@ export default function DailyCash() {
           setLedgerTimeOverride(ledgerDay, rowId, null);
           setLedgerTimeOverride(dateKeyMexico, rowId, iso);
         }
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
         setStoreTick((t) => t + 1);
-        void flushDailyCashPersistImmediate();
-        return;
+        await flushDailyCashPersistImmediate();
+        if (refetch.orders) {
+          queryClient.invalidateQueries({ queryKey: ["orders"] });
+        }
+        return refetch;
       }
 
-      persistOverrideOnly();
+      return persistOverrideOnly();
     },
     [queryClient, useLocalFinance],
   );
@@ -1434,16 +1596,16 @@ export default function DailyCash() {
     async (ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
       const key = ledgerPendingKey(ledgerDay, rowId);
       try {
-        await persistLedgerTimeCommit(ledgerDay, rowId, dateKeyMexico, timeHHmm);
+        const refetch = await persistLedgerTimeCommit(ledgerDay, rowId, dateKeyMexico, timeHHmm);
         setPendingLedgerTimes((prev) => {
           if (!prev[key]) return prev;
           const next = { ...prev };
           delete next[key];
           return next;
         });
-        queryClient.invalidateQueries({ queryKey: ["expenses"] });
-        queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        if (refetch?.expenses) queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        if (refetch?.companyTransactions) queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+        if (refetch?.orders) queryClient.invalidateQueries({ queryKey: ["orders"] });
       } catch (err) {
         console.error("[ledgerTime] popover commit failed", err);
       }
@@ -1457,10 +1619,14 @@ export default function DailyCash() {
     setSavingLedgerTimes(true);
     const remaining =
       /** @type {Record<string, { ledgerDay: string; rowId: string; dateKeyMexico: string; timeHHmm: string }>} */ ({});
+    const refetch = { expenses: false, companyTransactions: false, orders: false };
     try {
       for (const [key, e] of entries) {
         try {
-          await persistLedgerTimeCommit(e.ledgerDay, e.rowId, e.dateKeyMexico, e.timeHHmm);
+          const result = await persistLedgerTimeCommit(e.ledgerDay, e.rowId, e.dateKeyMexico, e.timeHHmm);
+          refetch.expenses = refetch.expenses || Boolean(result?.expenses);
+          refetch.companyTransactions = refetch.companyTransactions || Boolean(result?.companyTransactions);
+          refetch.orders = refetch.orders || Boolean(result?.orders);
         } catch (err) {
           console.error("[ledgerTime]", err);
           remaining[key] = e;
@@ -1468,9 +1634,9 @@ export default function DailyCash() {
       }
       setPendingLedgerTimes(remaining);
       setStoreTick((t) => t + 1);
-      await queryClient.refetchQueries({ queryKey: ["expenses"] });
-      await queryClient.refetchQueries({ queryKey: ["companyTransactions"] });
-      await queryClient.refetchQueries({ queryKey: ["orders"] });
+      if (refetch.expenses) await queryClient.refetchQueries({ queryKey: ["expenses"] });
+      if (refetch.companyTransactions) await queryClient.refetchQueries({ queryKey: ["companyTransactions"] });
+      if (refetch.orders) await queryClient.refetchQueries({ queryKey: ["orders"] });
       if (Object.keys(remaining).length) {
         alert("Some rows could not be saved. Check the network and try again for the remaining edits.");
       }
@@ -1602,8 +1768,8 @@ export default function DailyCash() {
 
   const renderLedgerTableRows = (rows, sectionDayStr) => {
     const ov = getDetailOverrides(sectionDayStr);
-    const sectionManualCount = latestManualCountForDay(openingCountDiffHistory, sectionDayStr);
-    const sectionResetTime = sectionManualCount ? rowSortTime(sectionManualCount.ts, sectionDayStr) : null;
+    const sectionManualCount = latestManualCountForDayCalc(openingCountDiffHistory, sectionDayStr);
+    const sectionResetTime = sectionManualCount ? rowSortTimeCalc(sectionManualCount.ts, sectionDayStr) : null;
     return rows.flatMap((r, i) => {
       const expandKey = `${sectionDayStr}::${r.id}`;
       const isExpanded = expandedLedgerKey === expandKey;
@@ -1787,7 +1953,7 @@ export default function DailyCash() {
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
-                    {ev.priorCloseDayStr || "No prior close"}
+                    {ev.expectedSourceLabel || ev.priorCloseDayStr || "No prior count"}
                   </td>
                   <td className="max-w-[240px] px-2 py-1.5">
                     <Input
@@ -2194,7 +2360,7 @@ export default function DailyCash() {
                 inputMode="decimal"
                 value={openingInput}
                 onChange={(e) => setOpeningInput(e.target.value)}
-                onBlur={persistOpening}
+                onBlur={() => persistOpening(false)}
                 placeholder="Manual count"
                 readOnly={periodMode === "month"}
                 className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600 read-only:cursor-default read-only:opacity-90"
@@ -2203,7 +2369,7 @@ export default function DailyCash() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={persistOpening}
+                onClick={() => persistOpening(true)}
                 disabled={periodMode === "month"}
                 className="h-11 border-yellow-500/25 bg-[#0f0f0c] px-3 text-xs font-medium uppercase tracking-[0.14em] text-yellow-200 hover:bg-yellow-500/10 disabled:opacity-40"
               >
@@ -2238,8 +2404,8 @@ export default function DailyCash() {
                     </p>
                   )}
                   <p>
-                    Enter the exact physical cash count for {formDayStr}. Saving a number records the update time and compares it
-                    with the calculated expected value.
+                    Enter the exact physical cash count for {formDayStr}. Blur saves when the value changed; click{" "}
+                    <strong className="text-gray-400">Save</strong> to log another count even if the amount is the same.
                   </p>
                   {priorDrawerClose ? (
                     <div className="border-t border-yellow-500/10 pt-2">
@@ -2253,14 +2419,16 @@ export default function DailyCash() {
                       </p>
                     </div>
                   ) : null}
-                  {openingDiffVsPriorClose != null && priorDrawerClose ? (
+                  {openingDiffVsPriorClose != null ? (
                     <p
                       className={cn(
                         "text-[11px] tabular-nums",
                         openingDiffVsPriorClose > 0 ? "text-emerald-400/85" : "text-rose-400/85",
                       )}
                     >
-                      vs prior close ({formatMexicoMonthShortDayYearEn(`${priorDrawerClose.closeDayStr}T12:00:00`)}):{" "}
+                      vs {selectedDayManualCount?.expectedSourceLabel || (priorDrawerClose
+                        ? `prior close (${formatMexicoMonthShortDayYearEn(`${priorDrawerClose.closeDayStr}T12:00:00`)})`
+                        : "expected")}:
                       {openingDiffVsPriorClose > 0 ? "+" : ""}
                       {formatMx(openingDiffVsPriorClose)}
                     </p>

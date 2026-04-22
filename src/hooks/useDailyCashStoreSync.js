@@ -29,9 +29,7 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
 
   const isLocalOnlyMode =
     import.meta.env.DEV &&
-    (import.meta.env.VITE_LOCAL_DEV_BYPASS_AUTH === "true" ||
-      !appParams.appId ||
-      !appParams.serverUrl);
+    (!appParams.appId || !appParams.serverUrl);
 
   const { data: settings = [] } = useQuery({
     queryKey: ["appSettings"],

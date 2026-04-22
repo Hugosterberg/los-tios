@@ -201,7 +201,10 @@ export function initDailyCashPersistenceRemote(serverJson, persistAsync) {
   }
 
   let memoryMerged = false;
-  if (!hasMeaningfulData(fromServer) && memoryHadData) {
+  if (memoryHadData) {
+    /* Keep any in-memory writes made before remote hydration finished (e.g. Shopping writing
+       a ledger time override right after mount). Without this overlay, a non-empty server store
+       can wipe the fresh override and Daily Cash falls back to the raw API timestamp. */
     internalStore = mergeDailyCashStores(internalStore, memoryBefore);
     memoryMerged = true;
   }
@@ -397,7 +400,7 @@ const OPENING_DIFF_CAP = 250;
 
 /**
  * Manual count history for the opening cash drawer.
- * @param {{ dateKey: string, priorCloseDayStr?: string | null, expectedEnd: number | null, enteredOpening: number, diff: number | null, comment?: string }} payload
+ * @param {{ dateKey: string, ts?: string, priorCloseDayStr?: string | null, expectedEnd: number | null, enteredOpening: number, diff: number | null, comment?: string, expectedSourceLabel?: string, previousManualCountId?: string | null, previousManualCountDateKey?: string | null, previousManualCountTs?: string | null }} payload
  */
 export function recordOpeningCountDiff(payload) {
   const { dateKey, priorCloseDayStr, expectedEnd, enteredOpening, diff } = payload;
@@ -414,7 +417,7 @@ export function recordOpeningCountDiff(payload) {
     store.openingCountMeta = {};
   }
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  const ts = new Date().toISOString();
+  const ts = typeof payload.ts === "string" && payload.ts.trim() !== "" ? payload.ts.trim() : new Date().toISOString();
   store.openings[dateKey] = enteredOpening;
   store.openingCountMeta[dateKey] = { updatedAt: ts };
   store.openingDiffEvents.unshift({
@@ -426,6 +429,10 @@ export function recordOpeningCountDiff(payload) {
     enteredOpening,
     diff,
     comment,
+    expectedSourceLabel: typeof payload.expectedSourceLabel === "string" ? payload.expectedSourceLabel.trim() : "",
+    previousManualCountId: payload.previousManualCountId || null,
+    previousManualCountDateKey: payload.previousManualCountDateKey || null,
+    previousManualCountTs: payload.previousManualCountTs || null,
   });
   if (store.openingDiffEvents.length > OPENING_DIFF_CAP) {
     store.openingDiffEvents.length = OPENING_DIFF_CAP;
@@ -476,7 +483,7 @@ export function updateOpeningCountDiffComment(id, comment) {
  * @param {string} dateKeyMexico yyyy-MM-dd (Mexico calendar day this count applies to)
  * @param {string} timeHHmm HH:mm (24h)
  */
-export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm) {
+export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm, patch = null) {
   if (!isPlainDateKey(dateKeyMexico)) return;
   const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
   if (!iso) return;
@@ -486,7 +493,7 @@ export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm) {
   if (idx === -1) return;
   const prev = list[idx];
   const prevDateKey = prev.dateKey;
-  list[idx] = { ...prev, ts: iso, dateKey: dateKeyMexico };
+  list[idx] = { ...prev, ...(patch && typeof patch === "object" ? patch : {}), ts: iso, dateKey: dateKeyMexico };
   store.openingDiffEvents = list;
   syncOpeningFromLatestDiff(store, prevDateKey);
   if (prevDateKey !== dateKeyMexico) {
@@ -498,5 +505,7 @@ export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm) {
 /** Newest first */
 export function listOpeningCountDiffs() {
   const ev = readRaw().openingDiffEvents;
-  return Array.isArray(ev) ? [...ev] : [];
+  return Array.isArray(ev)
+    ? [...ev].sort((a, b) => new Date(b?.ts || 0).getTime() - new Date(a?.ts || 0).getTime())
+    : [];
 }

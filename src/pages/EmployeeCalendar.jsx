@@ -42,7 +42,8 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatMexicoLongDateEn, withMexicoCreatedDateForPayload } from "@/lib/mexicoTime";
+import { formatMexicoLongDateEn } from "@/lib/mexicoTime";
+import { createEntityWithOptionalTimestamp } from "@/lib/businessTimestamps";
 import {
   isLocalFinanceMode,
   localListEmployees,
@@ -419,7 +420,10 @@ export default function EmployeeCalendar() {
     mutationFn: (data) =>
       useLocalFinance
         ? localCreateExpense(data)
-        : base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
+        : createEntityWithOptionalTimestamp(base44.entities.Expense, data, {
+            dateField: "date",
+            timestampField: "recorded_at",
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },

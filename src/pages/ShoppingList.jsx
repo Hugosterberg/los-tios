@@ -44,16 +44,25 @@ import {
 } from "@/lib/localDevFinance";
 import { cn } from "@/lib/utils";
 import {
+  formatMexicoTime,
   formatMexicoDateShortEn,
   formatMexicoMonthYearLabelEn,
+  getMexicoDateAndTimePartsForInput,
   getMexicoDateKey,
   getMexicoNowDateKey,
   getMexicoNowTimeHHmm,
   getMexicoNowYearMonth,
+  mexicoBusinessDayCreatedAtIso,
   mexicoWallDateTimeToUtcIso,
   normalizeHHmm,
   withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
+import {
+  createEntityWithOptionalTimestamp,
+  updateEntityWithOptionalTimestamp,
+  withOptionalIsoTimestampForPayload,
+} from "@/lib/businessTimestamps";
+import { expensePaymentSourceLabel } from "@/lib/dailyCashCalculations";
 import {
   flushDailyCashPersistImmediate,
   setLedgerTimeOverride,
@@ -198,9 +207,12 @@ export default function ShoppingList() {
         name: e.name || "",
         amount: Number(e.amount || 0),
         dateIso: String(e.date || "").slice(0, 10),
+        createdDateIso: String(e.recorded_at || e.created_date || "").trim(),
+        paymentSource: String(e.payment_source || "company_cash"),
       }))
       .sort((a, b) => {
         if (a.dateIso !== b.dateIso) return b.dateIso.localeCompare(a.dateIso);
+        if (a.createdDateIso !== b.createdDateIso) return b.createdDateIso.localeCompare(a.createdDateIso);
         return a.name.localeCompare(b.name);
       });
   }, [expenses]);
@@ -283,7 +295,13 @@ export default function ShoppingList() {
 
   const createItem = useMutation({
     mutationFn: (data) =>
-      useLocalFinance ? localCreateShoppingList(data) : base44.entities.ShoppingList.create(data),
+      useLocalFinance
+        ? localCreateShoppingList(data)
+        : createEntityWithOptionalTimestamp(base44.entities.ShoppingList, data, {
+            dateField: "purchased_date",
+            timestampField: "purchased_at",
+            ensureCreatedDate: false,
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
     },
@@ -291,7 +309,11 @@ export default function ShoppingList() {
 
   const updateItem = useMutation({
     mutationFn: ({ id, data }) =>
-      useLocalFinance ? localUpdateShoppingList(id, data) : base44.entities.ShoppingList.update(id, data),
+      useLocalFinance
+        ? localUpdateShoppingList(id, data)
+        : updateEntityWithOptionalTimestamp(base44.entities.ShoppingList, id, data, {
+            timestampField: "purchased_at",
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
     },
@@ -311,11 +333,22 @@ export default function ShoppingList() {
         return localCreateExpense(data);
       }
       const { created_date: explicitCreated, ...rest } = data;
-      const base = withMexicoCreatedDateForPayload(rest);
+      const base = withOptionalIsoTimestampForPayload(withMexicoCreatedDateForPayload(rest), {
+        dateField: "date",
+        timestampField: "recorded_at",
+      });
       if (explicitCreated != null && String(explicitCreated).trim() !== "") {
-        return base44.entities.Expense.create({ ...base, created_date: String(explicitCreated).trim() });
+        return createEntityWithOptionalTimestamp(
+          base44.entities.Expense,
+          { ...base, created_date: String(explicitCreated).trim() },
+          { dateField: "date", timestampField: "recorded_at", ensureCreatedDate: false },
+        );
       }
-      return base44.entities.Expense.create(base);
+      return createEntityWithOptionalTimestamp(base44.entities.Expense, base, {
+        dateField: "date",
+        timestampField: "recorded_at",
+        ensureCreatedDate: false,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -327,7 +360,9 @@ export default function ShoppingList() {
       if (useLocalFinance) {
         return localUpdateExpense(id, patch);
       }
-      return base44.entities.Expense.update(id, patch);
+      return updateEntityWithOptionalTimestamp(base44.entities.Expense, id, patch, {
+        timestampField: "recorded_at",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -409,7 +444,12 @@ export default function ShoppingList() {
       return;
     }
     try {
-      await patchExpenseRow.mutateAsync({ id: r.id, date: v });
+      const fallbackCreatedIso = r.createdDateIso || mexicoBusinessDayCreatedAtIso(r.dateIso || v);
+      const preservedTime = getMexicoDateAndTimePartsForInput(fallbackCreatedIso).timeHHmm || "12:00";
+      const nextCreatedIso =
+        mexicoWallDateTimeToUtcIso(v, preservedTime) ||
+        mexicoBusinessDayCreatedAtIso(v);
+      await patchExpenseRow.mutateAsync({ id: r.id, date: v, created_date: nextCreatedIso, recorded_at: nextCreatedIso });
     } catch (e) {
       console.error(e);
       alert("Could not save date.");
@@ -594,7 +634,9 @@ export default function ShoppingList() {
     }
 
     const dateStr = quickPurchaseDate || getMexicoNowDateKey();
-    const createdIso = mexicoWallDateTimeToUtcIso(dateStr, normalizeHHmm(quickPurchaseTime));
+    const createdIso =
+      mexicoWallDateTimeToUtcIso(dateStr, normalizeHHmm(quickPurchaseTime)) ||
+      mexicoBusinessDayCreatedAtIso(dateStr);
 
     const listPayload = {
       item_name: itemName,
@@ -606,6 +648,7 @@ export default function ShoppingList() {
       estimated_cost: amount,
       actual_cost: amount,
       purchased_date: dateStr,
+      ...(createdIso ? { purchased_at: createdIso } : {}),
       due_date: "",
       supplier: "",
       notes: "Quick entry from Shopping List",
@@ -718,7 +761,9 @@ export default function ShoppingList() {
     }
 
     const today = getMexicoNowDateKey();
-    const createdIso = mexicoWallDateTimeToUtcIso(today, getMexicoNowTimeHHmm());
+    const createdIso =
+      mexicoWallDateTimeToUtcIso(today, getMexicoNowTimeHHmm()) ||
+      mexicoBusinessDayCreatedAtIso(today);
 
     try {
       await updateItem.mutateAsync({
@@ -726,6 +771,7 @@ export default function ShoppingList() {
         data: {
           status: "purchased",
           purchased_date: today,
+          ...(createdIso ? { purchased_at: createdIso } : {}),
           actual_cost: actualCost,
           estimated_cost: actualCost,
         },
@@ -783,12 +829,21 @@ export default function ShoppingList() {
   };
 
   const handleExportShoppingPurchasesCsv = () => {
-    const headers = ["Purchase", "Sum (MXN)", "Date (ISO)"];
+    const headers = ["Purchase", "Sum (MXN)", "Date (ISO)", "Time (Mexico)", "Paid with", "Affects cash drawer"];
     const rows = registeredPurchasesForMonth;
     const dataLines = rows.map((r) =>
-      [r.name, formatMoneyCompact(r.amount), r.dateIso].map(escapeCsvField).join(","),
+      [
+        r.name,
+        formatMoneyCompact(r.amount),
+        r.dateIso,
+        r.createdDateIso ? formatMexicoTime(r.createdDateIso) : "",
+        expensePaymentSourceLabel(r.paymentSource),
+        r.paymentSource === "company_cash" ? "yes" : "no",
+      ].map(escapeCsvField).join(","),
     );
-    const totalLine = ["TOTAL", formatMoneyCompact(registeredPurchasesMonthTotal), ""].map(escapeCsvField).join(",");
+    const totalLine = ["TOTAL", formatMoneyCompact(registeredPurchasesMonthTotal), "", "", "", ""]
+      .map(escapeCsvField)
+      .join(",");
     const csv = `\uFEFF${[headers.map(escapeCsvField).join(","), ...dataLines, totalLine].join("\r\n")}`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1800,12 +1855,14 @@ export default function ShoppingList() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto border-t border-yellow-500/15">
-                    <table className="w-full min-w-[560px] border-collapse text-left text-[11px] sm:text-xs">
+                    <table className="w-full min-w-[860px] border-collapse text-left text-[11px] sm:text-xs">
                       <thead>
                         <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
                           <th className="border-r border-yellow-500/30 px-3 py-2.5">Purchase</th>
                           <th className="border-r border-yellow-500/20 px-3 py-2.5 text-right">Sum (MXN)</th>
                           <th className="border-r border-yellow-500/20 px-3 py-2.5">Date</th>
+                          <th className="border-r border-yellow-500/20 px-3 py-2.5">Time</th>
+                          <th className="border-r border-yellow-500/20 px-3 py-2.5">Paid with</th>
                           <th className="w-10 px-1 py-2.5 text-center">
                             <span className="sr-only">Delete</span>
                           </th>
@@ -1889,6 +1946,17 @@ export default function ShoppingList() {
                                 </button>
                               )}
                             </td>
+                            <td className="border-r border-yellow-500/15 px-3 py-2 text-gray-300">
+                              {r.createdDateIso ? formatMexicoTime(r.createdDateIso) : "â€”"}
+                            </td>
+                            <td className="border-r border-yellow-500/15 px-3 py-2">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-gray-200">{expensePaymentSourceLabel(r.paymentSource)}</span>
+                                <span className="text-[10px] uppercase tracking-wide text-gray-500">
+                                  {r.paymentSource === "company_cash" ? "Counts in cash" : "Outside cash"}
+                                </span>
+                              </div>
+                            </td>
                             <td className="px-1 py-1 text-center align-middle">
                               <button
                                 type="button"
@@ -1909,6 +1977,8 @@ export default function ShoppingList() {
                           <td className="border-r border-yellow-500/20 px-3 py-2.5 text-right font-mono tabular-nums">
                             ${formatMoneyCompact(registeredPurchasesMonthTotal)}
                           </td>
+                          <td className="border-r border-yellow-500/20 px-3 py-2.5 text-gray-500" />
+                          <td className="border-r border-yellow-500/20 px-3 py-2.5 text-gray-500" />
                           <td className="border-r border-yellow-500/20 px-3 py-2.5 text-gray-500" />
                           <td className="px-1 py-2.5" />
                         </tr>

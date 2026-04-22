@@ -124,6 +124,7 @@ export default function FinanceSummary() {
       type: entry.type === "contribution" ? "Contribution" : "Withdrawal",
       amount: entry.amount || 0,
       date: entry.date,
+      recordedAt: entry.recorded_at || entry.created_date || "",
       positive: entry.type === "contribution",
     })),
     ...expenses.map((entry) => ({
@@ -135,10 +136,14 @@ export default function FinanceSummary() {
       type: "Expense",
       amount: entry.amount || 0,
       date: entry.date,
+      recordedAt: entry.recorded_at || entry.created_date || "",
       positive: false,
     })),
   ]
-    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.recordedAt || b.date || 0).getTime() - new Date(a.recordedAt || a.date || 0).getTime(),
+    )
     .slice(0, 12);
 
   return (

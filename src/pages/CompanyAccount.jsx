@@ -16,8 +16,8 @@ import {
   formatMexicoLongDateEs,
   formatMexicoMonthDayShort,
   getMexicoNowDateKey,
-  withMexicoCreatedDateForPayload,
 } from "@/lib/mexicoTime";
+import { createEntityWithOptionalTimestamp, updateEntityWithOptionalTimestamp } from "@/lib/businessTimestamps";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listOrders } from "@/lib/local-dev-orders";
@@ -116,7 +116,11 @@ export default function CompanyAccount() {
   });
 
   const createTransaction = useMutation({
-    mutationFn: (data) => base44.entities.CompanyTransaction.create(withMexicoCreatedDateForPayload(data)),
+    mutationFn: (data) =>
+      createEntityWithOptionalTimestamp(base44.entities.CompanyTransaction, data, {
+        dateField: "date",
+        timestampField: "recorded_at",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
@@ -125,7 +129,10 @@ export default function CompanyAccount() {
   });
 
   const updateTransaction = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.CompanyTransaction.update(id, data),
+    mutationFn: ({ id, data }) =>
+      updateEntityWithOptionalTimestamp(base44.entities.CompanyTransaction, id, data, {
+        timestampField: "recorded_at",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
@@ -164,7 +171,11 @@ export default function CompanyAccount() {
   });
 
   const createExpense = useMutation({
-    mutationFn: (data) => base44.entities.Expense.create(withMexicoCreatedDateForPayload(data)),
+    mutationFn: (data) =>
+      createEntityWithOptionalTimestamp(base44.entities.Expense, data, {
+        dateField: "date",
+        timestampField: "recorded_at",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       resetExpenseForm();
@@ -172,7 +183,10 @@ export default function CompanyAccount() {
   });
 
   const updateExpense = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Expense.update(id, data),
+    mutationFn: ({ id, data }) =>
+      updateEntityWithOptionalTimestamp(base44.entities.Expense, id, data, {
+        timestampField: "recorded_at",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       resetExpenseForm();
@@ -292,6 +306,7 @@ export default function CompanyAccount() {
       subtitle: transaction.description || transaction.payment_method || 'Manual entry',
       amount: transaction.amount || 0,
       date: transaction.date,
+      recordedAt: transaction.recorded_at || transaction.created_date || '',
       tone: transaction.type === 'contribution' ? 'positive' : 'negative',
     })),
     ...expenses.map((expense) => ({
@@ -303,10 +318,11 @@ export default function CompanyAccount() {
         : expense.category || 'Expense',
       amount: expense.amount || 0,
       date: expense.date,
+      recordedAt: expense.recorded_at || expense.created_date || '',
       tone: 'negative',
     })),
   ]
-    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .sort((a, b) => new Date(b.recordedAt || b.date || 0).getTime() - new Date(a.recordedAt || a.date || 0).getTime())
     .slice(0, 12);
 
   const handleTransactionSubmit = (e) => {
