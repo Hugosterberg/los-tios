@@ -11,6 +11,8 @@ import {
   initDailyCashPersistenceLocal,
   initDailyCashPersistenceRemote,
 } from "@/lib/dailyCashLocal";
+import { useManualCashCountsSync } from "@/hooks/useManualCashCountsSync";
+import { migrateLegacyManualCountBlobToBase44 } from "@/lib/manualCashCountMigration";
 import {
   DAILY_CASH_LEDGER_PAYLOAD_FIELD,
   DAILY_CASH_LEDGER_QUERY_KEY,
@@ -30,8 +32,6 @@ import {
  *   settings: any[];
  *   settingsRowId: string | null;
  *   isLocalOnlyMode: boolean;
- *   bumpStoreTick: () => void;
- *   storeTick: number;
  * }}
  */
 export function useDailyCashStoreSync({ onStoreChange } = {}) {
@@ -47,7 +47,7 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
     enabled: !isLocalOnlyMode,
   });
 
-  const { data: ledgerRows = [] } = useQuery({
+  const { data: ledgerRows = [], isFetched: isLedgerQueryFetched } = useQuery({
     queryKey: DAILY_CASH_LEDGER_QUERY_KEY,
     queryFn: listDailyCashLedgerRows,
     enabled: !isLocalOnlyMode,
@@ -82,6 +82,13 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       };
     }
     if (!settingsRowId) {
+      return undefined;
+    }
+    /* Wait for the ledger list query to settle. Otherwise `ledgerRows` is [] while loading, we
+       hydrate from empty + legacy-only, then when the real row arrives this effect re-runs and
+       the cleanup `flush` can overwrite `ledger_payload_json` with that empty store — wiping
+       manual count history (`openingDiffEvents`). */
+    if (!isLedgerQueryFetched) {
       return undefined;
     }
 
@@ -153,11 +160,22 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       disposeDailyCashPersistence();
       const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
       if (migrated || memoryMerged) {
-        void flushDailyCashPersistImmediate().catch((err) => {
+        try {
+          await flushDailyCashPersistImmediate();
+        } catch (err) {
           console.error("[dailyCash] migration persist failed", err);
-        });
+        }
       }
       if (!cancelled) {
+        /* Base44: create `ManualCashCount` rows from legacy `openingDiffEvents`, then persist ledger JSON without them. */
+        try {
+          const mig = await migrateLegacyManualCountBlobToBase44(queryClient);
+          if (mig?.ok === false) {
+            console.warn("[manualCashCount] bootstrap migration did not complete:", mig?.reason || "unknown");
+          }
+        } catch (err) {
+          console.warn("[manualCashCount] bootstrap migration error", err);
+        }
         onStoreChangeRef.current?.();
       }
     };
@@ -170,7 +188,7 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
         disposeDailyCashPersistence();
       });
     };
-  }, [isLocalOnlyMode, settingsRowId, queryClient, ledgerBootstrapKey]);
+  }, [isLocalOnlyMode, settingsRowId, isLedgerQueryFetched, queryClient, ledgerBootstrapKey]);
 
   useEffect(() => {
     if (isLocalOnlyMode || !settingsRowId) return undefined;
@@ -187,6 +205,11 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       window.removeEventListener("pagehide", flush);
     };
   }, [isLocalOnlyMode, settingsRowId]);
+
+  useManualCashCountsSync({
+    enabled: !isLocalOnlyMode && !!settingsRowId && isLedgerQueryFetched,
+    onSnapshotChange: () => onStoreChangeRef.current?.(),
+  });
 
   return { settings, settingsRowId, isLocalOnlyMode };
 }

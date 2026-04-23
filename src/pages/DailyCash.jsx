@@ -49,6 +49,7 @@ import {
 import { expectedLaborEntriesForDate, totalExpectedLaborForDate } from "@/lib/employeeLabor";
 import {
   addManualLine,
+  applyManualCountOpeningsToStore,
   flushDailyCashPersistImmediate,
   getDetailOverrides,
   getEarliestOpeningInMexicoMonth,
@@ -68,6 +69,14 @@ import {
   moveManualLineToDay,
   updateManualLine,
 } from "@/lib/dailyCashLocal";
+import {
+  MANUAL_CASH_COUNTS_QUERY_KEY,
+  createManualCashCountRow,
+  deleteManualCashCountRow,
+  manualCountPayloadToCreateBody,
+  manualCountRowUpdateFromExpectation,
+  updateManualCashCountRow,
+} from "@/lib/manualCashCountRepository";
 import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
 import {
   AppOrderLedgerDetailPanel,
@@ -1116,39 +1125,78 @@ export default function DailyCash() {
     [openingCountDiffHistory, sumDrawerCashBetweenInstants, getPriorDrawerCloseForDay],
   );
 
-  const persistOpening = useCallback((forceRecord = false) => {
-    const trimmed = openingInput.trim();
-    const oldPersisted = getOpeningBalance(formDayStr);
-    let didWrite = false;
-    if (trimmed === "") {
-      setOpeningBalance(formDayStr, null);
-      didWrite = true;
-    } else {
-      const n = parseFloat(trimmed.replace(",", "."));
-      if (Number.isFinite(n) && (forceRecord || oldPersisted !== n)) {
-        const eventTs = mexicoBusinessDayCreatedAtIso(formDayStr);
-        const expectedInfo = deriveManualCountExpectation(formDayStr, eventTs);
-        const expectedEnd = expectedInfo.expectedEnd;
-        const diff = expectedEnd === null ? null : n - expectedEnd;
-        recordOpeningCountDiff({
-          dateKey: formDayStr,
-          ts: eventTs,
-          priorCloseDayStr: expectedInfo.priorCloseDayStr,
-          expectedSourceLabel: expectedInfo.expectedSourceLabel,
-          expectedEnd,
-          enteredOpening: n,
-          diff,
-          previousManualCountId: expectedInfo.previousManualCount?.id || null,
-          previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
-          previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
-          comment: "",
-        });
+  const persistOpening = useCallback(
+    (forceRecord = false) => {
+      const trimmed = openingInput.trim();
+      const oldPersisted = getOpeningBalance(formDayStr);
+      let didWrite = false;
+      if (trimmed === "") {
+        setOpeningBalance(formDayStr, null);
         didWrite = true;
+      } else {
+        const n = parseFloat(trimmed.replace(",", "."));
+        if (Number.isFinite(n) && (forceRecord || oldPersisted !== n)) {
+          const eventTs = mexicoBusinessDayCreatedAtIso(formDayStr);
+          const expectedInfo = deriveManualCountExpectation(formDayStr, eventTs);
+          const expectedEnd = expectedInfo.expectedEnd;
+          const diff = expectedEnd === null ? null : n - expectedEnd;
+          if (isLocalOnlyMode) {
+            recordOpeningCountDiff({
+              dateKey: formDayStr,
+              ts: eventTs,
+              priorCloseDayStr: expectedInfo.priorCloseDayStr,
+              expectedSourceLabel: expectedInfo.expectedSourceLabel,
+              expectedEnd,
+              enteredOpening: n,
+              diff,
+              previousManualCountId: expectedInfo.previousManualCount?.id || null,
+              previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+              previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+              comment: "",
+            });
+          } else {
+            void (async () => {
+              try {
+                const body = manualCountPayloadToCreateBody({
+                  dateKey: formDayStr,
+                  ts: eventTs,
+                  priorCloseDayStr: expectedInfo.priorCloseDayStr,
+                  expectedSourceLabel: expectedInfo.expectedSourceLabel,
+                  expectedEnd,
+                  enteredOpening: n,
+                  diff,
+                  comment: "",
+                  previousManualCountId: expectedInfo.previousManualCount?.id || null,
+                  previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+                  previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+                });
+                const row = await createManualCashCountRow(body);
+                const ts =
+                  row && typeof row.logged_at_utc === "string" && row.logged_at_utc.trim() !== ""
+                    ? row.logged_at_utc.trim()
+                    : eventTs;
+                applyManualCountOpeningsToStore(formDayStr, n, ts);
+                await queryClient.invalidateQueries({ queryKey: MANUAL_CASH_COUNTS_QUERY_KEY });
+                await flushDailyCashPersistImmediate();
+                setStoreTick((t) => t + 1);
+              } catch (e) {
+                console.error(e);
+                alert(
+                  "Could not save manual count. In Base44 Data, create the **ManualCashCount** collection (see base44/entities/ManualCashCount.jsonc) and ensure your role can create rows.",
+                );
+              }
+            })();
+          }
+          didWrite = true;
+        }
       }
-    }
-    setStoreTick((t) => t + 1);
-    if (didWrite) void flushDailyCashPersistImmediate();
-  }, [formDayStr, openingInput, deriveManualCountExpectation]);
+      if (didWrite && (isLocalOnlyMode || trimmed === "")) {
+        setStoreTick((t) => t + 1);
+        void flushDailyCashPersistImmediate();
+      }
+    },
+    [formDayStr, openingInput, deriveManualCountExpectation, isLocalOnlyMode, queryClient],
+  );
 
   const persistedOpening = useMemo(() => getOpeningBalance(formDayStr), [formDayStr, storeTick]);
   const openingCountMeta = useMemo(() => getOpeningCountMeta(formDayStr), [formDayStr, storeTick]);
@@ -1405,30 +1453,77 @@ export default function DailyCash() {
     }
   };
 
-  const handleManualCountCommentCommit = useCallback((eventId, value) => {
-    updateOpeningCountDiffComment(eventId, value);
-    setStoreTick((t) => t + 1);
-  }, []);
+  const handleManualCountCommentCommit = useCallback(
+    (eventId, value) => {
+      if (isLocalOnlyMode) {
+        updateOpeningCountDiffComment(eventId, value);
+        setStoreTick((t) => t + 1);
+        return;
+      }
+      void (async () => {
+        try {
+          await updateManualCashCountRow(eventId, {
+            comment: typeof value === "string" ? value.trim() : "",
+          });
+          await queryClient.invalidateQueries({ queryKey: MANUAL_CASH_COUNTS_QUERY_KEY });
+          await flushDailyCashPersistImmediate();
+          setStoreTick((t) => t + 1);
+        } catch (e) {
+          console.error(e);
+          alert("Could not update comment.");
+        }
+      })();
+    },
+    [isLocalOnlyMode, queryClient],
+  );
 
-  const handleManualCountDateTimeCommit = useCallback((eventId, dateKeyMexico, timeHHmm) => {
-    const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
-    if (!iso) return;
-    const current = openingCountDiffHistory.find((ev) => ev?.id === eventId);
-    if (!current || !Number.isFinite(Number(current.enteredOpening))) return;
-    const expectedInfo = deriveManualCountExpectation(dateKeyMexico, iso, eventId);
-    const expectedEnd = expectedInfo.expectedEnd;
-    const diff = expectedEnd == null ? null : Number(current.enteredOpening) - expectedEnd;
-    updateOpeningCountDiffDateTime(eventId, dateKeyMexico, timeHHmm, {
-      priorCloseDayStr: expectedInfo.priorCloseDayStr,
-      expectedSourceLabel: expectedInfo.expectedSourceLabel,
-      expectedEnd,
-      diff,
-      previousManualCountId: expectedInfo.previousManualCount?.id || null,
-      previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
-      previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
-    });
-    setStoreTick((t) => t + 1);
-  }, [openingCountDiffHistory, deriveManualCountExpectation]);
+  const handleManualCountDateTimeCommit = useCallback(
+    (eventId, dateKeyMexico, timeHHmm) => {
+      const iso = mexicoWallDateTimeToUtcIso(dateKeyMexico, timeHHmm);
+      if (!iso) return;
+      const current = openingCountDiffHistory.find((ev) => ev?.id === eventId);
+      if (!current || !Number.isFinite(Number(current.enteredOpening))) return;
+      const expectedInfo = deriveManualCountExpectation(dateKeyMexico, iso, eventId);
+      const expectedEnd = expectedInfo.expectedEnd;
+      const diff = expectedEnd == null ? null : Number(current.enteredOpening) - expectedEnd;
+      if (isLocalOnlyMode) {
+        updateOpeningCountDiffDateTime(eventId, dateKeyMexico, timeHHmm, {
+          priorCloseDayStr: expectedInfo.priorCloseDayStr,
+          expectedSourceLabel: expectedInfo.expectedSourceLabel,
+          expectedEnd,
+          diff,
+          previousManualCountId: expectedInfo.previousManualCount?.id || null,
+          previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+          previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+        });
+        setStoreTick((t) => t + 1);
+        return;
+      }
+      void (async () => {
+        try {
+          const patch = manualCountRowUpdateFromExpectation({
+            countDayMexico: dateKeyMexico,
+            loggedAtUtc: iso,
+            priorCloseDayStr: expectedInfo.priorCloseDayStr,
+            expectedEnd,
+            diff,
+            expectedSourceLabel: expectedInfo.expectedSourceLabel,
+            previousManualCountId: expectedInfo.previousManualCount?.id || null,
+            previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+            previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+          });
+          await updateManualCashCountRow(eventId, patch);
+          await queryClient.invalidateQueries({ queryKey: MANUAL_CASH_COUNTS_QUERY_KEY });
+          await flushDailyCashPersistImmediate();
+          setStoreTick((t) => t + 1);
+        } catch (e) {
+          console.error(e);
+          alert("Could not update date/time.");
+        }
+      })();
+    },
+    [openingCountDiffHistory, deriveManualCountExpectation, isLocalOnlyMode, queryClient],
+  );
 
   const handleStageLedgerTime = useCallback((ledgerDay, rowId, dateKeyMexico, timeHHmm) => {
     const key = ledgerPendingKey(ledgerDay, rowId);
@@ -1659,11 +1754,28 @@ export default function DailyCash() {
     void flushDailyCashPersistImmediate();
   }, []);
 
-  const handleRemoveManualCountDiff = useCallback((eventId) => {
-    if (!window.confirm("Delete this logged manual count?")) return;
-    removeOpeningCountDiff(eventId);
-    setStoreTick((t) => t + 1);
-  }, []);
+  const handleRemoveManualCountDiff = useCallback(
+    (eventId) => {
+      if (!window.confirm("Delete this logged manual count?")) return;
+      if (isLocalOnlyMode) {
+        removeOpeningCountDiff(eventId);
+        setStoreTick((t) => t + 1);
+        return;
+      }
+      void (async () => {
+        try {
+          await deleteManualCashCountRow(eventId);
+          await queryClient.invalidateQueries({ queryKey: MANUAL_CASH_COUNTS_QUERY_KEY });
+          await flushDailyCashPersistImmediate();
+          setStoreTick((t) => t + 1);
+        } catch (e) {
+          console.error(e);
+          alert("Could not delete manual count.");
+        }
+      })();
+    },
+    [isLocalOnlyMode, queryClient],
+  );
 
   const handleUndoManual = async () => {
     if (!lastRemovedManual) return;
@@ -1920,7 +2032,7 @@ export default function DailyCash() {
         {isLocalOnlyMode ? (
           <>Stored in this browser in local dev — switch to </>
         ) : (
-          <>Synced to your workspace — switch to </>
+          <>Each save is a row in the ManualCashCount database table — switch to </>
         )}
         <strong className="text-gray-300">Today</strong> to add entries.
       </p>
@@ -2031,7 +2143,7 @@ export default function DailyCash() {
                       {isLocalOnlyMode ? (
                         <>In this local dev session, counts stay in the browser only.</>
                       ) : (
-                        <>Counts sync to your workspace so they survive clearing browser data.</>
+                        <>Each count is stored as its own row in the ManualCashCount table (not inside the ledger JSON blob).</>
                       )}
                     </>
                   ) : (
@@ -2045,7 +2157,10 @@ export default function DailyCash() {
                       {isLocalOnlyMode ? (
                         <>Manual counts and drawer data stay in this browser in local dev.</>
                       ) : (
-                        <>Manual counts and drawer totals sync to app settings when you are signed in.</>
+                        <>
+                          Manual counts are stored in the ManualCashCount table; other drawer data still syncs with DailyCashLedger
+                          when you are signed in.
+                        </>
                       )}
                     </>
                   )}

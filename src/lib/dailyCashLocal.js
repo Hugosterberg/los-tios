@@ -13,9 +13,101 @@ const PERSIST_DEBOUNCE_MS = 650;
 
 /** @type {"none" | "localStorage" | "remote"} */
 let persistenceMode = "none";
+
+export function getDailyCashPersistenceMode() {
+  return persistenceMode;
+}
 /** @type {null | ((json: string) => Promise<void>)} */
 let persistFn = null;
 let persistDebounceTimer = null;
+
+/** Production: manual counts live on `ManualCashCount` rows; this cache mirrors the server list. */
+let remoteManualCountEvents = [];
+let remoteManualCountsHydrated = false;
+
+export function clearRemoteManualCountSnapshot() {
+  remoteManualCountEvents = [];
+  remoteManualCountsHydrated = false;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} events same shape as legacy opening diff events
+ * @param {boolean} hydrated
+ */
+export function setRemoteManualCountSnapshot(events, hydrated = true) {
+  remoteManualCountEvents = Array.isArray(events) ? events : [];
+  remoteManualCountsHydrated = Boolean(hydrated);
+}
+
+/** @returns {ReturnType<typeof listOpeningCountDiffs>} */
+export function peekOpeningDiffEventsFromStoreBlob() {
+  const ev = readRaw().openingDiffEvents;
+  return Array.isArray(ev) ? [...ev] : [];
+}
+
+export function clearOpeningDiffEventsFromStore() {
+  const store = readRaw();
+  store.openingDiffEvents = [];
+  writeRaw(store);
+}
+
+export function applyManualCountOpeningsToStore(dateKey, enteredOpening, ts) {
+  if (!dateKey) return;
+  const n = Number(enteredOpening);
+  if (!Number.isFinite(n)) return;
+  const store = readRaw();
+  if (!store.openingCountMeta || typeof store.openingCountMeta !== "object") {
+    store.openingCountMeta = {};
+  }
+  const iso = typeof ts === "string" && ts.trim() !== "" ? ts.trim() : new Date().toISOString();
+  store.openings[dateKey] = n;
+  store.openingCountMeta[dateKey] = { updatedAt: iso };
+  writeRaw(store);
+}
+
+/**
+ * Recompute `openings` / `openingCountMeta` from the authoritative manual-count list (newest wins per Mexico day).
+ * @param {Array<{ dateKey?: string; ts?: string; enteredOpening?: number }>} events
+ */
+export function syncOpeningsAfterManualCountsReplace(events) {
+  const store = readRaw();
+  const list = Array.isArray(events) ? events : [];
+  const affectedDays = new Set(Object.keys(store.openings));
+  for (const ev of list) {
+    if (ev?.dateKey) affectedDays.add(ev.dateKey);
+  }
+  const latestByDay = new Map();
+  for (const ev of list) {
+    if (!ev?.dateKey || !Number.isFinite(Number(ev.enteredOpening))) continue;
+    const t = new Date(ev.ts || 0).getTime();
+    if (!Number.isFinite(t)) continue;
+    const cur = latestByDay.get(ev.dateKey);
+    if (!cur || t >= new Date(cur.ts || 0).getTime()) {
+      latestByDay.set(ev.dateKey, ev);
+    }
+  }
+  if (!store.openingCountMeta || typeof store.openingCountMeta !== "object") {
+    store.openingCountMeta = {};
+  }
+  for (const dk of affectedDays) {
+    const latest = latestByDay.get(dk);
+    if (latest) {
+      store.openings[dk] = Number(latest.enteredOpening);
+      store.openingCountMeta[dk] = { updatedAt: latest.ts };
+    } else {
+      delete store.openings[dk];
+      delete store.openingCountMeta[dk];
+    }
+  }
+  writeRaw(store);
+}
+
+function jsonPayloadForRemotePersist() {
+  if (persistenceMode !== "remote") {
+    return JSON.stringify(internalStore);
+  }
+  return JSON.stringify({ ...internalStore, openingDiffEvents: [] });
+}
 
 /** Settled after every remote AppSettings write started from this module (flush + debounced persist). */
 let remotePersistIdle = Promise.resolve();
@@ -164,7 +256,7 @@ function scheduleRemotePersist() {
   clearTimeout(persistDebounceTimer);
   persistDebounceTimer = setTimeout(() => {
     persistDebounceTimer = null;
-    const json = JSON.stringify(internalStore);
+    const json = jsonPayloadForRemotePersist();
     const fn = persistFn;
     if (!fn) return;
     const p = Promise.resolve(fn(json)).catch((err) => {
@@ -194,6 +286,7 @@ export function initDailyCashPersistenceLocal() {
   persistDebounceTimer = null;
   persistFn = null;
   persistenceMode = "localStorage";
+  clearRemoteManualCountSnapshot();
   internalStore = readLocalStorageStore() || defaultStore();
 }
 
@@ -208,6 +301,7 @@ export function initDailyCashPersistenceRemote(serverJson, persistAsync) {
   persistDebounceTimer = null;
   persistenceMode = "remote";
   persistFn = persistAsync;
+  clearRemoteManualCountSnapshot();
 
   const memoryBefore = normalizeParsed(JSON.parse(JSON.stringify(readRaw())));
   const memoryHadData = hasMeaningfulData(memoryBefore);
@@ -245,7 +339,7 @@ export async function flushDailyCashPersistImmediate() {
   clearTimeout(persistDebounceTimer);
   persistDebounceTimer = null;
   const fn = persistFn;
-  const json = JSON.stringify(internalStore);
+  const json = jsonPayloadForRemotePersist();
   const persistPromise = Promise.resolve(fn(json));
   chainRemotePersistPromise(persistPromise);
   await persistPromise;
@@ -257,6 +351,7 @@ export function disposeDailyCashPersistence() {
   persistDebounceTimer = null;
   persistFn = null;
   persistenceMode = "none";
+  clearRemoteManualCountSnapshot();
   /* Keep internalStore — resetting here dropped manual counts entered before remote init (settings row still loading). */
 }
 
@@ -534,6 +629,11 @@ export function updateOpeningCountDiffDateTime(id, dateKeyMexico, timeHHmm, patc
 
 /** Newest first */
 export function listOpeningCountDiffs() {
+  if (persistenceMode === "remote" && remoteManualCountsHydrated) {
+    return [...remoteManualCountEvents].sort(
+      (a, b) => new Date(b?.ts || 0).getTime() - new Date(a?.ts || 0).getTime(),
+    );
+  }
   const ev = readRaw().openingDiffEvents;
   return Array.isArray(ev)
     ? [...ev].sort((a, b) => new Date(b?.ts || 0).getTime() - new Date(a?.ts || 0).getTime())
