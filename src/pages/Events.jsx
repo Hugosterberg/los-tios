@@ -22,7 +22,11 @@ import {
   saveLocalCustomerEvents,
   serializeCustomerEvents,
 } from "@/lib/customerEvents";
-import { DEFAULT_APP_SETTINGS, buildDefaultAppSettings } from "@/lib/appSettings";
+import {
+  DEFAULT_APP_SETTINGS,
+  buildDefaultAppSettings,
+  omitDailyCashStoreJsonForAppSettingsUpdate,
+} from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
 
 const emptyForm = () => ({
@@ -201,10 +205,10 @@ export default function Events() {
         saveLocalCustomerEvents(nextEvents);
         return { local: true, events: nextEvents };
       }
-      const payload = {
+      const payload = omitDailyCashStoreJsonForAppSettingsUpdate({
         ...appSettingsPayload(currentSettings),
         [CUSTOMER_EVENTS_SETTINGS_KEY]: serializeCustomerEvents(nextEvents),
-      };
+      });
       try {
         const result = settings[0]
           ? await base44.entities.AppSettings.update(settings[0].id, payload)

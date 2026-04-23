@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { appParams } from "@/lib/app-params";
 import { saveStoredIntegrationSettings } from "@/lib/integrationSettings";
-import { buildDefaultAppSettings } from "@/lib/appSettings";
+import { buildDefaultAppSettings, omitDailyCashStoreJsonForAppSettingsUpdate } from "@/lib/appSettings";
 
 export default function Customization() {
   const queryClient = useQueryClient();
@@ -38,10 +38,11 @@ export default function Customization() {
 
   const saveSettings = useMutation({
     mutationFn: (data) => {
+      const payload = omitDailyCashStoreJsonForAppSettingsUpdate(data);
       if (settings[0]) {
-        return base44.entities.AppSettings.update(settings[0].id, data);
+        return base44.entities.AppSettings.update(settings[0].id, payload);
       } else {
-        return base44.entities.AppSettings.create(data);
+        return base44.entities.AppSettings.create(payload);
       }
     },
     onSuccess: () => {

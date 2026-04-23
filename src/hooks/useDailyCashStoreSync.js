@@ -50,8 +50,9 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       initDailyCashPersistenceLocal();
       onStoreChangeRef.current?.();
       return () => {
-        void flushDailyCashPersistImmediate();
-        disposeDailyCashPersistence();
+        void flushDailyCashPersistImmediate().finally(() => {
+          disposeDailyCashPersistence();
+        });
       };
     }
     if (!settingsRowId) {
@@ -91,8 +92,9 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
     onStoreChangeRef.current?.();
 
     return () => {
-      void flushDailyCashPersistImmediate();
-      disposeDailyCashPersistence();
+      void flushDailyCashPersistImmediate().finally(() => {
+        disposeDailyCashPersistence();
+      });
     };
   }, [isLocalOnlyMode, settingsRowId, queryClient]);
 

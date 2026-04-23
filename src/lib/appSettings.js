@@ -211,3 +211,19 @@ export function buildDefaultAppSettings(overrides = {}) {
     ...overrides,
   };
 }
+
+/**
+ * `daily_cash_store_json` is written only by the Daily Cash persistence layer
+ * (`useDailyCashStoreSync` / `flushDailyCashPersistImmediate`). Other screens save
+ * full AppSettings objects from React Query; that cache can be stale (another tab,
+ * no refetch yet), so including this field would overwrite the server's blob and
+ * wipe manual count / diff history. Strip it from broad AppSettings.update payloads.
+ *
+ * @param {Record<string, unknown>} data
+ * @returns {Record<string, unknown>}
+ */
+export function omitDailyCashStoreJsonForAppSettingsUpdate(data) {
+  if (!data || typeof data !== "object") return data;
+  const { daily_cash_store_json: _omit, ...rest } = data;
+  return rest;
+}

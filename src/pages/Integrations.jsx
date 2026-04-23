@@ -10,7 +10,11 @@ import {
   hasRevolutApiConfig,
   isRevolutPersonalMode,
 } from "@/api/revolut";
-import { buildDefaultAppSettings, INTEGRATION_SETTINGS_SECTIONS } from "@/lib/appSettings";
+import {
+  buildDefaultAppSettings,
+  INTEGRATION_SETTINGS_SECTIONS,
+  omitDailyCashStoreJsonForAppSettingsUpdate,
+} from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
 import { formatMexicoDateTimeMediumShort } from "@/lib/mexicoTime";
@@ -301,16 +305,17 @@ export default function Integrations() {
 
   const saveSettings = useMutation({
     mutationFn: (data) => {
+      const payload = omitDailyCashStoreJsonForAppSettingsUpdate(data);
       if (isLocalOnlyMode) {
-        saveStoredIntegrationSettings(data);
-        return Promise.resolve(data);
+        saveStoredIntegrationSettings(payload);
+        return Promise.resolve(payload);
       }
 
       if (settings[0]) {
-        return base44.entities.AppSettings.update(settings[0].id, data);
+        return base44.entities.AppSettings.update(settings[0].id, payload);
       }
 
-      return base44.entities.AppSettings.create(data);
+      return base44.entities.AppSettings.create(payload);
     },
     onSuccess: (_, values) => {
       if (!isLocalOnlyMode) {
