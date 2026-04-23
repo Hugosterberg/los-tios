@@ -15,6 +15,18 @@ let persistenceMode = "none";
 let persistFn = null;
 let persistDebounceTimer = null;
 
+/** Settled after every remote AppSettings write started from this module (flush + debounced persist). */
+let remotePersistIdle = Promise.resolve();
+
+function chainRemotePersistPromise(p) {
+  remotePersistIdle = remotePersistIdle.then(() => p).catch(() => {});
+}
+
+/** Wait for in-flight remote persists so the next page does not hydrate from stale React Query data. */
+export function awaitDailyCashRemotePersistIdle() {
+  return remotePersistIdle;
+}
+
 const defaultStore = () => ({
   openings: {},
   openingCountMeta: {},
@@ -141,9 +153,12 @@ function scheduleRemotePersist() {
   persistDebounceTimer = setTimeout(() => {
     persistDebounceTimer = null;
     const json = JSON.stringify(internalStore);
-    Promise.resolve(persistFn(json)).catch((err) => {
+    const fn = persistFn;
+    if (!fn) return;
+    const p = Promise.resolve(fn(json)).catch((err) => {
       console.error("[dailyCash] persist failed", err);
     });
+    chainRemotePersistPromise(p);
   }, PERSIST_DEBOUNCE_MS);
 }
 
@@ -217,8 +232,11 @@ export async function flushDailyCashPersistImmediate() {
   if (persistenceMode !== "remote" || !persistFn || !isBrowser) return;
   clearTimeout(persistDebounceTimer);
   persistDebounceTimer = null;
+  const fn = persistFn;
   const json = JSON.stringify(internalStore);
-  await persistFn(json);
+  const persistPromise = Promise.resolve(fn(json));
+  chainRemotePersistPromise(persistPromise);
+  await persistPromise;
   clearLocalStorageStore();
 }
 

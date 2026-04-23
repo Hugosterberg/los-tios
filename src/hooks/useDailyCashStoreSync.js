@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { appParams } from "@/lib/app-params";
 import {
+  awaitDailyCashRemotePersistIdle,
   disposeDailyCashPersistence,
   flushDailyCashPersistImmediate,
   initDailyCashPersistenceLocal,
@@ -59,16 +60,7 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       return undefined;
     }
 
-    const cached = queryClient.getQueryData(["appSettings"]);
-    const rowFromCache = Array.isArray(cached)
-      ? cached.find((r) => r?.id === settingsRowId)
-      : null;
-    const rowFromRender = Array.isArray(settingsRef.current)
-      ? settingsRef.current.find((r) => r?.id === settingsRowId)
-      : null;
-    const row = rowFromCache ?? rowFromRender;
-    const serverJson =
-      typeof row?.daily_cash_store_json === "string" ? row.daily_cash_store_json : "";
+    let cancelled = false;
 
     const persist = async (json) => {
       await base44.entities.AppSettings.update(settingsRowId, {
@@ -82,16 +74,41 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       });
     };
 
-    disposeDailyCashPersistence();
-    const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
-    if (migrated || memoryMerged) {
-      void flushDailyCashPersistImmediate().catch((err) => {
-        console.error("[dailyCash] migration persist failed", err);
-      });
-    }
-    onStoreChangeRef.current?.();
+    const bootstrap = async () => {
+      try {
+        await awaitDailyCashRemotePersistIdle();
+      } catch {
+        /* ignore — idle chain already swallows persist errors */
+      }
+      if (cancelled) return;
+
+      const cached = queryClient.getQueryData(["appSettings"]);
+      const rowFromCache = Array.isArray(cached)
+        ? cached.find((r) => r?.id === settingsRowId)
+        : null;
+      const rowFromRender = Array.isArray(settingsRef.current)
+        ? settingsRef.current.find((r) => r?.id === settingsRowId)
+        : null;
+      const row = rowFromCache ?? rowFromRender;
+      const serverJson =
+        typeof row?.daily_cash_store_json === "string" ? row.daily_cash_store_json : "";
+
+      disposeDailyCashPersistence();
+      const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
+      if (migrated || memoryMerged) {
+        void flushDailyCashPersistImmediate().catch((err) => {
+          console.error("[dailyCash] migration persist failed", err);
+        });
+      }
+      if (!cancelled) {
+        onStoreChangeRef.current?.();
+      }
+    };
+
+    void bootstrap();
 
     return () => {
+      cancelled = true;
       void flushDailyCashPersistImmediate().finally(() => {
         disposeDailyCashPersistence();
       });
