@@ -105,6 +105,21 @@ function formatShoppingDueDate(iso) {
   }
 }
 
+/**
+ * Base44 may return UTC timestamps without timezone suffix.
+ * Treat naive date-times as UTC so Mexico display stays stable.
+ */
+function normalizeBackendUtcIso(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(raw)) return raw;
+  const normalized = raw.replace(" ", "T");
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d{1,6})?)?$/.test(normalized)) {
+    return `${normalized}Z`;
+  }
+  return raw;
+}
+
 const expenseCategoryByShoppingCategory = {
   ingredients: "ingredients",
   supplies: "other",
@@ -208,7 +223,7 @@ export default function ShoppingList() {
         name: e.name || "",
         amount: Number(e.amount || 0),
         dateIso: String(e.date || "").slice(0, 10),
-        createdDateIso: String(e.recorded_at || e.created_date || "").trim(),
+        createdDateIso: normalizeBackendUtcIso(e.recorded_at || e.created_date),
         paymentSource: String(e.payment_source || "company_cash"),
       }))
       .sort((a, b) => {
