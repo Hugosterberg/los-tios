@@ -105,15 +105,39 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       const settingsRow = rowFromCache ?? rowFromRender;
 
       const cachedLedger = queryClient.getQueryData(DAILY_CASH_LEDGER_QUERY_KEY);
-      const ledgerRow0 = Array.isArray(cachedLedger) ? cachedLedger[0] : null;
+      let ledgerRow0 = Array.isArray(cachedLedger) ? cachedLedger[0] : null;
+      const fromAppRaw = settingsRow?.daily_cash_store_json;
+
+      /* One-shot server migration: legacy AppSettings blob → DailyCashLedger (no manual copy in Base44 UI). */
+      if (
+        !cancelled &&
+        typeof fromAppRaw === "string" &&
+        dailyCashStoreJsonStringHasMeaningfulData(fromAppRaw)
+      ) {
+        const fromLedgerRaw = ledgerRow0?.[DAILY_CASH_LEDGER_PAYLOAD_FIELD];
+        const ledgerHasPayload =
+          typeof fromLedgerRaw === "string" &&
+          dailyCashStoreJsonStringHasMeaningfulData(fromLedgerRaw);
+        if (!ledgerHasPayload) {
+          try {
+            await persistDailyCashLedgerPayload({
+              json: fromAppRaw,
+              ledgerRowId: ledgerRow0?.id ?? null,
+              settingsRowId,
+              queryClient,
+            });
+            const after = queryClient.getQueryData(DAILY_CASH_LEDGER_QUERY_KEY);
+            ledgerRow0 = Array.isArray(after) ? after[0] : ledgerRow0;
+          } catch (err) {
+            console.warn(
+              "[dailyCashLedger] automatic legacy→ledger migration failed (create entity `DailyCashLedger` in Base44?)",
+              err,
+            );
+          }
+        }
+      }
 
       const serverJson = pickDailyCashHydrationJsonString(ledgerRow0, settingsRow);
-      const fromApp = settingsRow?.daily_cash_store_json;
-      const fromLedger = ledgerRow0?.[DAILY_CASH_LEDGER_PAYLOAD_FIELD];
-      const shouldSeedLedger =
-        typeof fromApp === "string" &&
-        dailyCashStoreJsonStringHasMeaningfulData(fromApp) &&
-        !dailyCashStoreJsonStringHasMeaningfulData(fromLedger);
 
       const persist = async (json) => {
         const led = queryClient.getQueryData(DAILY_CASH_LEDGER_QUERY_KEY);
@@ -128,9 +152,9 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
 
       disposeDailyCashPersistence();
       const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
-      if (migrated || memoryMerged || shouldSeedLedger) {
+      if (migrated || memoryMerged) {
         void flushDailyCashPersistImmediate().catch((err) => {
-          console.error("[dailyCash] migration / ledger seed persist failed", err);
+          console.error("[dailyCash] migration persist failed", err);
         });
       }
       if (!cancelled) {

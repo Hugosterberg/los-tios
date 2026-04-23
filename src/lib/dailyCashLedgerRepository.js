@@ -15,9 +15,10 @@
  *
  * ## Migrating from AppSettings
  *
- * 1. Copy the string from `AppSettings.daily_cash_store_json` into `ledger_payload_json` on a new `DailyCashLedger` row (or use Base44 import).
- * 2. Deploy this frontend; it reads **ledger first**, then legacy AppSettings if the ledger is empty.
- * 3. After the app has saved at least once, you may clear `daily_cash_store_json` on App Settings in Base44 (optional).
+ * Create the `DailyCashLedger` entity in Base44, deploy this app, open admin once: the client
+ * copies legacy `AppSettings.daily_cash_store_json` into `ledger_payload_json` when the ledger
+ * is still empty (see `useDailyCashStoreSync`). Manual paste in Base44 is only a fallback if
+ * that step fails (check the browser console).
  */
 
 import { base44 } from "@/api/base44Client";
