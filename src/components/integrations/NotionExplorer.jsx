@@ -105,7 +105,7 @@ export default function NotionExplorer() {
     try {
       const data = await callNotion(`blocks/${page.id}/children`, "GET");
       setPageBlocks(data.results || []);
-    } catch (e) {
+    } catch {
       setPageBlocks([]);
     } finally {
       setLoadingBlocks(false);

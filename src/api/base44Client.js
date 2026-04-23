@@ -8,12 +8,51 @@ import { appParams } from '@/lib/app-params';
  * (which may use Postgres/Supabase on the server side) is accessed only through this SDK.
  */
 const { appId, serverUrl, token, functionsVersion } = appParams;
+const hasBackendConfig = Boolean(appId && serverUrl);
+
+const createNoopEntityClient = () => ({
+  list: async () => [],
+  get: async () => null,
+  create: async (payload = {}) => payload,
+  update: async (_id, payload = {}) => payload,
+  delete: async (id) => ({ id }),
+});
+
+const createLocalNoopClient = () => ({
+  entities: new Proxy(
+    {},
+    {
+      get: () => createNoopEntityClient(),
+    },
+  ),
+  auth: {
+    me: async () => null,
+    logout: () => {},
+    redirectToLogin: () => {},
+  },
+  appLogs: {
+    logUserInApp: async () => null,
+  },
+  integrations: new Proxy(
+    {},
+    {
+      get: () => ({
+        invoke: async () => null,
+      }),
+    },
+  ),
+  functions: {
+    invoke: async () => null,
+  },
+});
 
 // Create a client with authentication required
-export const base44 = createClient({
-  appId,
-  serverUrl,
-  token,
-  functionsVersion,
-  requiresAuth: false
-});
+export const base44 = hasBackendConfig
+  ? createClient({
+      appId,
+      serverUrl,
+      token,
+      functionsVersion,
+      requiresAuth: false,
+    })
+  : createLocalNoopClient();

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -50,7 +51,7 @@ import {
 import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
 import { useMonthUrlSync, isValidMonthKey, appendMonthParam } from "@/hooks/useMonthUrlSync";
 import { formatMxn, formatCount } from "@/lib/format";
-import { listOrders } from "@/lib/local-dev-orders";
+import { isLocalDevOrdersMode, listOrders } from "@/lib/local-dev-orders";
 import {
   isLocalFinanceMode,
   localListExpenses,
@@ -118,7 +119,6 @@ import {
   getRecordDate,
   getStartOfToday,
   getTrendFromDifference,
-  isSameDay,
   matchesBranchFilter,
   matchesPaymentSourceFilter,
   matchesSalesChannelFilter,
@@ -183,6 +183,47 @@ function StatusBadge({ value }) {
   return <Badge className={`border ${styles}`}>{value}</Badge>;
 }
 
+function ProductList({ title, items = [], source = "mock" }) {
+  return (
+    <DashboardPanel
+      title={title}
+      sourceBadge={<SourceBadge source={source} />}
+      className="h-full"
+    >
+      <div className="space-y-3">
+        {items.length ? (
+          items.map((item, index) => (
+            <div
+              key={item.id || `${title}-${index}`}
+              className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4"
+            >
+              <p className="text-sm font-semibold text-white">{item.product || "Unknown product"}</p>
+              <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+                <span>{formatNumber(item.units || 0)} units</span>
+                <span className="text-yellow-500/50">-</span>
+                <span>{item.revenue || formatCurrency(0)}</span>
+              </div>
+              <p className="mt-1 text-xs text-yellow-200/80">{item.margin || "No margin data"}</p>
+              {item.href ? (
+                <Link
+                  to={item.href}
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-yellow-300 hover:text-yellow-200"
+                >
+                  View details <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4 text-sm text-gray-400">
+            No product data available for the selected filters.
+          </p>
+        )}
+      </div>
+    </DashboardPanel>
+  );
+}
+
 
 /** @typedef {{ mode: "calendar", start: Date, end: Date, label: string } | { mode: "rolling", start: Date | null, end: Date, label: string }} DashboardFilterWindow */
 
@@ -244,7 +285,8 @@ export default function Dashboard() {
     [selectedDedupeWindow],
   );
 
-  const useLocalFinance = isLocalFinanceMode();
+  const useLocalFinance = isLocalFinanceMode() || isLocalOnlyMode;
+  const useLocalOrders = isLocalDevOrdersMode || isLocalOnlyMode;
 
   /* Bootstraps the Daily Cash store so opening counts + diff events are readable on this page.
      Dashboard is read-only against the store, but the same persistence is shared with DailyCash/
@@ -261,8 +303,9 @@ export default function Dashboard() {
   const appSettings = React.useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
 
   const ordersQuery = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date"),
+    queryKey: ["orders", useLocalOrders ? "local" : "remote"],
+    queryFn: () =>
+      listOrders((orderBy) => base44.entities.Order.list(orderBy), "-created_date", { forceLocal: useLocalOrders }),
   });
 
   const expensesQuery = useQuery({

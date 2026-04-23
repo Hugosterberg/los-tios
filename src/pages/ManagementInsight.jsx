@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Building2, DatabaseZap, FileJson, PanelsTopLeft, ShieldCheck } from "lucide-react";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";

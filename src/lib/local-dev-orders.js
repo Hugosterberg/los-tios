@@ -44,8 +44,8 @@ const sortOrders = (orders, orderBy) => {
   return orders;
 };
 
-export const listOrders = async (remoteListFn, orderBy) => {
-  if (isLocalDevOrdersMode) {
+export const listOrders = async (remoteListFn, orderBy, { forceLocal = false } = {}) => {
+  if (isLocalDevOrdersMode || forceLocal) {
     return sortOrders(readStoredOrders(), orderBy);
   }
   return remoteListFn(orderBy);

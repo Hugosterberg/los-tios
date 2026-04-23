@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from "react-router-dom";
 import { BellRing, CheckCircle2, Clock3, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

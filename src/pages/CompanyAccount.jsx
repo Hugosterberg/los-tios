@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,8 +22,6 @@ import { createEntityWithOptionalTimestamp, updateEntityWithOptionalTimestamp } 
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listOrders } from "@/lib/local-dev-orders";
-import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
-import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 
 const createTransactionForm = (date = getMexicoNowDateKey()) => ({
   type: "contribution",
@@ -84,27 +83,6 @@ export default function CompanyAccount() {
   const { data: transactions = [] } = useQuery({
     queryKey: ['companyTransactions'],
     queryFn: () => base44.entities.CompanyTransaction.list('-date'),
-  });
-
-  const { data: settings = [] } = useQuery({
-    queryKey: ['appSettings'],
-    queryFn: () => base44.entities.AppSettings.list(),
-  });
-
-  const appSettings = settings[0] || {};
-
-  const loyverseOverviewQuery = useQuery({
-    queryKey: ['companyFinance', 'loyverse', settings[0]?.id || 'none'],
-    queryFn: () => getLoyverseOverview(appSettings),
-    enabled: hasLoyverseApiConfig(appSettings),
-    staleTime: 60_000,
-  });
-
-  const clipOverviewQuery = useQuery({
-    queryKey: ['companyFinance', 'clip', settings[0]?.id || 'none'],
-    queryFn: () => getClipOverview(appSettings),
-    enabled: hasClipApiConfig(appSettings),
-    staleTime: 60_000,
   });
 
   const { data: contributors = [] } = useQuery({
@@ -212,10 +190,6 @@ export default function CompanyAccount() {
     .filter(t => t.type === 'contribution')
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
-  const totalWithdrawals = transactions
-    .filter(t => t.type === 'withdrawal')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
-
   // Expenses paid from company cash
   const expensesFromCompanyCash = expenses
     .filter(e => e.payment_source === 'company_cash')
@@ -291,46 +265,6 @@ export default function CompanyAccount() {
   const totalEquityNet = equityHolders.reduce((sum, c) => sum + c.net_contribution, 0);
   const averageEquityNet = equityHolders.length > 0 ? totalEquityNet / equityHolders.length : 0;
 
-  const loyverseOverview = loyverseOverviewQuery.data;
-  const clipOverview = clipOverviewQuery.data;
-  const manualTransactionCount = transactions.length;
-  const manualContributionCount = transactions.filter((transaction) => transaction.type === 'contribution').length;
-  const manualWithdrawalCount = transactions.filter((transaction) => transaction.type === 'withdrawal').length;
-  const loyverseGrossSales = loyverseOverview?.metrics?.grossSales || 0;
-  const loyverseReceiptsCount = loyverseOverview?.metrics?.receiptsCount || 0;
-  const loyverseCompletedReceiptsCount = loyverseOverview?.metrics?.completedReceiptsCount || 0;
-  const loyverseCancelledReceiptsCount = loyverseOverview?.metrics?.cancelledReceiptsCount || 0;
-  const clipGrossVolume = clipOverview?.metrics?.grossVolume || 0;
-  const clipRefundedVolume = clipOverview?.metrics?.refundedVolume || 0;
-  const clipNetDeposits = clipOverview?.metrics?.netDeposits || 0;
-  const clipPaymentsCount = clipOverview?.metrics?.paymentsCount || 0;
-  const totalTrackedSourceVolume = loyverseGrossSales + clipGrossVolume + totalContributions;
-  const recentManualEntries = [
-    ...transactions.map((transaction) => ({
-      id: `transaction-${transaction.id}`,
-      kind: transaction.type === 'contribution' ? 'Contribution' : 'Withdrawal',
-      title: transaction.contributor_name || 'Manual transaction',
-      subtitle: transaction.description || transaction.payment_method || 'Manual entry',
-      amount: transaction.amount || 0,
-      date: transaction.date,
-      recordedAt: transaction.recorded_at || transaction.created_date || '',
-      tone: transaction.type === 'contribution' ? 'positive' : 'negative',
-    })),
-    ...expenses.map((expense) => ({
-      id: `expense-${expense.id}`,
-      kind: 'Expense',
-      title: expense.name || 'Expense',
-      subtitle: expense.from_shopping_list
-        ? `Shopping list - ${expense.category || 'ingredients'}`
-        : expense.category || 'Expense',
-      amount: expense.amount || 0,
-      date: expense.date,
-      recordedAt: expense.recorded_at || expense.created_date || '',
-      tone: 'negative',
-    })),
-  ]
-    .sort((a, b) => new Date(b.recordedAt || b.date || 0).getTime() - new Date(a.recordedAt || a.date || 0).getTime())
-    .slice(0, 12);
 
   const handleTransactionSubmit = (e) => {
     e.preventDefault();

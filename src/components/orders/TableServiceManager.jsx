@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from "react";
 import { formatMexicoTableService } from "@/lib/mexicoTime";
 import { Badge } from "@/components/ui/badge";

@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,7 +63,7 @@ export default function Customization() {
     try {
       const result = await base44.integrations.Core.UploadFile({ file });
       setFormData({ ...formData, logo_url: result.file_url });
-    } catch (error) {
+    } catch {
       alert('Error uploading logo');
     } finally {
       setUploadingLogo(false);

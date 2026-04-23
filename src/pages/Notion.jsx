@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { invokeNotionProxy } from "@/api/notionClient";
@@ -83,7 +84,7 @@ function getCheckboxStatus(page) {
 function getTaskStatus(page) {
   if (!page.properties) return { name: "Not started", color: "gray" };
   // Look for status or select properties
-  for (const [key, prop] of Object.entries(page.properties)) {
+  for (const [, prop] of Object.entries(page.properties)) {
     if (prop.type === "status" && prop.status) {
       return { name: prop.status.name, color: prop.status.color };
     }

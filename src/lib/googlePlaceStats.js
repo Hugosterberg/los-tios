@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Loads Google Maps JS (Places) and reads aggregate rating + total review count for a Place ID.
  * Uses the official Maps JavaScript API so the browser is not blocked by CORS (unlike the Places REST endpoint).

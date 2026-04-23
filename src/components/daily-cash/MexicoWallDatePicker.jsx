@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useRef, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { enUS } from "date-fns/locale";

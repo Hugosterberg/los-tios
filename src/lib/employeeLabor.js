@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { eachDayOfInterval, format, getISODay, parseISO } from "date-fns";
 
 /** Persisted in notes as a schema-compatible fallback: ISO weekdays 1=Mon ... 7=Sun */

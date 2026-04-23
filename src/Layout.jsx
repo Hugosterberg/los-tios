@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";

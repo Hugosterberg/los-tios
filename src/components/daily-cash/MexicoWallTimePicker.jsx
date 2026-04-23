@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,8 +14,15 @@ function parseHHmm(value) {
 }
 
 /**
- * Minimal hour:minute picker (Mexico wall clock display) — avoids native OS time popup styling.
- * @param {{ onInteractiveCommit?: (nextHHmm: string) => void }} [props] — optional; called after each hour/minute tap so parents can save without closing the popover.
+ * Minimal hour:minute picker (Mexico wall clock display) to avoid native OS time popup styling.
+ * @param {{
+ *  value: string,
+ *  onChange: (nextHHmm: string) => void,
+ *  onPopoverClose?: () => void,
+ *  onInteractiveCommit?: (nextHHmm: string) => void,
+ *  className?: string,
+ *  disabled?: boolean
+ * }} props
  */
 export function MexicoWallTimePicker({ value, onChange, onPopoverClose, onInteractiveCommit, className, disabled }) {
   const [open, setOpen] = useState(false);

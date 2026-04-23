@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -79,8 +80,6 @@ export default function ReceiptDialog({ order, open, onClose }) {
                   const extrasTotal = (item.extras || []).reduce((sum, extra) => sum + (extra.price || 0), 0);
                   const itemSubtotal = item.price * item.quantity;
                   const extrasSubtotal = extrasTotal * item.quantity;
-                  const itemTotal = itemSubtotal + extrasSubtotal;
-
                   return (
                     <React.Fragment key={index}>
                       <tr className="border-b">

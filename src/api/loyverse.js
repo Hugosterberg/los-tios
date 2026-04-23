@@ -196,6 +196,15 @@ function extractCursor(payload) {
   );
 }
 
+/**
+ * @param {string} path
+ * @param {string} collectionKey
+ * @param {{
+ *  maxPages?: number,
+ *  searchParams?: Record<string, string | number | null | undefined>,
+ *  settings?: Record<string, any>
+ * }} [options]
+ */
 async function fetchCollection(path, collectionKey, { maxPages = 10, searchParams, settings } = {}) {
   const allRecords = [];
   let cursor = null;

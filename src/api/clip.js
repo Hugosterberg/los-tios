@@ -158,6 +158,14 @@ function buildClipUrl(baseUrl, path, searchParams = {}) {
   return url.toString();
 }
 
+/**
+ * @param {string} path
+ * @param {{
+ *  searchParams?: Record<string, string | number | null | undefined>,
+ *  apiType?: "payments" | "settlements",
+ *  authToken?: string | null
+ * }} [options]
+ */
 async function clipFetch(path, { searchParams, apiType = "payments", authToken } = {}) {
   if (!authToken) {
     throw new ClipApiError("Missing Clip auth token");
@@ -361,13 +369,18 @@ function getDefaultSettlementsRange() {
 
 function getSettlementsRange(options = {}) {
   if (options.start || options.end) {
-    const end = options.end ? new Date(options.end) : new Date();
-    const start = options.start ? new Date(options.start) : new Date(end.getTime() - 89 * 24 * 60 * 60 * 1000);
-    const boundedStart = new Date(Math.max(start.getTime(), end.getTime() - 89 * 24 * 60 * 60 * 1000));
+    const now = new Date();
+    const yesterdayUtcEnd = new Date(now);
+    yesterdayUtcEnd.setUTCDate(yesterdayUtcEnd.getUTCDate() - 1);
+    yesterdayUtcEnd.setUTCHours(23, 59, 59, 999);
+    const requestedEnd = options.end ? new Date(options.end) : now;
+    const boundedEnd = new Date(Math.min(requestedEnd.getTime(), yesterdayUtcEnd.getTime()));
+    const start = options.start ? new Date(options.start) : new Date(boundedEnd.getTime() - 89 * 24 * 60 * 60 * 1000);
+    const boundedStart = new Date(Math.max(start.getTime(), boundedEnd.getTime() - 89 * 24 * 60 * 60 * 1000));
 
     return {
       from: normalizeClipDate(boundedStart),
-      to: normalizeClipDate(end),
+      to: normalizeClipDate(boundedEnd),
     };
   }
 
@@ -402,6 +415,16 @@ function getClipNextPage(payload, currentPage, pageSize, itemCount) {
   return null;
 }
 
+/**
+ * @param {string} path
+ * @param {{
+ *  searchParams?: Record<string, string | number | null | undefined>,
+ *  apiType?: "payments" | "settlements",
+ *  authToken?: string | null,
+ *  pageSize?: number,
+ *  maxPages?: number
+ * }} [options]
+ */
 async function fetchClipCollection(path, { searchParams, apiType, authToken, pageSize = 100, maxPages = 20 } = {}) {
   const allItems = [];
   let cursor = null;

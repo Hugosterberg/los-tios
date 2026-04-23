@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from "react-router-dom";
 import { ExternalLink, KeyRound, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";

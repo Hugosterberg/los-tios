@@ -71,7 +71,7 @@ export async function invokeNotionProxy(payload, integrationSettings = {}) {
           typeof data.error === "string"
             ? data.error
             : data.error?.message || JSON.stringify(data.error);
-        const err = new Error(msg);
+        const err = /** @type {any} */ (new Error(msg));
         err.response = { data, status: raw?.status };
         throw err;
       }
