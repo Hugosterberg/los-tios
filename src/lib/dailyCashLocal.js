@@ -1,6 +1,8 @@
 /**
  * Daily Cash store: opening float per day, manual adjustment lines, opening count history.
- * In production this syncs to AppSettings.daily_cash_store_json; local dev can use localStorage only.
+ * In production this syncs to the `DailyCashLedger` Base44 entity (`ledger_payload_json`);
+ * `AppSettings.daily_cash_store_json` is only a legacy read fallback until you migrate rows.
+ * Local dev without backend uses localStorage only.
  */
 
 import { isPlainDateKey, mexicoWallDateTimeToUtcIso } from "@/lib/mexicoTime";
@@ -145,6 +147,16 @@ function parseServerJson(str) {
   } catch {
     return null;
   }
+}
+
+/** @param {string | undefined | null} str */
+export function parseDailyCashStoreFromJsonString(str) {
+  return parseServerJson(str);
+}
+
+/** @param {string | undefined | null} str */
+export function dailyCashStoreJsonStringHasMeaningfulData(str) {
+  return hasMeaningfulData(parseServerJson(str));
 }
 
 function scheduleRemotePersist() {

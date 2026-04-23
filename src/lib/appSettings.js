@@ -43,7 +43,7 @@ export const DEFAULT_APP_SETTINGS = {
   revolut_account_id: "",
   /** JSON array of customer-facing events created from the admin Events page. */
   customer_events_json: "",
-  /** JSON blob for Daily Cash (openings, manual lines, count history) — see `dailyCashLocal`. */
+  /** @deprecated Legacy Daily Cash JSON — primary storage is `DailyCashLedger.ledger_payload_json`; kept for read fallback / emergency persist. */
   daily_cash_store_json: "",
 };
 

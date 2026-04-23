@@ -13,7 +13,10 @@ const hasBackendConfig = Boolean(appId && serverUrl);
 const createNoopEntityClient = () => ({
   list: async () => [],
   get: async () => null,
-  create: async (payload = {}) => payload,
+  create: async (payload = {}) => {
+    const p = payload && typeof payload === "object" ? payload : {};
+    return { ...p, id: p.id ?? `noop-${Date.now()}` };
+  },
   update: async (_id, payload = {}) => payload,
   delete: async (id) => ({ id }),
 });
