@@ -62,17 +62,38 @@ export function parseDedupeWindowMinutes(option) {
 
 function getDateRangeStart(range) {
   const today = getStartOfToday();
+  const todayKey = getMexicoNowDateKey();
+  const currentYear = Number(todayKey.slice(0, 4));
 
   switch (range) {
-    case "1 day":
+    case "Today":
       return today;
-    case "7 days":
+    case "Last week":
       return subDays(today, 6);
-    case "1 month":
-      return getStartOfMonth(today);
-    case "All history":
+    case "This year": {
+      const startKey = `${currentYear}-01-01`;
+      return new Date(mexicoWallDateTimeToUtcIso(startKey, "00:00") || `${startKey}T00:00:00.000Z`);
+    }
+    case "Last year": {
+      const startKey = `${currentYear - 1}-01-01`;
+      return new Date(mexicoWallDateTimeToUtcIso(startKey, "00:00") || `${startKey}T00:00:00.000Z`);
+    }
     default:
       return null;
+  }
+}
+
+function getDateRangeEnd(range) {
+  const today = getEndOfToday();
+  const todayKey = getMexicoNowDateKey();
+  const currentYear = Number(todayKey.slice(0, 4));
+  switch (range) {
+    case "Last year": {
+      const endKey = `${currentYear - 1}-12-31`;
+      return new Date(mexicoWallDateTimeToUtcIso(endKey, "23:59") || `${endKey}T23:59:59.999Z`);
+    }
+    default:
+      return today;
   }
 }
 
@@ -93,7 +114,7 @@ export function buildDashboardFilterWindow(calendarMonth, selectedDateRange) {
   return {
     mode: "rolling",
     start: getDateRangeStart(selectedDateRange),
-    end: getEndOfToday(),
+    end: getDateRangeEnd(selectedDateRange),
     label: selectedDateRange,
   };
 }
@@ -110,17 +131,29 @@ export function filterByDashboardWindow(records, window) {
 
 export function getDashboardQueryStart(range) {
   const today = getStartOfToday();
+  const todayKey = getMexicoNowDateKey();
+  const currentYear = Number(todayKey.slice(0, 4));
 
   switch (range) {
-    case "1 day":
-    case "7 days":
+    case "Today":
+    case "Last week":
       return subDays(today, 34);
-    case "1 month":
-      return new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    case "All history":
+    case "This year": {
+      const startKey = `${currentYear}-01-01`;
+      return new Date(mexicoWallDateTimeToUtcIso(startKey, "00:00") || `${startKey}T00:00:00.000Z`);
+    }
+    case "Last year": {
+      const startKey = `${currentYear - 1}-01-01`;
+      return new Date(mexicoWallDateTimeToUtcIso(startKey, "00:00") || `${startKey}T00:00:00.000Z`);
+    }
     default:
       return subDays(today, 89);
   }
+}
+
+export function getDashboardQueryEnd(range) {
+  const end = getDateRangeEnd(range);
+  return end instanceof Date && !Number.isNaN(end.getTime()) ? end : getEndOfToday();
 }
 
 export function sumOrderRevenue(orders) {

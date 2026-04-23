@@ -94,7 +94,6 @@ import {
 import {
   createEntityWithOptionalTimestamp,
   resolveRecordIsoTimestamp,
-  updateEntityWithOptionalTimestamp,
 } from "@/lib/businessTimestamps";
 import {
   buildDayTableRows as buildDayTableRowsCalc,
@@ -1499,16 +1498,17 @@ export default function DailyCash() {
             );
             refetch.expenses = true;
           } else {
-            await updateEntityWithOptionalTimestamp(
-              base44.entities.Expense,
+            await base44.entities.Expense.update(
               id,
-              isCrossDayMove ? { date: dateKeyMexico, recorded_at: iso } : { recorded_at: iso },
-              { timestampField: "recorded_at" },
+              isCrossDayMove
+                ? { date: dateKeyMexico, created_date: iso, recorded_at: iso }
+                : { created_date: iso, recorded_at: iso },
             );
             if (isCrossDayMove) refetch.expenses = true;
           }
         } catch (e) {
           console.error("[ledger] Expense.update (time)", e);
+          throw e;
         }
         if (dateKeyMexico === ledgerDay) {
           setLedgerTimeOverride(ledgerDay, rowId, iso);
@@ -1536,16 +1536,17 @@ export default function DailyCash() {
             );
             refetch.companyTransactions = true;
           } else {
-            await updateEntityWithOptionalTimestamp(
-              base44.entities.CompanyTransaction,
+            await base44.entities.CompanyTransaction.update(
               id,
-              isCrossDayMove ? { date: dateKeyMexico, recorded_at: iso } : { recorded_at: iso },
-              { timestampField: "recorded_at" },
+              isCrossDayMove
+                ? { date: dateKeyMexico, created_date: iso, recorded_at: iso }
+                : { created_date: iso, recorded_at: iso },
             );
             if (isCrossDayMove) refetch.companyTransactions = true;
           }
         } catch (e) {
           console.error("[ledger] CompanyTransaction.update (time)", e);
+          throw e;
         }
         if (dateKeyMexico === ledgerDay) {
           setLedgerTimeOverride(ledgerDay, rowId, iso);

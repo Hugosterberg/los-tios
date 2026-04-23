@@ -111,6 +111,7 @@ import {
   getClipSettlementNetAmount,
   getClipSettlementStatus,
   getDashboardQueryStart,
+  getDashboardQueryEnd,
   getEndOfToday,
   getExpenseAmount,
   getExpenseCategory,
@@ -232,10 +233,11 @@ function ProductList({ title, items = [], source = "mock" }) {
  * @param {string} selectedDateRange
  */
 const CALENDAR_MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const QUICK_RANGE_OPTIONS = ["Today", "Last week", "This year", "Last year"];
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
-  const [selectedDateRange, setSelectedDateRange] = React.useState(filterOptions.dateRanges[0]);
+  const [selectedDateRange, setSelectedDateRange] = React.useState(QUICK_RANGE_OPTIONS[0]);
   const [calendarMonth, setCalendarMonth] = React.useState(/** @type {null | { y: number, m: number }} */ (null));
   const [calendarBrowseYear, setCalendarBrowseYear] = React.useState(() => new Date().getFullYear());
   const [selectedBranch, setSelectedBranch] = React.useState(filterOptions.branches[0]);
@@ -257,7 +259,7 @@ export default function Dashboard() {
 
   /* Bidirectional sync of Dashboard's calendar-month picker with ?month=YYYY-MM.
      Active only when a calendar month is actually selected, so the rolling ranges
-     ("1 day", "7 days", etc.) never broadcast a misleading month to other tabs. */
+     ("Today", "Last week", etc.) never broadcast a misleading month to other tabs. */
   const calendarMonthKey = calendarMonth
     ? `${calendarMonth.y}-${String(calendarMonth.m + 1).padStart(2, "0")}`
     : "";
@@ -278,8 +280,8 @@ export default function Dashboard() {
     if (calendarMonth) {
       return new Date(calendarMonth.y, calendarMonth.m + 1, 0, 23, 59, 59, 999);
     }
-    return getEndOfToday();
-  }, [calendarMonth]);
+    return getDashboardQueryEnd(selectedDateRange);
+  }, [calendarMonth, selectedDateRange]);
   const dedupeWindowMs = React.useMemo(
     () => parseDedupeWindowMinutes(selectedDedupeWindow) * 60 * 1000,
     [selectedDedupeWindow],
@@ -491,8 +493,8 @@ export default function Dashboard() {
   const filteredClipSettlements = filterByDashboardWindow(clipSettlements, dashboardFilterWindow);
   const displayPeriodLabel = dashboardFilterWindow.mode === "calendar" ? dashboardFilterWindow.label : selectedDateRange;
   const selectedRangeLabelLower = displayPeriodLabel.toLowerCase();
-  /** Rolling "1 day" only — vecko-/månadsvy (eller kalendermånad) döljer rena "idag"-ytor. */
-  const isDayOnlyDashboardContext = !calendarMonth && selectedDateRange === "1 day";
+  /** Rolling "Today" only — week/year/month contexts hide pure today-only sections. */
+  const isDayOnlyDashboardContext = !calendarMonth && selectedDateRange === "Today";
 
   const deliveredOrders = filteredOrders.filter((order) => order.status === "delivered");
   const activeOrders = filteredOrders.filter((order) => ["pending", "preparing", "ready", "out_for_delivery"].includes(order.status)).length;
@@ -1504,7 +1506,7 @@ export default function Dashboard() {
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-500/70">Calendar month</p>
                     <p className="mt-1 text-xs text-gray-500 sm:text-sm">
-                      Select a month to align every KPI with that full calendar window. Changing the date range below clears this.
+                      Select a month to align every KPI with that full calendar window, or use a quick range.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1551,6 +1553,29 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Quick range</span>
+                  {QUICK_RANGE_OPTIONS.map((option) => {
+                    const active = !calendarMonth && selectedDateRange === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDateRange(option);
+                          setCalendarMonth(null);
+                        }}
+                        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          active
+                            ? "border-yellow-400/80 bg-yellow-400/15 text-yellow-100"
+                            : "border-white/10 bg-black/25 text-gray-400 hover:border-yellow-500/35 hover:text-gray-200"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
                 {calendarMonth ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
                     <span className="text-xs text-gray-500">
@@ -1563,7 +1588,7 @@ export default function Dashboard() {
                       className="h-8 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-200"
                       onClick={() => setCalendarMonth(null)}
                     >
-                      Clear · use date range
+                      Clear · use quick range
                     </Button>
                   </div>
                 ) : null}
@@ -1639,16 +1664,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mx-auto mt-5 grid max-w-[1500px] gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <SelectField
-              label="Date range"
-              options={filterOptions.dateRanges}
-              value={selectedDateRange}
-              onChange={(value) => {
-                setSelectedDateRange(value);
-                setCalendarMonth(null);
-              }}
-            />
+          <div className="mx-auto mt-5 grid max-w-[1500px] gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SelectField label="Branch" options={filterOptions.branches} value={selectedBranch} onChange={setSelectedBranch} />
             <SelectField label="Sales channel" options={filterOptions.salesChannels} value={selectedChannel} onChange={setSelectedChannel} />
             <SelectField label="Payment source" options={filterOptions.paymentSources} value={selectedPaymentSource} onChange={setSelectedPaymentSource} />
