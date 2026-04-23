@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * One Base44 row per saved manual drawer count — not embedded in DailyCashLedger JSON.
- * Create entity **ManualCashCount** in Base44 (see `base44/entities/ManualCashCount.jsonc`).
+ * Create entity **ManualCashCount** in Base44 (see `entities/ManualCashCount.jsonc`).
  */
 
 import { base44 } from "@/api/base44Client";

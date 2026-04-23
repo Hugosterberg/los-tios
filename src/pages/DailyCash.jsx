@@ -1182,7 +1182,7 @@ export default function DailyCash() {
               } catch (e) {
                 console.error(e);
                 alert(
-                  "Could not save manual count. In Base44 Data, create the **ManualCashCount** collection (see base44/entities/ManualCashCount.jsonc) and ensure your role can create rows.",
+                  "Could not save manual count. In Base44 Data, create the **ManualCashCount** collection (see entities/ManualCashCount.jsonc at repo root) and ensure your role can create rows.",
                 );
               }
             })();

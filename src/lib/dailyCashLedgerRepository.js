@@ -15,6 +15,8 @@
  *
  * ## Migrating from AppSettings
  *
+ * Schema file in this repo: **`entities/DailyCashLedger.jsonc`** (Base44 root `entities/` folder for sync).
+ *
  * Create the `DailyCashLedger` entity in Base44, deploy this app, open admin once: the client
  * copies legacy `AppSettings.daily_cash_store_json` into `ledger_payload_json` when the ledger
  * is still empty (see `useDailyCashStoreSync`). Manual paste in Base44 is only a fallback if

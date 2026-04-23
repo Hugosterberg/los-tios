@@ -4,11 +4,11 @@
 
 ### A. Entity file in this Git repo (recommended)
 
-The schema lives next to your other models:
+Base44 expects entity JSON schemas in the repo root **`entities/`** directory (same level as `src/`), not under `base44/`. This repo keeps them there so GitHub ↔ Base44 sync picks them up for **Data**.
 
-- **`base44/entities/DailyCashLedger.jsonc`**
+- **`entities/DailyCashLedger.jsonc`**
 
-In the **Base44 web code editor**, add the same file under **`entities/`** (or pull from Git if that project is linked), then deploy:
+In the **Base44 web code editor**, mirror the same file under **`entities/`** (or pull from Git if that project is linked), then deploy:
 
 - **`entities push`** or **`deploy`** (per [Base44 entity docs](https://docs.base44.com/developers/backend/resources/entities/entity-schemas))
 
