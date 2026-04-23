@@ -235,14 +235,22 @@ function ProductList({ title, items = [], source = "mock" }) {
 const CALENDAR_MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const QUICK_RANGE_OPTIONS = ["Today", "Last week", "This year", "Last year"];
 
+function getDefaultDashboardCalendarMonth() {
+  const key = getMexicoNowDateKey();
+  const y = Number(key.slice(0, 4));
+  const m0 = Number(key.slice(5, 7)) - 1;
+  if (Number.isFinite(y) && m0 >= 0 && m0 <= 11) {
+    return { y, m: m0 };
+  }
+  const d = new Date();
+  return { y: d.getFullYear(), m: d.getMonth() };
+}
+
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [selectedDateRange, setSelectedDateRange] = React.useState(QUICK_RANGE_OPTIONS[0]);
-  const [calendarMonth, setCalendarMonth] = React.useState(/** @type {null | { y: number, m: number }} */ (null));
-  const [calendarBrowseYear, setCalendarBrowseYear] = React.useState(() => new Date().getFullYear());
-  const [selectedBranch, setSelectedBranch] = React.useState(filterOptions.branches[0]);
-  const [selectedChannel, setSelectedChannel] = React.useState(filterOptions.salesChannels[0]);
-  const [selectedPaymentSource, setSelectedPaymentSource] = React.useState(filterOptions.paymentSources[0]);
+  const [calendarMonth, setCalendarMonth] = React.useState(getDefaultDashboardCalendarMonth);
+  const [calendarBrowseYear, setCalendarBrowseYear] = React.useState(() => getDefaultDashboardCalendarMonth().y);
   const [selectedDedupeWindow, setSelectedDedupeWindow] = React.useState(DEDUPE_WINDOW_OPTIONS[2]);
   const [selectedDedupePriority, setSelectedDedupePriority] = React.useState(DEDUPE_PRIORITY_OPTIONS[0]);
   const [kpiDetailItem, setKpiDetailItem] = React.useState(null);
@@ -374,59 +382,121 @@ export default function Dashboard() {
   const clipPayments = clipOverview?.payments || [];
   const clipSettlements = clipOverview?.settlements || [];
 
-  /* ---------------- Money at a glance (today, Mexico-local) ----------------
-     These KPIs intentionally ignore the filter/date-range UI above so they always
-     represent "what's true right now". Sales use the same buildMergedCanonicalEvents
-     pipeline as the main Sales panel, just scoped to the current Mexico calendar day.
-  */
-  const todayMexicoKey = getMexicoNowDateKey();
+  /* ---------------- Money at a glance (same window as calendar / quick range above) ---------------- */
+  const glanceRangeStart = dashboardFilterWindow.start;
+  const glanceRangeEnd = dashboardFilterWindow.end;
+  const glanceRangeStartKey =
+    glanceRangeStart && glanceRangeEnd ? formatDateSafe(glanceRangeStart, "yyyy-MM-dd") : "";
+  const glanceRangeEndKey =
+    glanceRangeStart && glanceRangeEnd ? formatDateSafe(glanceRangeEnd, "yyyy-MM-dd") : "";
 
-  const todayCanonicalEvents = React.useMemo(() => {
-    const start = getStartOfToday();
-    const end = getEndOfToday();
-    const inTodayWindow = (record) => {
+  const dashboardAllSourcesSalesFilter = React.useMemo(
+    () => ({
+      paymentSource: filterOptions.paymentSources[0],
+      branch: filterOptions.branches[0],
+      channel: filterOptions.salesChannels[0],
+    }),
+    [],
+  );
+
+  const kpiCanonicalEvents = React.useMemo(() => {
+    if (!glanceRangeStart || !glanceRangeEnd) {
+      return [];
+    }
+    const inWindow = (record) => {
       const d = getRecordDate(record);
-      return d >= start && d <= end;
+      return d >= glanceRangeStart && d <= glanceRangeEnd;
     };
     const { canonicalEvents } = buildMergedCanonicalEvents({
-      receipts: receipts.filter(inTodayWindow),
-      clipPayments: clipPayments.filter(inTodayWindow),
+      receipts: receipts.filter(inWindow),
+      clipPayments: clipPayments.filter(inWindow),
       contributionTransactions: transactions
         .filter((t) => t?.type === "contribution")
-        .filter(inTodayWindow),
+        .filter(inWindow),
       stores: loyverseOverview?.stores || [],
       dedupeWindowMs,
       priorityMode: selectedDedupePriority,
+      paymentSource: dashboardAllSourcesSalesFilter.paymentSource,
+      branch: dashboardAllSourcesSalesFilter.branch,
+      channel: dashboardAllSourcesSalesFilter.channel,
     });
     return canonicalEvents;
-  }, [receipts, clipPayments, transactions, loyverseOverview, dedupeWindowMs, selectedDedupePriority]);
+  }, [
+    receipts,
+    clipPayments,
+    transactions,
+    loyverseOverview,
+    dedupeWindowMs,
+    selectedDedupePriority,
+    glanceRangeStart,
+    glanceRangeEnd,
+    dashboardAllSourcesSalesFilter,
+  ]);
 
-  const todaySales = sumEventAmounts(todayCanonicalEvents);
+  const kpiSalesTotal = React.useMemo(() => sumEventAmounts(kpiCanonicalEvents), [kpiCanonicalEvents]);
 
-  const todayExpensesTotal = expenses
-    .filter((e) => String(e?.date || "").slice(0, 10) === todayMexicoKey)
-    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const todayWithdrawalsTotal = transactions
-    .filter((t) => t?.type === "withdrawal" && String(t?.date || "").slice(0, 10) === todayMexicoKey)
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  const todayNet = todaySales - todayExpensesTotal - todayWithdrawalsTotal;
+  const kpiExpensesTotal = React.useMemo(() => {
+    if (!glanceRangeStartKey || !glanceRangeEndKey) return 0;
+    return expenses
+      .filter((e) => {
+        const dk = String(e?.date || "").slice(0, 10);
+        return dk >= glanceRangeStartKey && dk <= glanceRangeEndKey;
+      })
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  }, [expenses, glanceRangeStartKey, glanceRangeEndKey]);
 
-  /* "Cash in drawer" uses the most recent manual count we have locally. cashStoreTick is
-     read so the memo re-evaluates after the remote store hydrates. */
-  const cashInDrawerSnapshot = React.useMemo(() => {
-    const diffs = listOpeningCountDiffs();
+  const kpiWithdrawalsTotal = React.useMemo(() => {
+    if (!glanceRangeStartKey || !glanceRangeEndKey) return 0;
+    return transactions
+      .filter((t) => t?.type === "withdrawal")
+      .filter((t) => {
+        const dk = String(t?.date || "").slice(0, 10);
+        return dk >= glanceRangeStartKey && dk <= glanceRangeEndKey;
+      })
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  }, [transactions, glanceRangeStartKey, glanceRangeEndKey]);
+
+  const kpiNet = kpiSalesTotal - kpiExpensesTotal - kpiWithdrawalsTotal;
+
+  const glanceCashSnapshot = React.useMemo(() => {
+    if (!glanceRangeStartKey || !glanceRangeEndKey) {
+      return { amount: null, dateKey: null, countedAtIso: null, diff: null };
+    }
+    const diffs = listOpeningCountDiffs().filter(
+      (ev) => ev?.dateKey && ev.dateKey >= glanceRangeStartKey && ev.dateKey <= glanceRangeEndKey,
+    );
     const latest = diffs.length > 0 ? diffs[0] : null;
-    const latestDateKey = latest?.dateKey || todayMexicoKey;
-    const amount = Number(getOpeningBalance(latestDateKey));
-    const meta = getOpeningCountMeta(latestDateKey);
-    const countedAtIso = latest?.ts || meta?.updatedAt || null;
-    return {
-      amount: Number.isFinite(amount) ? amount : null,
-      dateKey: latestDateKey,
-      countedAtIso,
-      diff: latest?.diff ?? null,
-    };
-  }, [cashStoreTick, todayMexicoKey]);
+    if (latest) {
+      const n = Number(latest.enteredOpening);
+      return {
+        amount: Number.isFinite(n) ? n : null,
+        dateKey: latest.dateKey,
+        countedAtIso: latest.ts || null,
+        diff: latest.diff ?? null,
+      };
+    }
+    const endOpening = Number(getOpeningBalance(glanceRangeEndKey));
+    if (Number.isFinite(endOpening)) {
+      const meta = getOpeningCountMeta(glanceRangeEndKey);
+      return {
+        amount: endOpening,
+        dateKey: glanceRangeEndKey,
+        countedAtIso: meta?.updatedAt ?? null,
+        diff: null,
+      };
+    }
+    return { amount: null, dateKey: glanceRangeEndKey, countedAtIso: null, diff: null };
+  }, [cashStoreTick, glanceRangeStartKey, glanceRangeEndKey]);
+
+  const glanceCashAgeLabel = React.useMemo(() => {
+    const iso = glanceCashSnapshot.countedAtIso;
+    if (!iso) return "No count logged in this period";
+    try {
+      return `Counted ${formatDistanceToNowStrict(new Date(iso), { addSuffix: true, locale: enUS })}`;
+    } catch {
+      return "Counted in period";
+    }
+  }, [glanceCashSnapshot.countedAtIso]);
 
   /* Cash variance over the last 30 Mexico-calendar days. One bar per day; only days where a
      manual count was actually performed produce a bar (zero-days are omitted — otherwise the chart
@@ -455,16 +525,6 @@ export default function Dashboard() {
     null,
   );
 
-  const cashInDrawerAgeLabel = React.useMemo(() => {
-    const iso = cashInDrawerSnapshot.countedAtIso;
-    if (!iso) return "Never counted";
-    try {
-      return `Counted ${formatDistanceToNowStrict(new Date(iso), { addSuffix: true, locale: enUS })}`;
-    } catch {
-      return "Counted recently";
-    }
-  }, [cashInDrawerSnapshot.countedAtIso]);
-  /* ------------------------------------------------------------------------ */
   const clipPaymentsPayload = clipOverview?.raw?.paymentsPayload || null;
   const clipSettlementsPayload = clipOverview?.raw?.settlementsPayload || null;
   const filteredOrders = filterByDashboardWindow(orders, dashboardFilterWindow);
@@ -604,9 +664,9 @@ export default function Dashboard() {
     stores: loyverseOverview?.stores || [],
     dedupeWindowMs,
     priorityMode: selectedDedupePriority,
-    paymentSource: selectedPaymentSource,
-    branch: selectedBranch,
-    channel: selectedChannel,
+    paymentSource: dashboardAllSourcesSalesFilter.paymentSource,
+    branch: dashboardAllSourcesSalesFilter.branch,
+    channel: dashboardAllSourcesSalesFilter.channel,
   });
   /* Top 10 best-selling dishes in the selected filter window. Uses Loyverse receipt line items
      only because line-level data isn't available for Clip/manual yet. */
@@ -691,13 +751,13 @@ export default function Dashboard() {
   })();
   const filteredDuplicateRowsRaw = mergedSaleDuplicates.filter(({ duplicate, canonical }) =>
     (
-      matchesPaymentSourceFilter(duplicate, selectedPaymentSource)
-      && matchesBranchFilter(duplicate, selectedBranch)
-      && matchesSalesChannelFilter(duplicate, selectedChannel)
+      matchesPaymentSourceFilter(duplicate, dashboardAllSourcesSalesFilter.paymentSource)
+      && matchesBranchFilter(duplicate, dashboardAllSourcesSalesFilter.branch)
+      && matchesSalesChannelFilter(duplicate, dashboardAllSourcesSalesFilter.channel)
     ) || (
-      matchesPaymentSourceFilter(canonical, selectedPaymentSource)
-      && matchesBranchFilter(canonical, selectedBranch)
-      && matchesSalesChannelFilter(canonical, selectedChannel)
+      matchesPaymentSourceFilter(canonical, dashboardAllSourcesSalesFilter.paymentSource)
+      && matchesBranchFilter(canonical, dashboardAllSourcesSalesFilter.branch)
+      && matchesSalesChannelFilter(canonical, dashboardAllSourcesSalesFilter.channel)
     ),
   );
   const filteredDeduplicationRows = filteredDuplicateRowsRaw.slice(0, 20).map(({ duplicate, canonical, matchedWithinMinutes }, index) => ({
@@ -752,7 +812,9 @@ export default function Dashboard() {
     .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
 
   const ordersCount = salesTransactionCount;
-  const clipFilterActive = selectedPaymentSource === "All sources" || selectedPaymentSource === "Clip";
+  const clipFilterActive =
+    dashboardAllSourcesSalesFilter.paymentSource === "All sources" ||
+    dashboardAllSourcesSalesFilter.paymentSource === "Clip";
   const costPerOrder = ordersCount ? totalExpenses / ordersCount : 0;
   const comparisonCards = [
     {
@@ -1032,7 +1094,7 @@ export default function Dashboard() {
           ? "order_records"
           : "mock";
 
-  const kpiFilterSummary = `${displayPeriodLabel} · ${selectedBranch} · ${selectedChannel} · ${selectedPaymentSource} · Dedupe ${selectedDedupeWindow} / ${selectedDedupePriority}`;
+  const kpiFilterSummary = `${displayPeriodLabel} · all branches & channels · Dedupe ${selectedDedupeWindow} / ${selectedDedupePriority}`;
 
   const canonicalSourceStats = React.useMemo(() => {
     const count = { loyverse: 0, clip: 0, manual: 0 };
@@ -1117,7 +1179,7 @@ export default function Dashboard() {
       value: formatCurrency(netSales),
       delta: primaryComparisonCard.deltaLabel,
       trend: primaryComparisonCard.trend,
-      comparisonLabel: `Combined for ${selectedRangeLabelLower} and ${selectedPaymentSource.toLowerCase()}: Loyverse receipts + unmatched Clip payments + unmatched manual entries.${filteredDeduplicatedSalesCount ? ` ${filteredDeduplicatedSalesCount} duplicate matches removed.` : ""}`,
+      comparisonLabel: `Combined for ${selectedRangeLabelLower} (all payment sources): Loyverse receipts + unmatched Clip payments + unmatched manual entries.${filteredDeduplicatedSalesCount ? ` ${filteredDeduplicatedSalesCount} duplicate matches removed.` : ""}`,
       sparkTone: "positive",
       sparkline: revenue7Days.map((item) => Math.max(item.revenue, 0)),
       href: dashboardFocusHref("net-sales"),
@@ -1344,8 +1406,8 @@ export default function Dashboard() {
     });
 
   const paymentSummary = [
-    { label: `Total Received (${displayPeriodLabel})`, value: formatCurrency(filteredSalesTotal), subtext: `Deduplicated received amount filtered to ${selectedPaymentSource.toLowerCase()} for ${selectedRangeLabelLower}`, dataSource: salesPipelineDataSource },
-    { label: `Net Sales Inflow (${displayPeriodLabel})`, value: formatCurrency(netSales), subtext: filteredDeduplicatedSalesCount ? `Duplicate same-amount same-time sales removed across Loyverse, Clip, and manual entries (${filteredDeduplicatedSalesCount} matches for current payment-source filter).` : `Filtered to ${selectedPaymentSource.toLowerCase()} across Loyverse, Clip, and manual contributions for the selected period`, dataSource: salesPipelineDataSource },
+    { label: `Total Received (${displayPeriodLabel})`, value: formatCurrency(filteredSalesTotal), subtext: `Deduplicated received amount for ${selectedRangeLabelLower} (all payment sources).`, dataSource: salesPipelineDataSource },
+    { label: `Net Sales Inflow (${displayPeriodLabel})`, value: formatCurrency(netSales), subtext: filteredDeduplicatedSalesCount ? `Duplicate same-amount same-time sales removed across Loyverse, Clip, and manual entries (${filteredDeduplicatedSalesCount} matches).` : `All payment sources across Loyverse, Clip, and manual contributions for the selected period`, dataSource: salesPipelineDataSource },
     { label: `Pending Settlements (${displayPeriodLabel})`, value: clipFilterActive ? formatCurrency(pendingSettlements) : "—", subtext: clipOverview ? (clipFilterActive ? "Clip payments older than 24h compared against filtered net deposits" : "Only applicable for All sources or Clip view") : "Needs Clip to calculate", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
     { label: `Settled Amounts (${displayPeriodLabel})`, value: formatCurrency(depositTotal), subtext: clipOverview ? "Live from filtered Clip settlements" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
     { label: `Refunds (${displayPeriodLabel})`, value: formatCurrency(filteredRefundVolume), subtext: clipOverview ? "Live from filtered Clip refunds" : "Waiting for Clip", dataSource: hasClipApiConfig(appSettings) ? "clip" : "mock" },
@@ -1653,7 +1715,7 @@ export default function Dashboard() {
                   <span className="text-sm text-gray-300">Needs replacement / mapping</span>
                 </div>
                 <p className="mt-3 text-xs text-gray-500">
-                  Date, payment source, branch, and sales channel now affect the combined sales and reconciliation views on this page. Revolut is not integrated yet in this repo, so bank views still come from local finance records instead of the Revolut API.
+                  Combined sales and reconciliation use all payment sources, branches, and channels for the selected period. Revolut is not integrated yet in this repo, so bank views still come from local finance records instead of the Revolut API.
                 </p>
                 {leanOpsMode ? (
                   <p className="mt-2 text-xs text-yellow-300">
@@ -1664,11 +1726,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mx-auto mt-5 grid max-w-[1500px] gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SelectField label="Branch" options={filterOptions.branches} value={selectedBranch} onChange={setSelectedBranch} />
-            <SelectField label="Sales channel" options={filterOptions.salesChannels} value={selectedChannel} onChange={setSelectedChannel} />
-            <SelectField label="Payment source" options={filterOptions.paymentSources} value={selectedPaymentSource} onChange={setSelectedPaymentSource} />
-          </div>
         </div>
       </div>
 
@@ -1676,10 +1733,10 @@ export default function Dashboard() {
         <section id="money-at-a-glance" className="mb-8">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Right now</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Selected period</p>
               <h2 className="mt-1 text-2xl font-bold text-yellow-400">Money at a glance</h2>
               <p className="mt-1 text-xs text-gray-500">
-                Ignores the filters above — always shows today in Mexico and the most recent cash count.
+                Matches the calendar month or quick range above ({displayPeriodLabel}). Cash uses the latest count in that window, or the saved opening on the last day of the range.
               </p>
             </div>
             <Button asChild variant="outline" className="hidden sm:inline-flex border-yellow-500/25 bg-[#242424] text-gray-200 hover:bg-[#2b2b2b]">
@@ -1711,17 +1768,18 @@ export default function Dashboard() {
                 </p>
                 <SourceBadge source="manual" />
               </div>
+              <p className="mt-1 text-[11px] font-medium text-yellow-500/70">{displayPeriodLabel}</p>
               <p className="mt-3 text-3xl font-bold tabular-nums text-yellow-300 sm:text-4xl">
-                {cashInDrawerSnapshot.amount !== null ? formatCurrency(cashInDrawerSnapshot.amount) : "—"}
+                {glanceCashSnapshot.amount !== null ? formatCurrency(glanceCashSnapshot.amount) : "—"}
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
-                <span>{cashInDrawerAgeLabel}</span>
-                {cashInDrawerSnapshot.diff !== null && cashInDrawerSnapshot.diff !== 0 && (
+                <span>{glanceCashAgeLabel}</span>
+                {glanceCashSnapshot.diff !== null && glanceCashSnapshot.diff !== 0 && (
                   <span
-                    className={`tabular-nums ${cashInDrawerSnapshot.diff > 0 ? "text-yellow-200" : "text-red-300"}`}
+                    className={`tabular-nums ${glanceCashSnapshot.diff > 0 ? "text-yellow-200" : "text-red-300"}`}
                   >
-                    Last diff {cashInDrawerSnapshot.diff > 0 ? "+" : ""}
-                    {formatCurrency(cashInDrawerSnapshot.diff)}
+                    Last diff {glanceCashSnapshot.diff > 0 ? "+" : ""}
+                    {formatCurrency(glanceCashSnapshot.diff)}
                   </span>
                 )}
               </div>
@@ -1730,32 +1788,35 @@ export default function Dashboard() {
             <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
-                  Sales today
+                  Sales
                 </p>
                 <SourceBadge source={salesPipelineDataSource} />
               </div>
+              <p className="mt-1 text-[11px] font-medium text-yellow-500/70">{displayPeriodLabel}</p>
               <p className="mt-3 text-3xl font-bold tabular-nums text-yellow-300 sm:text-4xl">
-                {formatCurrency(todaySales)}
+                {formatCurrency(kpiSalesTotal)}
               </p>
               <p className="mt-3 text-xs text-gray-400">
-                {formatNumber(todayCanonicalEvents.length)} {todayCanonicalEvents.length === 1 ? "sale" : "sales"} recorded so far
+                {formatNumber(kpiCanonicalEvents.length)}{" "}
+                {kpiCanonicalEvents.length === 1 ? "sale" : "sales"} in this period (Clip + Loyverse + manual inflows)
               </p>
             </div>
 
             <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
-                  Net today
+                  Net
                 </p>
                 <SourceBadge source="finance_ledger" />
               </div>
+              <p className="mt-1 text-[11px] font-medium text-yellow-500/70">{displayPeriodLabel}</p>
               <p
-                className={`mt-3 text-3xl font-bold tabular-nums sm:text-4xl ${todayNet < 0 ? "text-red-300" : "text-yellow-300"}`}
+                className={`mt-3 text-3xl font-bold tabular-nums sm:text-4xl ${kpiNet < 0 ? "text-red-300" : "text-yellow-300"}`}
               >
-                {formatCurrency(todayNet)}
+                {formatCurrency(kpiNet)}
               </p>
               <p className="mt-3 text-xs text-gray-400">
-                Sales − expenses ({formatCurrency(todayExpensesTotal)}) − withdrawals ({formatCurrency(todayWithdrawalsTotal)})
+                Sales − expenses ({formatCurrency(kpiExpensesTotal)}) − withdrawals ({formatCurrency(kpiWithdrawalsTotal)})
               </p>
             </div>
           </div>
