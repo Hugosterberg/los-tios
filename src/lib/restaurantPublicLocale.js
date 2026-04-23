@@ -62,7 +62,6 @@ export function getPublicRestaurantCopy(locale) {
     ctaDirections: "Cómo llegar y horario",
     heroFootnote:
       "Envío, recoger o comer aquí. Av. Oaxaca 305, Plaza Monte Albán, Puerto Escondido, Oax.",
-    addToCart: "Agregar al carrito",
     vegetarian: "Vegetariana",
     aboutTitle: "Cuatro tíos, un horno, sin atajos",
     aboutSubtitle: "Los Tíos, Puerto Escondido",
@@ -94,7 +93,7 @@ export function getPublicRestaurantCopy(locale) {
     mapLarger: "Abrir mapa grande y ruta en Google Maps →",
     fullMenuSectionTitle: "Menú",
     fullMenuSectionSubtitle:
-      "Toca un platillo para agregar. Puedes elegir envío, recoger o comer en el local.",
+      "Explora el menú. Pedidos por WhatsApp o en el local.",
     langToggle: "Idioma del sitio",
     langEs: "Español (México)",
     langEn: "English",
@@ -136,7 +135,6 @@ export function getPublicRestaurantCopy(locale) {
     ctaDirections: "Directions & hours",
     heroFootnote:
       "Delivery, pickup, or dine-in. Av. Oaxaca 305, Plaza Monte Albán, Puerto Escondido, Oax.",
-    addToCart: "Add to cart",
     vegetarian: "Vegetarian",
     aboutTitle: "Four uncles, one oven, zero shortcuts",
     aboutSubtitle: "Los Tíos, Puerto Escondido",
@@ -167,7 +165,7 @@ export function getPublicRestaurantCopy(locale) {
     mapSectionLabel: "Map",
     mapLarger: "Open full map & directions in Google Maps →",
     fullMenuSectionTitle: "Menu",
-    fullMenuSectionSubtitle: "Tap items to add. Checkout supports delivery, pickup, and dine-in.",
+    fullMenuSectionSubtitle: "Browse the menu. Order via WhatsApp or at the restaurant.",
     langToggle: "Site language",
     langEs: "Spanish (Mexico)",
     langEn: "English",
