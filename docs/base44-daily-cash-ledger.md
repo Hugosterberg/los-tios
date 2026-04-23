@@ -1,6 +1,22 @@
 # Daily Cash — `DailyCashLedger` entity (Base44)
 
-## What you do in Base44 (only this)
+## What you do (repo + Base44)
+
+### A. Entity file in this Git repo (recommended)
+
+The schema lives next to your other models:
+
+- **`base44/entities/DailyCashLedger.jsonc`**
+
+In the **Base44 web code editor**, add the same file under **`entities/`** (or pull from Git if that project is linked), then deploy:
+
+- **`entities push`** or **`deploy`** (per [Base44 entity docs](https://docs.base44.com/developers/backend/resources/entities/entity-schemas))
+
+After deploy, **`DailyCashLedger`** appears under **Data** in the dashboard like `Order` / `AppSettings`.
+
+### B. Or create only in the Base44 UI
+
+If you prefer not to use the file from Git:
 
 1. Create an entity named **`DailyCashLedger`**.
 2. Add one string/long-text field: **`ledger_payload_json`** (required).
