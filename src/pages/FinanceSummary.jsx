@@ -203,11 +203,11 @@ export default function FinanceSummary() {
         )}
 
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 bg-[#242424] border border-yellow-500/20">
-            <TabsTrigger value="all" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">All</TabsTrigger>
-            <TabsTrigger value="loyverse" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Loyverse</TabsTrigger>
-            <TabsTrigger value="clip" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Clip</TabsTrigger>
-            <TabsTrigger value="manual" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Manual</TabsTrigger>
+          <TabsList className="flex w-full gap-1 overflow-x-auto border border-yellow-500/20 bg-[#242424] p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="all" className="min-w-[5.5rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">All</TabsTrigger>
+            <TabsTrigger value="loyverse" className="min-w-[6.5rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Loyverse</TabsTrigger>
+            <TabsTrigger value="clip" className="min-w-[5.5rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Clip</TabsTrigger>
+            <TabsTrigger value="manual" className="min-w-[6rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Manual</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4">

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { BellRing, CheckCircle2, Clock3, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getDashboardSourceMeta } from "@/components/dashboard/sourceMeta";
 
 const severityStyles = {
   critical: "border-red-400/30 bg-red-400/10 text-red-300",
@@ -29,41 +30,7 @@ export default function AlertFeed({ alerts }) {
     <div className="space-y-3">
       {alerts.map((alert) => {
         const StatusIcon = statusIcons[alert.status] || ShieldAlert;
-        const sourceMeta = {
-          clip: {
-            label: "Clip",
-            tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
-          },
-          loyverse: {
-            label: "Loyverse",
-            tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
-          },
-          both: {
-            label: "Clip + Loyverse",
-            tone: "border-amber-400/30 bg-amber-400/10 text-amber-100",
-          },
-          order_records: {
-            label: "Order module",
-            tone: "border-yellow-300/25 bg-yellow-300/8 text-yellow-300",
-          },
-          finance_ledger: {
-            label: "Finance ledger",
-            tone: "border-yellow-600/30 bg-yellow-600/10 text-yellow-100",
-          },
-          manual: {
-            label: "Manual",
-            tone: "border-yellow-500/20 bg-yellow-500/8 text-yellow-200",
-          },
-          mock: {
-            label: "Hardcoded",
-            tone: "border-yellow-400/20 bg-yellow-400/10 text-yellow-200",
-          },
-          live: {
-            label: "Live data",
-            tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
-          },
-        };
-        const source = sourceMeta[alert.dataSource] || sourceMeta.mock;
+        const source = getDashboardSourceMeta(alert.dataSource);
 
         return (
           <Link

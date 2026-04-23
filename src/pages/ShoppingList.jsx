@@ -934,6 +934,52 @@ export default function ShoppingList() {
           ))}
         </div>
 
+        <div className="grid grid-cols-3 gap-2 sm:hidden">
+          <Button
+            type="button"
+            variant={mainTab === "list" ? "default" : "outline"}
+            onClick={() => {
+              setMainTab("list");
+              setShowForm(false);
+            }}
+            className={cn(
+              "h-10 px-3 text-xs",
+              mainTab === "list"
+                ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                : "border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10",
+            )}
+          >
+            List ({pendingItems.length})
+          </Button>
+          <Button
+            type="button"
+            variant={mainTab === "purchase" ? "default" : "outline"}
+            onClick={() => {
+              setMainTab("purchase");
+              setShowForm(false);
+            }}
+            className={cn(
+              "h-10 px-3 text-xs",
+              mainTab === "purchase"
+                ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                : "border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10",
+            )}
+          >
+            Purchase
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setMainTab("list");
+              setShowForm(true);
+            }}
+            className="h-10 gap-1 bg-yellow-400 text-black hover:bg-yellow-300"
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </Button>
+        </div>
+
         {mainTab === "list" && (
           <>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1226,7 +1272,110 @@ export default function ShoppingList() {
               <p className="mt-4 text-gray-400">Loading list…</p>
             </div>
           ) : pendingListRows.length > 0 ? (
-            <div className="overflow-x-auto rounded-lg border border-yellow-500/25 bg-[#1a1a1a] shadow-inner">
+            <>
+            <div className="space-y-3 sm:hidden">
+              {pendingListRows.map((item) => {
+                const cat = categories.find((c) => c.id === item.category);
+                return (
+                  <Card key={item.id} className="border border-yellow-500/20 bg-[#242424] text-gray-200 shadow-none">
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold leading-snug text-yellow-100">{item.item_name}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+                            {cat ? (
+                              <span className={cn("rounded px-1.5 py-0.5", cat.color)}>
+                                {cat.icon} {cat.name}
+                              </span>
+                            ) : null}
+                            <span>
+                              {Number(item.quantity || 1)} {item.unit || "units"}
+                            </span>
+                            <span>Due {formatShoppingDueDate(item.due_date) ?? "—"}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10"
+                            onClick={() => handleEdit(item)}
+                            aria-label="Edit row"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 border-yellow-500/30 text-red-400 hover:bg-red-950/40 hover:text-red-300"
+                            onClick={() => handleDelete(item.id)}
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-medium text-gray-400">Amount paid / estimate (MXN)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label={`Amount for ${item.item_name}`}
+                          value={amountDraftById[item.id] ?? ""}
+                          onChange={(e) =>
+                            setAmountDraftById((prev) => ({ ...prev, [item.id]: e.target.value }))
+                          }
+                          onBlur={() => commitPendingRowEstimatedCost(item)}
+                          placeholder="0"
+                          className={cn(
+                            "h-10 border-yellow-500/25 bg-[#141414] px-3 text-base text-white tabular-nums",
+                            "[appearance:textfield] [-moz-appearance:textfield]",
+                            "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={updateItem.isPending || createExpense.isPending}
+                          onClick={() => finalizePurchaseFromList(item, "company_cash")}
+                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                        >
+                          <Banknote className="h-4 w-4" />
+                          Cash
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={updateItem.isPending || createExpense.isPending}
+                          onClick={() => finalizePurchaseFromList(item, "company_account")}
+                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                        >
+                          <Landmark className="h-4 w-4" />
+                          Card
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={updateItem.isPending || createExpense.isPending}
+                          onClick={() => finalizePurchaseFromList(item, "individual")}
+                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                        >
+                          <User className="h-4 w-4" />
+                          Person
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto rounded-lg border border-yellow-500/25 bg-[#1a1a1a] shadow-inner sm:block">
               <table className="w-full min-w-[44rem] border-collapse text-sm">
                 <caption className="sr-only">Shopping list, pending items</caption>
                 <thead>
@@ -1382,6 +1531,7 @@ export default function ShoppingList() {
                 </tbody>
               </table>
             </div>
+            </>
           ) : (
             <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
               <CardContent className="py-16 text-center">

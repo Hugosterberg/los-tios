@@ -18,6 +18,15 @@ import IntegrationsHub from './pages/IntegrationsHub';
 import { Button } from "@/components/ui/button";
 
 const { Pages, Layout } = pagesConfig;
+const DashboardPage = Pages["Dashboard"];
+
+const CenteredStatusCard = ({ children, maxWidth = "max-w-lg" }) => (
+  <div className="min-h-screen bg-[#111111] p-6 text-white flex items-center justify-center">
+    <div className={`w-full ${maxWidth} rounded-2xl border bg-[#1b1b1b] p-6`}>
+      {children}
+    </div>
+  </div>
+);
 
 class AdminErrorBoundary extends React.Component {
   constructor(props) {
@@ -35,17 +44,19 @@ class AdminErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#111111] text-white flex items-center justify-center p-6">
-          <div className="max-w-2xl w-full rounded-2xl border border-red-500/30 bg-[#1b1b1b] p-6">
-            <h1 className="text-xl font-semibold text-red-300">Admin page crashed</h1>
-            <p className="mt-2 text-sm text-gray-300">
-              A runtime error occurred while rendering this admin page.
-            </p>
-            <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-red-200">
-              {this.state.errorMessage}
-            </pre>
+        <CenteredStatusCard maxWidth="max-w-2xl">
+          <div className="rounded-2xl border border-red-500/30 p-0">
+            <div className="p-6">
+              <h1 className="text-xl font-semibold text-red-300">Admin page crashed</h1>
+              <p className="mt-2 text-sm text-gray-300">
+                A runtime error occurred while rendering this admin page.
+              </p>
+              <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-red-200">
+                {this.state.errorMessage}
+              </pre>
+            </div>
           </div>
-        </div>
+        </CenteredStatusCard>
       );
     }
 
@@ -53,14 +64,23 @@ class AdminErrorBoundary extends React.Component {
   }
 }
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const LayoutWrapper = ({ children }) => (Layout ? <Layout>{children}</Layout> : children);
+
+const renderAdminPage = (page) => (
+  <AdminErrorBoundary>
+    <LayoutWrapper>{page}</LayoutWrapper>
+  </AdminErrorBoundary>
+);
+
+const FullScreenSpinner = () => (
+  <div className="fixed inset-0 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+  </div>
+);
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
-  const location = window.location;
-  const isCustomerPage = location.pathname === '/';
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const isCustomerPage = window.location.pathname === '/';
 
   // Always render customer page without auth
   if (isCustomerPage) {
@@ -74,11 +94,7 @@ const AuthenticatedApp = () => {
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <FullScreenSpinner />;
   }
 
   // Handle authentication errors
@@ -90,73 +106,44 @@ const AuthenticatedApp = () => {
     } else if (authError.type === 'auth_required') {
       if (import.meta.env.DEV) {
         return (
-          <div className="min-h-screen bg-[#111111] text-white flex items-center justify-center p-6">
-            <div className="max-w-lg w-full rounded-2xl border border-yellow-500/20 bg-[#1b1b1b] p-6">
-              <h1 className="text-xl font-semibold text-yellow-300">Authentication required</h1>
-              <p className="mt-2 text-sm text-gray-300">
-                The app could not authenticate for `/admin`. In local development, this usually means missing or stale auth parameters.
-              </p>
-              <div className="mt-4">
-                <Button onClick={() => navigateToLogin()} className="bg-yellow-400 text-black hover:bg-yellow-300">
-                  Go to login
-                </Button>
+          <CenteredStatusCard>
+            <div className="rounded-2xl border border-yellow-500/20 p-0">
+              <div className="p-6">
+                <h1 className="text-xl font-semibold text-yellow-300">Authentication required</h1>
+                <p className="mt-2 text-sm text-gray-300">
+                  The app could not authenticate for `/admin`. In local development, this usually means missing or stale auth parameters.
+                </p>
+                <div className="mt-4">
+                  <Button onClick={() => navigateToLogin()} className="bg-yellow-400 text-black hover:bg-yellow-300">
+                    Go to login
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </CenteredStatusCard>
         );
       }
 
       navigateToLogin();
-      return (
-        <div className="fixed inset-0 flex items-center justify-center">
-          <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-        </div>
-      );
+      return <FullScreenSpinner />;
     }
   }
 
   // Render admin pages
   return (
     <Routes>
-      {/* Customer-facing page - no admin layout */}
-      <Route path="/" element={<CustomerOrder />} />
-
       {/* Admin pages - with layout */}
-      <Route path="/admin" element={
-        <AdminErrorBoundary>
-          <LayoutWrapper currentPageName="Dashboard">
-            {Pages["Dashboard"] ? React.createElement(Pages["Dashboard"]) : <></>}
-          </LayoutWrapper>
-        </AdminErrorBoundary>
-      } />
+      <Route path="/admin" element={renderAdminPage(DashboardPage ? <DashboardPage /> : null)} />
       <Route path="/CustomerOrder" element={<CustomerOrder />} />
-      <Route path="/Notion" element={
-        <LayoutWrapper currentPageName="Notion">
-          <NotionPage />
-        </LayoutWrapper>
-      } />
-      <Route path="/IncomeTracker" element={
-        <LayoutWrapper currentPageName="IncomeTracker">
-          <IncomeTracker />
-        </LayoutWrapper>
-      } />
-      <Route path="/IntegrationsHub" element={
-        <LayoutWrapper currentPageName="IntegrationsHub">
-          <IntegrationsHub />
-        </LayoutWrapper>
-      } />
+      <Route path="/Notion" element={renderAdminPage(<NotionPage />)} />
+      <Route path="/IncomeTracker" element={renderAdminPage(<IncomeTracker />)} />
+      <Route path="/IntegrationsHub" element={renderAdminPage(<IntegrationsHub />)} />
       {Object.entries(Pages).map(([path, Page]) => (
         path !== "CustomerOrder" && (
           <Route
             key={path}
             path={`/${path}`}
-            element={
-              <AdminErrorBoundary>
-                <LayoutWrapper currentPageName={path}>
-                  <Page />
-                </LayoutWrapper>
-              </AdminErrorBoundary>
-            }
+            element={renderAdminPage(<Page />)}
           />
         )
       ))}

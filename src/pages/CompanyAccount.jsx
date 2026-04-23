@@ -24,6 +24,45 @@ import { listOrders } from "@/lib/local-dev-orders";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getClipOverview, hasClipApiConfig } from "@/api/clip";
 
+const createTransactionForm = (date = getMexicoNowDateKey()) => ({
+  type: "contribution",
+  contributor_name: "",
+  amount: 0,
+  date,
+  payment_method: "cash",
+  description: "",
+  notes: "",
+  reference_number: "",
+});
+
+const createContributorForm = () => ({
+  name: "",
+  email: "",
+  phone: "",
+  role: "partner",
+  is_active: true,
+  notes: "",
+});
+
+const createExpenseForm = (date = getMexicoNowDateKey()) => ({
+  name: "",
+  category: "ingredients",
+  amount: 0,
+  quantity: 1,
+  unit: "units",
+  is_recurring: false,
+  recurring_frequency: "monthly",
+  date,
+  notes: "",
+  supplier: "",
+  payment_source: "company_cash",
+  paid_by_company: false,
+  from_shopping_list: false,
+  contributors: [],
+});
+
+const createContributorInput = () => ({ name: "", amount: 0 });
+
 export default function CompanyAccount() {
   const [selectedDate, setSelectedDate] = useState(getMexicoNowDateKey());
   const [showTransactionForm, setShowTransactionForm] = useState(false);
@@ -32,47 +71,15 @@ export default function CompanyAccount() {
   const [editingContributor, setEditingContributor] = useState(null);
   const queryClient = useQueryClient();
 
-  const [transactionForm, setTransactionForm] = useState({
-    type: "contribution",
-    contributor_name: "",
-    amount: 0,
-    date: getMexicoNowDateKey(),
-    payment_method: "cash",
-    description: "",
-    notes: "",
-    reference_number: "",
-  });
-
-  const [contributorForm, setContributorForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    role: "partner",
-    is_active: true,
-    notes: "",
-  });
+  const [transactionForm, setTransactionForm] = useState(() => createTransactionForm());
+  const [contributorForm, setContributorForm] = useState(createContributorForm);
 
   // Expense form state
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState("all");
-  const [expenseForm, setExpenseForm] = useState({
-    name: "",
-    category: "ingredients",
-    amount: 0,
-    quantity: 1,
-    unit: "units",
-    is_recurring: false,
-    recurring_frequency: "monthly",
-    date: getMexicoNowDateKey(),
-    notes: "",
-    supplier: "",
-    payment_source: "company_cash",
-    paid_by_company: false,
-    from_shopping_list: false,
-    contributors: [],
-  });
-  const [contributorInput, setContributorInput] = useState({ name: "", amount: 0 });
+  const [expenseForm, setExpenseForm] = useState(() => createExpenseForm());
+  const [contributorInput, setContributorInput] = useState(createContributorInput);
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['companyTransactions'],
@@ -314,7 +321,7 @@ export default function CompanyAccount() {
       kind: 'Expense',
       title: expense.name || 'Expense',
       subtitle: expense.from_shopping_list
-        ? `Shopping list · ${expense.category || 'ingredients'}`
+        ? `Shopping list - ${expense.category || 'ingredients'}`
         : expense.category || 'Expense',
       amount: expense.amount || 0,
       date: expense.date,
@@ -377,29 +384,13 @@ export default function CompanyAccount() {
   };
 
   const resetTransactionForm = () => {
-    setTransactionForm({
-      type: "contribution",
-      contributor_name: "",
-      amount: 0,
-      date: getMexicoNowDateKey(),
-      payment_method: "cash",
-      description: "",
-      notes: "",
-      reference_number: "",
-    });
+    setTransactionForm(createTransactionForm());
     setEditingTransaction(null);
     setShowTransactionForm(false);
   };
 
   const resetContributorForm = () => {
-    setContributorForm({
-      name: "",
-      email: "",
-      phone: "",
-      role: "partner",
-      is_active: true,
-      notes: "",
-    });
+    setContributorForm(createContributorForm());
     setEditingContributor(null);
     setShowContributorForm(false);
   };
@@ -472,7 +463,7 @@ export default function CompanyAccount() {
         ...expenseForm,
         contributors: [...(expenseForm.contributors || []), { ...contributorInput }]
       });
-      setContributorInput({ name: "", amount: 0 });
+      setContributorInput(createContributorInput());
     }
   };
 
@@ -484,23 +475,8 @@ export default function CompanyAccount() {
   };
 
   const resetExpenseForm = () => {
-    setExpenseForm({
-      name: "",
-      category: "ingredients",
-      amount: 0,
-      quantity: 1,
-      unit: "units",
-      is_recurring: false,
-      recurring_frequency: "monthly",
-      date: getMexicoNowDateKey(),
-      notes: "",
-      supplier: "",
-      payment_source: "company_cash",
-      paid_by_company: false,
-      from_shopping_list: false,
-      contributors: [],
-    });
-    setContributorInput({ name: "", amount: 0 });
+    setExpenseForm(createExpenseForm());
+    setContributorInput(createContributorInput());
     setEditingExpense(null);
     setShowExpenseForm(false);
   };
@@ -617,11 +593,11 @@ export default function CompanyAccount() {
 
         {/* Tabs */}
         <Tabs defaultValue="expenses" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 bg-[#242424] border border-yellow-500/20">
-            <TabsTrigger value="daily-income" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Daily Income</TabsTrigger>
-            <TabsTrigger value="expenses" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Expenses</TabsTrigger>
-            <TabsTrigger value="transactions" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Transactions</TabsTrigger>
-            <TabsTrigger value="contributors" className="text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Contributors</TabsTrigger>
+          <TabsList className="flex w-full gap-1 overflow-x-auto border border-yellow-500/20 bg-[#242424] p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="daily-income" className="min-w-[7rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Daily Income</TabsTrigger>
+            <TabsTrigger value="expenses" className="min-w-[6rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Expenses</TabsTrigger>
+            <TabsTrigger value="transactions" className="min-w-[7rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Transactions</TabsTrigger>
+            <TabsTrigger value="contributors" className="min-w-[7rem] text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black text-gray-400">Contributors</TabsTrigger>
           </TabsList>
 
           {/* Daily Income Tab */}

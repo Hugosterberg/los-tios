@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getDashboardSourceMeta } from "@/components/dashboard/sourceMeta";
 
 function Sparkline({ values = [], tone = "neutral" }) {
   if (!values.length) {
@@ -46,41 +47,7 @@ export default function KpiCard({ item, onOpenBreakdown }) {
   const TrendIcon = trendIcon;
   const href = item.href || "#";
   const interactiveBreakdown = Boolean(item.breakdown && onOpenBreakdown);
-  const sourceMeta = {
-    clip: {
-      label: "Clip",
-      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
-    },
-    loyverse: {
-      label: "Loyverse",
-      tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
-    },
-    both: {
-      label: "Clip + Loyverse",
-      tone: "border-amber-400/30 bg-amber-400/10 text-amber-100",
-    },
-    order_records: {
-      label: "Order module",
-      tone: "border-yellow-300/25 bg-yellow-300/8 text-yellow-300",
-    },
-    finance_ledger: {
-      label: "Finance ledger",
-      tone: "border-yellow-600/30 bg-yellow-600/10 text-yellow-100",
-    },
-    manual: {
-      label: "Manual",
-      tone: "border-yellow-500/20 bg-yellow-500/8 text-yellow-200",
-    },
-    mock: {
-      label: "Hardcoded",
-      tone: "border-yellow-400/20 bg-yellow-400/10 text-yellow-200",
-    },
-    live: {
-      label: "Live data",
-      tone: "border-yellow-400/25 bg-yellow-400/10 text-yellow-100",
-    },
-  };
-  const source = sourceMeta[item.dataSource] || sourceMeta.mock;
+  const source = getDashboardSourceMeta(item.dataSource);
 
   const cardBody = (
     <>
@@ -137,7 +104,7 @@ export default function KpiCard({ item, onOpenBreakdown }) {
             className="inline-flex items-center gap-1 text-[11px] text-yellow-500/80 transition-colors hover:text-yellow-300"
             onClick={(e) => e.stopPropagation()}
           >
-            Open in Management insight
+            Open related section
             <ArrowRight className="h-3 w-3" />
           </Link>
         </div>

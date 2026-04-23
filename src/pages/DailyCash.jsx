@@ -2049,12 +2049,13 @@ export default function DailyCash() {
                     </>
                   )}
                 </p>
-                <div
-                  className="mt-4 inline-flex rounded-xl border border-yellow-500/40 bg-[#0c0c0a]/90 p-1 shadow-inner shadow-black/40"
-                  role="group"
-                  aria-label="Daily cash view: Today, Month, or Manual counting history"
-                >
-                  <Button
+                <div className="mt-4 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <div
+                    className="inline-flex min-w-max rounded-xl border border-yellow-500/40 bg-[#0c0c0a]/90 p-1 shadow-inner shadow-black/40"
+                    role="group"
+                    aria-label="Daily cash view: Today, Month, or Manual counting history"
+                  >
+                    <Button
                     type="button"
                     size="sm"
                     variant="ghost"
@@ -2068,7 +2069,7 @@ export default function DailyCash() {
                   >
                     Today
                   </Button>
-                  <Button
+                    <Button
                     type="button"
                     size="sm"
                     variant="ghost"
@@ -2082,7 +2083,7 @@ export default function DailyCash() {
                   >
                     Month
                   </Button>
-                  <Button
+                    <Button
                     type="button"
                     size="sm"
                     variant="ghost"
@@ -2093,9 +2094,10 @@ export default function DailyCash() {
                         ? "bg-yellow-400 text-black shadow-sm hover:bg-yellow-300"
                         : "text-gray-200 hover:bg-yellow-500/15 hover:text-yellow-50"
                     )}
-                  >
-                    Manual counting history
-                  </Button>
+                    >
+                      Manual counting history
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-yellow-500/15 bg-black/25 px-3 py-2 text-[11px] text-gray-400">
                   <span className="shrink-0 rounded border border-yellow-500/25 bg-yellow-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-yellow-500/90">
@@ -2615,6 +2617,9 @@ export default function DailyCash() {
               sort below it (dimmed).
             </p>
           </div>
+          <div className="border-b border-yellow-500/10 bg-[#12100b] px-4 py-2 text-[11px] text-gray-500 sm:hidden">
+            Swipe sideways to see the full ledger. Time and save actions stay at the far right.
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
               <thead>
@@ -2698,7 +2703,7 @@ export default function DailyCash() {
               type="button"
               disabled={pendingLedgerCount === 0 || savingLedgerTimes}
               onClick={() => void handleSavePendingLedgerTimes()}
-              className="h-9 shrink-0 gap-2 bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40"
+              className="h-10 w-full shrink-0 gap-2 bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40 sm:h-9 sm:w-auto"
             >
               {savingLedgerTimes ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               {savingLedgerTimes ? "Saving…" : "Save time changes"}

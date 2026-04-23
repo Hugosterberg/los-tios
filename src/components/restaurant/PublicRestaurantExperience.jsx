@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
-import { MapPin, MessageCircle, UtensilsCrossed, Star, ChevronRight, ChevronLeft } from "lucide-react";
+import { MapPin, MessageCircle, UtensilsCrossed, Star, ChevronRight, ChevronLeft, Languages } from "lucide-react";
 import { getPublicRestaurantCopy } from "@/lib/restaurantPublicLocale";
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_PLACE_URL, GOOGLE_PLACE_ID, TRIPADVISOR_URL } from "@/lib/mapsPlace";
 import { fetchGooglePlaceReviewStats } from "@/lib/googlePlaceStats";
@@ -31,6 +31,7 @@ export default function PublicRestaurantExperience({
   onLocaleChange,
 }) {
   const closeNav = useCallback(() => setMobileNavOpen(false), [setMobileNavOpen]);
+  const toggleNav = useCallback(() => setMobileNavOpen((open) => !open), [setMobileNavOpen]);
   const t = useMemo(() => getPublicRestaurantCopy(locale), [locale]);
 
   const [placeStats, setPlaceStats] = useState(null);
@@ -64,6 +65,39 @@ export default function PublicRestaurantExperience({
     };
   }, [emblaApi]);
 
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    const closeOnHashChange = () => setMobileNavOpen(false);
+    window.addEventListener("hashchange", closeOnHashChange);
+    return () => {
+      window.removeEventListener("hashchange", closeOnHashChange);
+    };
+  }, [setMobileNavOpen]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const handleDesktop = (event) => {
+      if (event.matches) {
+        setMobileNavOpen(false);
+      }
+    };
+    handleDesktop(media);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", handleDesktop);
+      return () => media.removeEventListener("change", handleDesktop);
+    }
+    media.addListener(handleDesktop);
+    return () => media.removeListener(handleDesktop);
+  }, [setMobileNavOpen]);
+
   const scrollReviewsPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollReviewsNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
@@ -82,7 +116,7 @@ export default function PublicRestaurantExperience({
         {t.skipToMenu}
       </a>
 
-      <header className="sticky top-0 z-40 border-b border-yellow-500/20 bg-[#1a1a1a] shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+      <header className="relative sticky top-0 z-40 border-b border-yellow-500/20 bg-[#1a1a1a] shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-[0.14]"
@@ -91,7 +125,8 @@ export default function PublicRestaurantExperience({
         <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6">
           <a
             href="#top"
-            className="flex min-w-0 items-center gap-3 rounded-xl pr-2 outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400/70"
+            onClick={closeNav}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl pr-2 outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400/70"
           >
             <img
               src={logoSrc}
@@ -113,6 +148,12 @@ export default function PublicRestaurantExperience({
             role="group"
             aria-label={t.langToggle}
           >
+            <span
+              aria-hidden
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-yellow-300/75"
+            >
+              <Languages className="h-3.5 w-3.5" />
+            </span>
             <button
               type="button"
               className={`rounded-full px-2.5 py-1.5 text-xs font-bold transition sm:px-3 ${
@@ -181,12 +222,18 @@ export default function PublicRestaurantExperience({
             </Button>
           </nav>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
             <div
               className="flex shrink-0 items-center rounded-full border border-yellow-500/30 bg-black/40 p-0.5"
               role="group"
               aria-label={t.langToggle}
             >
+              <span
+                aria-hidden
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-yellow-300/75"
+              >
+                <Languages className="h-3.5 w-3.5" />
+              </span>
               <button
                 type="button"
                 className={`rounded-full px-2 py-1.5 text-xs font-bold ${
@@ -208,17 +255,19 @@ export default function PublicRestaurantExperience({
                 EN
               </button>
             </div>
-            <Button asChild size="sm" className="bg-yellow-400 px-3 text-[#1a1a1a] hover:bg-yellow-300">
-              <a href="#menu">{t.navMenu}</a>
-            </Button>
             <button
               type="button"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-yellow-500/25 bg-[#242424] text-gray-100 outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400/70"
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border text-gray-100 outline-offset-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400/70 ${
+                mobileNavOpen
+                  ? "border-yellow-400/60 bg-yellow-400/10 text-yellow-200"
+                  : "border-yellow-500/25 bg-[#242424]"
+              }`}
               aria-expanded={mobileNavOpen}
               aria-controls="mobile-drawer-nav"
-              onClick={() => setMobileNavOpen((o) => !o)}
+              aria-label={mobileNavOpen ? t.navClose || "Close navigation" : t.navOpen}
+              onClick={toggleNav}
             >
-              <span className="sr-only">{t.navOpen}</span>
+              <span className="sr-only">{mobileNavOpen ? t.navClose || "Close navigation" : t.navOpen}</span>
               <span className="flex flex-col gap-1.5" aria-hidden>
                 <span className={`block h-0.5 w-5 bg-current transition ${mobileNavOpen ? "translate-y-2 rotate-45" : ""}`} />
                 <span className={`block h-0.5 w-5 bg-current transition ${mobileNavOpen ? "opacity-0" : ""}`} />
@@ -229,45 +278,63 @@ export default function PublicRestaurantExperience({
         </div>
 
         {mobileNavOpen ? (
-          <div
-            id="mobile-drawer-nav"
-            className="border-t border-yellow-500/20 bg-[#111111] px-4 py-4 md:hidden"
-            role="dialog"
-            aria-label="Mobile navigation"
-          >
-            <nav className="mx-auto flex max-w-6xl flex-col gap-1" aria-label="Mobile">
-              {t.mobileNav.map(([href, label]) => (
+          <>
+            <button
+              type="button"
+              aria-label={t.navClose || "Close navigation"}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] md:hidden"
+              onClick={closeNav}
+            />
+            <div
+              id="mobile-drawer-nav"
+              className="absolute inset-x-0 top-full z-50 border-t border-yellow-500/20 bg-[#111111]/98 px-4 py-4 shadow-[0_18px_40px_rgba(0,0,0,0.5)] md:hidden"
+              role="dialog"
+              aria-label="Mobile navigation"
+            >
+              <nav className="mx-auto flex max-w-6xl flex-col gap-2" aria-label="Mobile">
+                {t.mobileNav.map(([href, label]) => (
+                  <a
+                    key={href}
+                    href={href}
+                    onClick={closeNav}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-base font-medium text-gray-100 transition hover:bg-white/5"
+                  >
+                    {label}
+                  </a>
+                ))}
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <a
+                    href="#menu"
+                    onClick={closeNav}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-4 py-3.5 text-base font-semibold text-[#1a1a1a] hover:bg-yellow-300"
+                  >
+                    <UtensilsCrossed className="h-5 w-5" aria-hidden />
+                    {t.navOrder}
+                  </a>
+                  <a
+                    href={WA_HREF}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={closeNav}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-500/30 bg-[#1a1a1a] px-4 py-3.5 text-base font-semibold text-yellow-300 hover:bg-yellow-400/10"
+                  >
+                    <MessageCircle className="h-5 w-5" aria-hidden />
+                    {t.mobileWhatsApp}
+                  </a>
+                </div>
                 <a
-                  key={href}
-                  href={href}
+                  href={GOOGLE_MAPS_PLACE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={closeNav}
-                  className="rounded-xl px-4 py-3 text-base font-medium text-gray-100 hover:bg-white/5"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-500/30 px-4 py-3 text-base font-medium text-gray-100 hover:bg-white/5"
                 >
-                  {label}
+                  <MapPin className="h-5 w-5" aria-hidden />
+                  {t.mobileMaps}
                 </a>
-              ))}
-              <a
-                href={WA_HREF}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={closeNav}
-                className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 py-3 text-base font-semibold text-[#1a1a1a] hover:bg-yellow-300"
-              >
-                <MessageCircle className="h-5 w-5" aria-hidden />
-                {t.mobileWhatsApp}
-              </a>
-              <a
-                href={GOOGLE_MAPS_PLACE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={closeNav}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-yellow-500/30 px-4 py-3 text-base font-medium text-gray-100 hover:bg-white/5"
-              >
-                <MapPin className="h-5 w-5" aria-hidden />
-                {t.mobileMaps}
-              </a>
-            </nav>
-          </div>
+              </nav>
+            </div>
+          </>
         ) : null}
       </header>
 

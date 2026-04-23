@@ -13,7 +13,6 @@ import { motion } from "framer-motion";
 import { appParams } from "@/lib/app-params";
 import { saveStoredIntegrationSettings } from "@/lib/integrationSettings";
 import { buildDefaultAppSettings } from "@/lib/appSettings";
-import { createPageUrl } from "@/utils";
 
 export default function Customization() {
   const queryClient = useQueryClient();
@@ -591,30 +590,6 @@ export default function Customization() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Integrations</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Keys and secrets now live in a dedicated admin screen so they do not get mixed into visual customization.
-              </p>
-              <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
-                <p className="font-semibold text-purple-950">Open the Integrations page</p>
-                <p className="mt-1 text-sm text-purple-800">
-                  There you can update all Clip and Loyverse public and secret keys from one place.
-                </p>
-                <Button
-                  type="button"
-                  className="mt-4 bg-purple-600 hover:bg-purple-700"
-                  onClick={() => window.location.assign(createPageUrl("Integrations"))}
-                >
-                  Go to Integrations
-                </Button>
-              </div>
             </CardContent>
           </Card>
 

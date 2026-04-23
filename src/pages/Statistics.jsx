@@ -912,9 +912,9 @@ export default function Statistics() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:space-y-7 lg:px-8 lg:py-7">
         <div className="no-print grid grid-cols-3 gap-1 rounded-xl border border-yellow-500/20 bg-[#242424] p-1">
           {[
-            { id: "daily", label: "Single day" },
-            { id: "monthly", label: "Monthly" },
-            { id: "yearly", label: "Yearly" },
+            { id: "daily", label: "Single day", mobileLabel: "Day" },
+            { id: "monthly", label: "Monthly", mobileLabel: "Month" },
+            { id: "yearly", label: "Yearly", mobileLabel: "Year" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -941,7 +941,8 @@ export default function Statistics() {
                 statsView === tab.id ? "bg-yellow-400/20 text-yellow-200" : "text-gray-400 hover:text-white",
               )}
             >
-              {tab.label}
+              <span className="sm:hidden">{tab.mobileLabel}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
