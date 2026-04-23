@@ -213,17 +213,45 @@ export function buildDefaultAppSettings(overrides = {}) {
 }
 
 /**
- * `daily_cash_store_json` is written only by the Daily Cash persistence layer
- * (`useDailyCashStoreSync` / `flushDailyCashPersistImmediate`). Other screens save
- * full AppSettings objects from React Query; that cache can be stale (another tab,
- * no refetch yet), so including this field would overwrite the server's blob and
- * wipe manual count / diff history. Strip it from broad AppSettings.update payloads.
+ * Large JSON blobs on `AppSettings` that are owned by a single feature and updated
+ * outside “save all settings” forms. Broad saves often spread `settings[0]` from
+ * React Query; that snapshot can be stale (another tab, no refetch), so sending
+ * these keys would silently overwrite newer server data — same failure mode as
+ * lost Daily Cash history. Strip them from any payload that is not that feature’s
+ * dedicated writer.
+ */
+export const APP_SETTINGS_SUBSYSTEM_JSON_KEYS = /** @type {const} */ ([
+  "daily_cash_store_json",
+  "customer_events_json",
+]);
+
+function omitAppSettingsKeys(data, keys) {
+  if (!data || typeof data !== "object") return data;
+  const out = { ...data };
+  for (const k of keys) {
+    if (k in out) delete out[k];
+  }
+  return out;
+}
+
+/**
+ * For Customization, Integrations, and any other “save whole settings form” flow
+ * that must not touch subsystem-owned JSON blobs.
+ *
+ * @param {Record<string, unknown>} data
+ * @returns {Record<string, unknown>}
+ */
+export function omitSubsystemOwnedJsonBlobsFromAppSettingsUpdate(data) {
+  return omitAppSettingsKeys(data, APP_SETTINGS_SUBSYSTEM_JSON_KEYS);
+}
+
+/**
+ * Events saves `customer_events_json` explicitly in the same payload; strip only
+ * Daily Cash so this update cannot wipe drawer data from a stale cache snapshot.
  *
  * @param {Record<string, unknown>} data
  * @returns {Record<string, unknown>}
  */
 export function omitDailyCashStoreJsonForAppSettingsUpdate(data) {
-  if (!data || typeof data !== "object") return data;
-  const { daily_cash_store_json: _omit, ...rest } = data;
-  return rest;
+  return omitAppSettingsKeys(data, ["daily_cash_store_json"]);
 }

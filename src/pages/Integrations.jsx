@@ -13,7 +13,7 @@ import {
 import {
   buildDefaultAppSettings,
   INTEGRATION_SETTINGS_SECTIONS,
-  omitDailyCashStoreJsonForAppSettingsUpdate,
+  omitSubsystemOwnedJsonBlobsFromAppSettingsUpdate,
 } from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
 import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
@@ -305,7 +305,7 @@ export default function Integrations() {
 
   const saveSettings = useMutation({
     mutationFn: (data) => {
-      const payload = omitDailyCashStoreJsonForAppSettingsUpdate(data);
+      const payload = omitSubsystemOwnedJsonBlobsFromAppSettingsUpdate(data);
       if (isLocalOnlyMode) {
         saveStoredIntegrationSettings(payload);
         return Promise.resolve(payload);
