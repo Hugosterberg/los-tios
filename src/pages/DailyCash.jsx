@@ -77,6 +77,7 @@ import {
   manualCountRowUpdateFromExpectation,
   updateManualCashCountRow,
 } from "@/lib/manualCashCountRepository";
+import { toast } from "@/components/ui/use-toast";
 import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
 import {
   AppOrderLedgerDetailPanel,
@@ -1180,10 +1181,30 @@ export default function DailyCash() {
                 await flushDailyCashPersistImmediate();
                 setStoreTick((t) => t + 1);
               } catch (e) {
-                console.error(e);
-                alert(
-                  "Could not save manual count. In Base44 Data, create the **ManualCashCount** collection (see entities/ManualCashCount.jsonc at repo root) and ensure your role can create rows.",
-                );
+                console.error("[ManualCashCount] Remote save failed:", e);
+                recordOpeningCountDiff({
+                  dateKey: formDayStr,
+                  ts: eventTs,
+                  priorCloseDayStr: expectedInfo.priorCloseDayStr,
+                  expectedSourceLabel: expectedInfo.expectedSourceLabel,
+                  expectedEnd,
+                  enteredOpening: n,
+                  diff,
+                  previousManualCountId: expectedInfo.previousManualCount?.id || null,
+                  previousManualCountDateKey: expectedInfo.previousManualCount?.dateKey || null,
+                  previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
+                  comment: "",
+                });
+                setStoreTick((t) => t + 1);
+                void flushDailyCashPersistImmediate();
+                toast({
+                  variant: "destructive",
+                  title: "Manual count saved locally — database error",
+                  description:
+                    "Could not save to Base44. Data is preserved in the local ledger for now. " +
+                    "Fix: create the ManualCashCount collection in Base44 Data (see entities/ManualCashCount.jsonc). " +
+                    `Error: ${e?.message || String(e)}`,
+                });
               }
             })();
           }
