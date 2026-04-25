@@ -18,30 +18,36 @@ import {
 } from "@/lib/manualCashCountRepository";
 
 /**
- * Loads manual drawer counts from the `ManualCashCount` Base44 entity (one row per save) and
- * mirrors them into {@link listOpeningCountDiffs} via {@link setRemoteManualCountSnapshot}.
- * Legacy blob migration runs in {@link useDailyCashStoreSync} after remote hydration; this hook
- * retries migration if the table was still empty while legacy events remained (e.g. race).
+ * Loads manual drawer counts from the `ManualCashCount` Base44 entity and mirrors them into
+ * {@link listOpeningCountDiffs} via {@link setRemoteManualCountSnapshot}.
+ *
+ * On query error the last successful snapshot is preserved so the UI keeps showing
+ * stale data rather than going blank. The caller receives `isError` / `isLoading` to
+ * render the appropriate indicator.
  *
  * @param {{ enabled: boolean; onSnapshotChange?: () => void }} args
+ * @returns {{ isError: boolean; isLoading: boolean; refetch: () => void }}
  */
 export function useManualCashCountsSync({ enabled, onSnapshotChange }) {
   const queryClient = useQueryClient();
   const onSnapRef = useRef(onSnapshotChange);
   onSnapRef.current = onSnapshotChange;
   const lastSnapshotKeyRef = useRef("");
+  const hasEverSucceededRef = useRef(false);
 
   const q = useQuery({
     queryKey: MANUAL_CASH_COUNTS_QUERY_KEY,
     queryFn: listManualCashCountRows,
     enabled: enabled && getDailyCashPersistenceMode() === "remote",
     staleTime: 30_000,
-    retry: false,
+    retry: 2,
+    retryDelay: 3_000,
   });
 
   useEffect(() => {
     if (!enabled) {
       lastSnapshotKeyRef.current = "";
+      hasEverSucceededRef.current = false;
       clearRemoteManualCountSnapshot();
       onSnapRef.current?.();
     }
@@ -52,31 +58,29 @@ export function useManualCashCountsSync({ enabled, onSnapshotChange }) {
 
     const push = (events) => {
       const sorted = [...events].sort((a, b) => new Date(b?.ts || 0) - new Date(a?.ts || 0));
-      /* Include `dataUpdatedAt` so comment / time edits refetched from the server always refresh the snapshot. */
       const key = `${q.dataUpdatedAt}:${sorted.length}:${sorted.map((e) => e?.id).join("|")}`;
       if (key === lastSnapshotKeyRef.current) return;
       lastSnapshotKeyRef.current = key;
+      hasEverSucceededRef.current = true;
       setRemoteManualCountSnapshot(sorted, true);
       syncOpeningsAfterManualCountsReplace(sorted);
       onSnapRef.current?.();
     };
 
     if (q.isError) {
-      lastSnapshotKeyRef.current = "";
-      clearRemoteManualCountSnapshot();
-      onSnapRef.current?.();
+      // Preserve the last known snapshot — don't go blank on a transient error.
+      // If we never succeeded, clear so the fallback (local blob) can show.
+      if (!hasEverSucceededRef.current) {
+        lastSnapshotKeyRef.current = "";
+        clearRemoteManualCountSnapshot();
+        onSnapRef.current?.();
+      }
       return;
     }
 
     if (!q.isSuccess || q.data === undefined) return;
 
     const rows = q.data;
-    if (rows === null) {
-      lastSnapshotKeyRef.current = "";
-      clearRemoteManualCountSnapshot();
-      onSnapRef.current?.();
-      return;
-    }
 
     if (rows.length > 0) {
       if (peekOpeningDiffEventsFromStoreBlob().length > 0) {
@@ -102,5 +106,9 @@ export function useManualCashCountsSync({ enabled, onSnapshotChange }) {
     push([]);
   }, [enabled, q.isSuccess, q.isError, q.data, q.dataUpdatedAt, queryClient]);
 
-  return { manualCashCountsQuery: q };
+  return {
+    isError: q.isError,
+    isLoading: q.isLoading || (q.isFetching && !q.isError),
+    refetch: () => queryClient.invalidateQueries({ queryKey: MANUAL_CASH_COUNTS_QUERY_KEY }),
+  };
 }

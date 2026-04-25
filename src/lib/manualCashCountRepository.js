@@ -118,16 +118,8 @@ export function manualCountRowUpdateFromExpectation(p) {
 }
 
 export async function listManualCashCountRows() {
-  try {
-    const rows = await base44.entities.ManualCashCount.list("-created_date");
-    return Array.isArray(rows) ? rows : [];
-  } catch (err) {
-    console.warn(
-      "[manualCashCount] ManualCashCount.list failed — create the entity in Base44 or check permissions:",
-      err,
-    );
-    return null;
-  }
+  const rows = await base44.entities.ManualCashCount.list("-created_date");
+  return Array.isArray(rows) ? rows : [];
 }
 
 /**

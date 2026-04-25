@@ -206,10 +206,11 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
     };
   }, [isLocalOnlyMode, settingsRowId]);
 
-  useManualCashCountsSync({
-    enabled: !isLocalOnlyMode && !!settingsRowId && isLedgerQueryFetched,
-    onSnapshotChange: () => onStoreChangeRef.current?.(),
-  });
+  const { isError: manualCountsError, isLoading: manualCountsLoading, refetch: manualCountsRefetch } =
+    useManualCashCountsSync({
+      enabled: !isLocalOnlyMode && !!settingsRowId && isLedgerQueryFetched,
+      onSnapshotChange: () => onStoreChangeRef.current?.(),
+    });
 
-  return { settings, settingsRowId, isLocalOnlyMode };
+  return { settings, settingsRowId, isLocalOnlyMode, manualCountsError, manualCountsLoading, manualCountsRefetch };
 }
