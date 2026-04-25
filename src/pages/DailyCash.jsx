@@ -159,7 +159,7 @@ function ManualCountWhenCell({ ev, onCommit }) {
 }
 
 /**
- * Editable TIME for ledger rows — stages changes until “Save time changes” below.
+ * Editable TIME for ledger rows — stages changes until "Save time changes" below.
  * Loyverse / labor rows still use AppSettings overrides on save.
  */
 function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onCommit, onReset }) {
@@ -883,7 +883,7 @@ export default function DailyCash() {
   /** @type {null | { kind: 'legacy'; dayStr: string; line: object } | { kind: 'registered'; snapshot: object }} */
   const [lastRemovedManual, setLastRemovedManual] = useState(null);
 
-  /** Staged ledger TIME edits — key `${ledgerDay}::${rowId}` until user clicks “Save time changes”. */
+  /** Staged ledger TIME edits — key `${ledgerDay}::${rowId}` until user clicks "Save time changes". */
   const [pendingLedgerTimes, setPendingLedgerTimes] = useState(
     /** @type {Record<string, { ledgerDay: string; rowId: string; dateKeyMexico: string; timeHHmm: string }>} */ ({}),
   );
@@ -970,7 +970,7 @@ export default function DailyCash() {
     [formDayStr, employees, shifts],
   );
 
-  /** Hero “Sunday box”: names in extralight white, caption in gold — same hierarchy as weekday / long date. */
+  /** Hero "Sunday box": names in extralight white, caption in gold — same hierarchy as weekday / long date. */
   const laborCalendarHeroTitle = useMemo(() => {
     if (periodMode !== "today") return null;
     if (!Number.isFinite(expectedLaborDay) || expectedLaborDay < 0.005) return null;
@@ -2047,34 +2047,34 @@ export default function DailyCash() {
           </span>
         </div>
       </div>
-      <p className=”text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90”>All logged manual counts</p>
-      <p className=”mt-1 text-xs text-gray-500”>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">All logged manual counts</p>
+      <p className="mt-1 text-xs text-gray-500">
         Each row is a saved physical count (Mexico calendar day) with the calculated expected drawer total, your actual count, and
-        the <span className=”text-gray-400”>± difference</span> (green = over expected, red = under).{“ “}
-        <span className=”text-gray-400”>
-          “Logged at” uses Mexico time — edit date/time if you counted after the fact so the ledger order and End cash match reality.
-        </span>{“ “}
-        Optional comment for variance notes.{“ “}
+        the <span className="text-gray-400">± difference</span> (green = over expected, red = under).{" "}
+        <span className="text-gray-400">
+          "Logged at" uses Mexico time — edit date/time if you counted after the fact so the ledger order and End cash match reality.
+        </span>{" "}
+        Optional comment for variance notes.{" "}
         {isLocalOnlyMode ? (
           <>Stored in this browser in local dev — switch to </>
         ) : (
           <>Each save is a row in the ManualCashCount database table — switch to </>
         )}
-        <strong className=”text-gray-300”>Today</strong> to add entries.
+        <strong className="text-gray-300">Today</strong> to add entries.
       </p>
 
       {/* Database error banner */}
       {!isLocalOnlyMode && manualCountsError && (
-        <div className=”mt-3 flex items-center justify-between gap-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2.5 text-xs text-rose-300”>
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3 py-2.5 text-xs text-rose-300">
           <span>
-            <strong className=”font-semibold”>Database error</strong> — could not load counts from Base44. Check that the
+            <strong className="font-semibold">Database error</strong> — could not load counts from Base44. Check that the
             ManualCashCount collection exists and has no blocking permissions.
           </span>
           <Button
-            type=”button”
-            size=”sm”
-            variant=”ghost”
-            className=”h-7 shrink-0 border border-rose-500/30 px-3 text-[11px] text-rose-300 hover:bg-rose-950/60”
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 shrink-0 border border-rose-500/30 px-3 text-[11px] text-rose-300 hover:bg-rose-950/60"
             onClick={manualCountsRefetch}
           >
             Retry
@@ -2084,93 +2084,93 @@ export default function DailyCash() {
 
       {/* Pending local-only counts banner */}
       {!isLocalOnlyMode && pendingLocalCounts > 0 && (
-        <div className=”mt-3 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2.5 text-xs text-amber-300”>
-          <strong className=”font-semibold”>{pendingLocalCounts} count{pendingLocalCounts > 1 ? “s” : “”} saved locally</strong>
-          {“ “}— not yet synced to database. They will migrate automatically once the ManualCashCount collection is reachable.
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2.5 text-xs text-amber-300">
+          <strong className="font-semibold">{pendingLocalCounts} count{pendingLocalCounts > 1 ? "s" : ""} saved locally</strong>
+          {" "}— not yet synced to database. They will migrate automatically once the ManualCashCount collection is reachable.
         </div>
       )}
 
-      <div className=”mt-3 max-h-[min(75vh,880px)] overflow-auto rounded-lg border border-yellow-500/15”>
-        <table className=”w-full min-w-[900px] border-collapse text-left text-[11px]”>
+      <div className="mt-3 max-h-[min(75vh,880px)] overflow-auto rounded-lg border border-yellow-500/15">
+        <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
           <thead>
-            <tr className=”border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90”>
-              <th className=”px-2 py-2”>Logged at (Mexico)</th>
-              <th className=”px-2 py-2”>Count day</th>
-              <th className=”px-2 py-2”>Expected source</th>
-              <th className=”px-2 py-2”>Comment</th>
-              <th className=”px-2 py-2 text-right”>Expected</th>
-              <th className=”px-2 py-2 text-right”>Actual manual</th>
-              <th className=”px-2 py-2 text-right”>Diff</th>
-              <th className=”w-10 px-1 py-2” />
+            <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
+              <th className="px-2 py-2">Logged at (Mexico)</th>
+              <th className="px-2 py-2">Count day</th>
+              <th className="px-2 py-2">Expected source</th>
+              <th className="px-2 py-2">Comment</th>
+              <th className="px-2 py-2 text-right">Expected</th>
+              <th className="px-2 py-2 text-right">Actual manual</th>
+              <th className="px-2 py-2 text-right">Diff</th>
+              <th className="w-10 px-1 py-2" />
             </tr>
           </thead>
           <tbody>
             {manualCountsLoading && openingCountDiffHistory.length === 0 ? (
               <tr>
-                <td colSpan={8} className=”px-4 py-10 text-center text-sm text-gray-500”>
-                  <Loader2 className=”mx-auto mb-2 h-4 w-4 animate-spin text-gray-600” />
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">
+                  <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin text-gray-600" />
                   Loading counts from database…
                 </td>
               </tr>
             ) : manualCountsError && openingCountDiffHistory.length === 0 ? (
               <tr>
-                <td colSpan={8} className=”px-4 py-10 text-center text-sm text-rose-400/80”>
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-rose-400/80">
                   Could not load counts — database error. See banner above.
                 </td>
               </tr>
             ) : openingCountDiffHistory.length === 0 ? (
               <tr>
-                <td colSpan={8} className=”px-4 py-14 text-center text-sm text-gray-500”>
-                  No manual counts yet. Open <strong className=”text-gray-300”>Today</strong>, enter the MXN in the drawer, leave the
+                <td colSpan={8} className="px-4 py-14 text-center text-sm text-gray-500">
+                  No manual counts yet. Open <strong className="text-gray-300">Today</strong>, enter the MXN in the drawer, leave the
                   field (blur) to save — each save appears here with expected vs actual and the difference.
                 </td>
               </tr>
             ) : (
               openingCountDiffHistory.map((ev) => (
-                <tr key={ev.id} className=”border-b border-yellow-500/10 text-gray-300”>
-                  <td className=”px-2 py-1.5 align-top”>
+                <tr key={ev.id} className="border-b border-yellow-500/10 text-gray-300">
+                  <td className="px-2 py-1.5 align-top">
                     <ManualCountWhenCell ev={ev} onCommit={handleManualCountDateTimeCommit} />
                   </td>
-                  <td className=”whitespace-nowrap px-2 py-1.5 tabular-nums”>{ev.dateKey}</td>
-                  <td className=”whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400”>
-                    {ev.expectedSourceLabel || ev.priorCloseDayStr || “No prior count”}
+                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
+                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
+                    {ev.expectedSourceLabel || ev.priorCloseDayStr || "No prior count"}
                   </td>
-                  <td className=”max-w-[240px] px-2 py-1.5”>
+                  <td className="max-w-[240px] px-2 py-1.5">
                     <Input
-                      defaultValue={ev.comment || “”}
+                      defaultValue={ev.comment || ""}
                       onBlur={(e) => handleManualCountCommentCommit(ev.id, e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === “Enter”) e.currentTarget.blur();
+                        if (e.key === "Enter") e.currentTarget.blur();
                       }}
-                      placeholder=”Why?”
-                      className=”h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700”
+                      placeholder="Why?"
+                      className="h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
                     />
                   </td>
-                  <td className=”px-2 py-1.5 text-right font-mono tabular-nums text-gray-400”>
-                    {ev.expectedEnd == null ? “-” : formatMx(ev.expectedEnd)}
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
+                    {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
                   </td>
-                  <td className=”px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90”>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
                     {formatMx(ev.enteredOpening)}
                   </td>
                   <td
                     className={cn(
-                      “px-2 py-1.5 text-right font-mono font-medium tabular-nums”,
-                      ev.diff == null ? “text-gray-500” : ev.diff > 0 ? “text-emerald-400/90” : “text-rose-400/90”,
+                      "px-2 py-1.5 text-right font-mono font-medium tabular-nums",
+                      ev.diff == null ? "text-gray-500" : ev.diff > 0 ? "text-emerald-400/90" : "text-rose-400/90",
                     )}
                   >
-                    {ev.diff == null ? “-” : `${ev.diff > 0 ? “+” : “”}${formatMx(ev.diff)}`}
+                    {ev.diff == null ? "-" : `${ev.diff > 0 ? "+" : ""}${formatMx(ev.diff)}`}
                   </td>
-                  <td className=”px-1 py-1.5 text-right”>
+                  <td className="px-1 py-1.5 text-right">
                     <Button
-                      type=”button”
-                      size=”icon”
-                      variant=”ghost”
-                      className=”h-7 w-7 text-gray-600 hover:bg-rose-950/40 hover:text-rose-300”
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-gray-600 hover:bg-rose-950/40 hover:text-rose-300"
                       onClick={() => handleRemoveManualCountDiff(ev.id)}
-                      aria-label=”Delete logged manual count”
-                      title=”Delete logged manual count”
+                      aria-label="Delete logged manual count"
+                      title="Delete logged manual count"
                     >
-                      <Trash2 className=”h-3.5 w-3.5” />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>
                 </tr>

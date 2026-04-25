@@ -305,7 +305,7 @@ export default function Orders() {
                 <p className="text-gray-500 text-xs max-w-3xl">
                   Orders here are stored in this app (web checkout and admin).{" "}
                   <span className="text-gray-400">
-                    Open delivery or dine-in tickets that exist only in Loyverse POS are not available through Loyverse’s public API, so they do not show in this list. After you close the sale in Loyverse, it appears in the receipts feed (e.g. Loyverse / Loyverse Orders), and this app can record a receipt when you complete a web order with Loyverse sync.
+                    Open delivery or dine-in tickets that exist only in Loyverse POS are not available through Loyverse's public API, so they do not show in this list. After you close the sale in Loyverse, it appears in the receipts feed (e.g. Loyverse / Loyverse Orders), and this app can record a receipt when you complete a web order with Loyverse sync.
                   </span>
                 </p>
               </div>
