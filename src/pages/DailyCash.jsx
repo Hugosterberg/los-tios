@@ -826,6 +826,8 @@ export default function DailyCash() {
 
   const [storeTick, setStoreTick] = useState(0);
   const bumpStoreTick = useCallback(() => setStoreTick((t) => t + 1), []);
+  // Prevents the blur that fires when clicking the Save button from creating a duplicate row.
+  const skipNextBlurRef = useRef(false);
   const { settings, isLocalOnlyMode, manualCountsError, manualCountsLoading, manualCountsRefetch } =
     useDailyCashStoreSync({ onStoreChange: bumpStoreTick });
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
@@ -1142,6 +1144,10 @@ export default function DailyCash() {
       } else {
         const n = parseFloat(trimmed.replace(",", "."));
         if (Number.isFinite(n) && (forceRecord || oldPersisted !== n)) {
+          // Optimistically mark the opening as saved immediately so any concurrent
+          // blur/click (e.g. the blur that fires when clicking the Save button) sees
+          // the already-persisted value and does not create a duplicate row.
+          setOpeningBalance(formDayStr, n);
           const eventTs = mexicoBusinessDayCreatedAtIso(formDayStr);
           const expectedInfo = deriveManualCountExpectation(formDayStr, eventTs);
           const expectedEnd = expectedInfo.expectedEnd;
@@ -2545,7 +2551,10 @@ export default function DailyCash() {
                 inputMode="decimal"
                 value={openingInput}
                 onChange={(e) => setOpeningInput(e.target.value)}
-                onBlur={() => persistOpening(false)}
+                onBlur={() => {
+                  if (skipNextBlurRef.current) { skipNextBlurRef.current = false; return; }
+                  persistOpening(false);
+                }}
                 placeholder="Manual count"
                 readOnly={periodMode === "month"}
                 className="h-11 border-yellow-500/20 bg-[#0f0f0c] text-xl font-semibold tabular-nums text-yellow-100 placeholder:text-gray-600 read-only:cursor-default read-only:opacity-90"
@@ -2554,6 +2563,7 @@ export default function DailyCash() {
                 type="button"
                 variant="outline"
                 size="sm"
+                onMouseDown={() => { skipNextBlurRef.current = true; }}
                 onClick={() => persistOpening(true)}
                 disabled={periodMode === "month"}
                 className="h-11 border-yellow-500/25 bg-[#0f0f0c] px-3 text-xs font-medium uppercase tracking-[0.14em] text-yellow-200 hover:bg-yellow-500/10 disabled:opacity-40"
