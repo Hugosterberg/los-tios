@@ -10,7 +10,9 @@ import {
   flushDailyCashPersistImmediate,
   initDailyCashPersistenceLocal,
   initDailyCashPersistenceRemote,
+  setDailyCashPersistErrorHandler,
 } from "@/lib/dailyCashLocal";
+import { toast } from "@/components/ui/use-toast";
 import { useManualCashCountsSync } from "@/hooks/useManualCashCountsSync";
 import { migrateLegacyManualCountBlobToBase44 } from "@/lib/manualCashCountMigration";
 import {
@@ -47,12 +49,13 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
     enabled: !isLocalOnlyMode,
   });
 
-  const { data: ledgerRows = [], isFetched: isLedgerQueryFetched } = useQuery({
+  const { data: ledgerRows = [], isFetched: isLedgerQueryFetched, isError: isLedgerError } = useQuery({
     queryKey: DAILY_CASH_LEDGER_QUERY_KEY,
     queryFn: listDailyCashLedgerRows,
     enabled: !isLocalOnlyMode,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
+    retryDelay: 3_000,
   });
 
   const settingsRowId = settings[0]?.id ?? null;
@@ -158,6 +161,13 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       };
 
       disposeDailyCashPersistence();
+      setDailyCashPersistErrorHandler((err) => {
+        toast({
+          variant: "destructive",
+          title: "Cash data not saved",
+          description: `Could not sync to database: ${err?.message || String(err)}. Reloading the page may help.`,
+        });
+      });
       const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
       if (migrated || memoryMerged) {
         try {
@@ -184,6 +194,7 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
 
     return () => {
       cancelled = true;
+      setDailyCashPersistErrorHandler(null);
       void flushDailyCashPersistImmediate().finally(() => {
         disposeDailyCashPersistence();
       });
@@ -212,5 +223,5 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
       onSnapshotChange: () => onStoreChangeRef.current?.(),
     });
 
-  return { settings, settingsRowId, isLocalOnlyMode, manualCountsError, manualCountsLoading, manualCountsRefetch };
+  return { settings, settingsRowId, isLocalOnlyMode, isLedgerError, manualCountsError, manualCountsLoading, manualCountsRefetch };
 }

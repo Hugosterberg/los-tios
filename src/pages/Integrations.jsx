@@ -16,6 +16,7 @@ import {
   omitSubsystemOwnedJsonBlobsFromAppSettingsUpdate,
 } from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
+import { toast } from "@/components/ui/use-toast";
 import { getResolvedIntegrationSettings, saveStoredIntegrationSettings } from "@/lib/integrationSettings";
 import { formatMexicoDateTimeMediumShort } from "@/lib/mexicoTime";
 import { invokeNotionProxy } from "@/api/notionClient";
@@ -322,8 +323,9 @@ export default function Integrations() {
         queryClient.invalidateQueries({ queryKey: ["appSettings"] });
       }
       saveStoredIntegrationSettings(values);
-      window.alert(isLocalOnlyMode ? "Settings saved locally." : "Settings saved successfully.");
+      toast({ title: isLocalOnlyMode ? "Settings saved locally" : "Settings saved" });
     },
+    onError: (err) => toast({ variant: "destructive", title: "Could not save settings", description: err?.message || "Check your connection and try again." }),
   });
 
   const handleFieldChange = (key, value) => {

@@ -134,6 +134,7 @@ export default function Loyverse() {
       setSelectedItem(null);
       setSelectedModifierIds([]);
     },
+    onError: (err) => toast({ variant: "destructive", title: "Could not save modifiers", description: err?.message || "Check your connection and try again." }),
   });
 
   const overview = overviewQuery.data;

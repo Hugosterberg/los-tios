@@ -1455,7 +1455,7 @@ export default function DailyCash() {
       setLastRemovedManual(null);
     } catch (e) {
       console.error(e);
-      alert("Could not register cash. Check your connection and try again.");
+      toast({ variant: "destructive", title: "Could not register cash", description: e?.message || "Check your connection and try again." });
     }
   };
 
@@ -1496,7 +1496,7 @@ export default function DailyCash() {
           setStoreTick((t) => t + 1);
         } catch (e) {
           console.error(e);
-          alert("Could not update comment.");
+          toast({ variant: "destructive", title: "Could not update comment", description: e?.message || "Check your connection and try again." });
         }
       })();
     },
@@ -1544,7 +1544,7 @@ export default function DailyCash() {
           setStoreTick((t) => t + 1);
         } catch (e) {
           console.error(e);
-          alert("Could not update date/time.");
+          toast({ variant: "destructive", title: "Could not update date/time", description: e?.message || "Check your connection and try again." });
         }
       })();
     },
@@ -1760,7 +1760,7 @@ export default function DailyCash() {
       if (refetch.companyTransactions) await queryClient.refetchQueries({ queryKey: ["companyTransactions"] });
       if (refetch.orders) await queryClient.refetchQueries({ queryKey: ["orders"] });
       if (Object.keys(remaining).length) {
-        alert("Some rows could not be saved. Check the network and try again for the remaining edits.");
+        toast({ variant: "destructive", title: "Some time edits could not be saved", description: "Check the network and try again for the remaining rows." });
       }
     } finally {
       setSavingLedgerTimes(false);
@@ -1796,7 +1796,7 @@ export default function DailyCash() {
           setStoreTick((t) => t + 1);
         } catch (e) {
           console.error(e);
-          alert("Could not delete manual count.");
+          toast({ variant: "destructive", title: "Could not delete manual count", description: e?.message || "Check your connection and try again." });
         }
       })();
     },
@@ -1831,7 +1831,7 @@ export default function DailyCash() {
         setLastRemovedManual(null);
       } catch (e) {
         console.error(e);
-        alert("Could not undo. Try again.");
+        toast({ variant: "destructive", title: "Could not undo", description: e?.message || "Try again." });
       }
     }
   };
@@ -1896,7 +1896,7 @@ export default function DailyCash() {
         }
       } catch (e) {
         console.error(e);
-        alert("Could not save detail. Try again.");
+        toast({ variant: "destructive", title: "Could not save detail", description: e?.message || "Try again." });
       }
     },
     [formDayStr, saveOrderDetail, saveTransactionDescription, saveExpenseDetail],

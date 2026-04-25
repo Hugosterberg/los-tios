@@ -49,16 +49,8 @@ export function pickDailyCashHydrationJsonString(ledgerRow, appSettingsRow) {
  * @returns {Promise<any[]>}
  */
 export async function listDailyCashLedgerRows() {
-  try {
-    const rows = await base44.entities.DailyCashLedger.list("-created_date");
-    return Array.isArray(rows) ? rows : [];
-  } catch (err) {
-    console.warn(
-      "[dailyCashLedger] DailyCashLedger.list failed — create the entity in Base44 or check permissions:",
-      err,
-    );
-    return [];
-  }
+  const rows = await base44.entities.DailyCashLedger.list("-created_date");
+  return Array.isArray(rows) ? rows : [];
 }
 
 /**
@@ -101,5 +93,7 @@ export async function persistDailyCashLedgerPayload({ json, ledgerRowId, setting
       if (first?.id !== settingsRowId) return prev;
       return [{ ...first, daily_cash_store_json: json }, ...prev.slice(1)];
     });
+    // Re-throw so the debounced persist caller notifies the user via the error handler.
+    throw Object.assign(new Error("DailyCashLedger unavailable — saved to AppSettings fallback instead"), { cause: err });
   }
 }

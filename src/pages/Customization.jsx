@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { appParams } from "@/lib/app-params";
 import { saveStoredIntegrationSettings } from "@/lib/integrationSettings";
+import { toast } from "@/components/ui/use-toast";
 import {
   buildDefaultAppSettings,
   omitSubsystemOwnedJsonBlobsFromAppSettingsUpdate,
@@ -51,15 +52,16 @@ export default function Customization() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appSettings'] });
       saveStoredIntegrationSettings(formData);
-      alert("Settings saved successfully.");
+      toast({ title: "Settings saved" });
     },
+    onError: (err) => toast({ variant: "destructive", title: "Could not save settings", description: err?.message || "Check your connection and try again." }),
   });
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!canUploadImages) {
-      alert("Image upload requires a configured backend and sign-in. Use the image URL field locally.");
+      toast({ variant: "destructive", title: "Image upload unavailable", description: "Requires a configured backend and sign-in. Use the image URL field locally." });
       return;
     }
 
@@ -68,7 +70,7 @@ export default function Customization() {
       const result = await base44.integrations.Core.UploadFile({ file });
       setFormData({ ...formData, logo_url: result.file_url });
     } catch {
-      alert('Error uploading logo');
+      toast({ variant: "destructive", title: "Logo upload failed", description: "Could not upload image. Try again." });
     } finally {
       setUploadingLogo(false);
     }

@@ -21,6 +21,14 @@ export function getDailyCashPersistenceMode() {
 let persistFn = null;
 let persistDebounceTimer = null;
 
+/** Called when a debounced remote persist fails — wire up via {@link setDailyCashPersistErrorHandler}. */
+let persistErrorHandler = null;
+
+/** @param {((err: unknown) => void) | null} handler */
+export function setDailyCashPersistErrorHandler(handler) {
+  persistErrorHandler = typeof handler === "function" ? handler : null;
+}
+
 /** Production: manual counts live on `ManualCashCount` rows; this cache mirrors the server list. */
 let remoteManualCountEvents = [];
 let remoteManualCountsHydrated = false;
@@ -261,6 +269,7 @@ function scheduleRemotePersist() {
     if (!fn) return;
     const p = Promise.resolve(fn(json)).catch((err) => {
       console.error("[dailyCash] persist failed", err);
+      try { persistErrorHandler?.(err); } catch { /* never let a UI callback crash the store */ }
     });
     chainRemotePersistPromise(p);
   }, PERSIST_DEBOUNCE_MS);

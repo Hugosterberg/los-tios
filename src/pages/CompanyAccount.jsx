@@ -22,6 +22,10 @@ import { createEntityWithOptionalTimestamp, updateEntityWithOptionalTimestamp } 
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listOrders } from "@/lib/local-dev-orders";
+import { toast } from "@/components/ui/use-toast";
+
+const mutationErrorToast = (title) => (err) =>
+  toast({ variant: "destructive", title, description: err?.message || "Check your connection and try again." });
 
 const createTransactionForm = (date = getMexicoNowDateKey()) => ({
   type: "contribution",
@@ -111,6 +115,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
       resetTransactionForm();
     },
+    onError: mutationErrorToast("Could not save transaction"),
   });
 
   const updateTransaction = useMutation({
@@ -123,6 +128,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
       resetTransactionForm();
     },
+    onError: mutationErrorToast("Could not update transaction"),
   });
 
   const deleteTransaction = useMutation({
@@ -130,6 +136,7 @@ export default function CompanyAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companyTransactions'] });
     },
+    onError: mutationErrorToast("Could not delete transaction"),
   });
 
   const createContributor = useMutation({
@@ -138,6 +145,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
       resetContributorForm();
     },
+    onError: mutationErrorToast("Could not save contributor"),
   });
 
   const updateContributor = useMutation({
@@ -146,6 +154,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
       resetContributorForm();
     },
+    onError: mutationErrorToast("Could not update contributor"),
   });
 
   const deleteContributor = useMutation({
@@ -153,6 +162,7 @@ export default function CompanyAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contributors'] });
     },
+    onError: mutationErrorToast("Could not delete contributor"),
   });
 
   const createExpense = useMutation({
@@ -165,6 +175,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       resetExpenseForm();
     },
+    onError: mutationErrorToast("Could not save expense"),
   });
 
   const updateExpense = useMutation({
@@ -176,6 +187,7 @@ export default function CompanyAccount() {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       resetExpenseForm();
     },
+    onError: mutationErrorToast("Could not update expense"),
   });
 
   const deleteExpense = useMutation({
@@ -183,6 +195,7 @@ export default function CompanyAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
     },
+    onError: mutationErrorToast("Could not delete expense"),
   });
 
   // Calculate balances

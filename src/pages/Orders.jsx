@@ -104,11 +104,13 @@ export default function Orders() {
   const updateOrder = useMutation({
     mutationFn: ({ id, data }) => updateOrderEntity(id, data, (orderId, payload) => base44.entities.Order.update(orderId, payload)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+    onError: (err) => toast({ variant: "destructive", title: "Could not update order", description: err?.message || "Check your connection." }),
   });
 
   const deleteOrder = useMutation({
     mutationFn: (id) => deleteOrderEntity(id, (orderId) => base44.entities.Order.delete(orderId)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+    onError: (err) => toast({ variant: "destructive", title: "Could not delete order", description: err?.message || "Check your connection." }),
   });
 
   const createOrder = useMutation({
@@ -117,6 +119,7 @@ export default function Orders() {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       setShowNewOrderForm(false);
     },
+    onError: (err) => toast({ variant: "destructive", title: "Could not create order", description: err?.message || "Check your connection." }),
   });
 
   const activeOrders = orders.filter((order) => order.status !== "delivered" && order.status !== "cancelled");
