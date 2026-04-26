@@ -1362,17 +1362,19 @@ export default function EmployeeCalendar() {
                           key={day.toISOString()}
                           type="button"
                           onClick={() => {
-                            if (stats.list.length > 0) {
+                            setCurrentWeekStart(startOfWeek(day, { weekStartsOn: 1 }));
+                            setScheduleView("week");
+                            if (stats.list.length === 1) {
                               openShiftDialog(day, stats.list[0]);
                               return;
                             }
-                            setCurrentWeekStart(startOfWeek(day, { weekStartsOn: 1 }));
-                            setScheduleView("week");
-                            if (showMonthTemplateRoster) {
+                            if (stats.list.length === 0 && showMonthTemplateRoster) {
                               openTemplateShiftDialog(day, templateEmployee);
                               return;
                             }
-                            openShiftDialog(day);
+                            if (stats.list.length === 0) {
+                              openShiftDialog(day);
+                            }
                           }}
                           className={cn(
                             "flex min-h-[4.5rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[5.25rem] sm:p-2",
@@ -1391,19 +1393,24 @@ export default function EmployeeCalendar() {
                             {format(day, "d")}
                           </span>
                           {stats.count > 0 ? (
-                            <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight text-yellow-200/90 sm:text-[10px]">
-                              <span className="truncate font-medium text-gray-200">
-                                {stats.list[0].employee_name}
-                                <span className="font-normal text-gray-500"> · </span>
-                                <span className="tabular-nums text-gray-400">
-                                  {formatShiftClock(stats.list[0].start_time)}–
-                                  {formatShiftClock(stats.list[0].end_time)}
+                            <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight">
+                              {stats.list.map((s) => (
+                                <span key={s.id} className="flex min-w-0 flex-col">
+                                  <span className="truncate font-medium text-gray-200">
+                                    {s.employee_name}
+                                    <span className="font-normal text-gray-500"> · </span>
+                                    <span className="tabular-nums text-gray-400">
+                                      {formatShiftClock(s.start_time)}–{formatShiftClock(s.end_time)}
+                                    </span>
+                                  </span>
+                                  <span className="tabular-nums text-yellow-500/80">{formatMx(Number(s.amount || 0))}</span>
                                 </span>
-                              </span>
+                              ))}
                               {stats.count > 1 && (
-                                <span className="text-[9px] text-gray-500">+{stats.count - 1} more</span>
+                                <span className="mt-0.5 tabular-nums text-[8px] font-semibold text-yellow-400/70">
+                                  Total {formatMx(stats.total)}
+                                </span>
                               )}
-                              <span className="tabular-nums text-yellow-500/85">{formatMx(stats.total)}</span>
                             </span>
                           ) : showMonthTemplateRoster ? (
                             <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight sm:text-[10px]">
