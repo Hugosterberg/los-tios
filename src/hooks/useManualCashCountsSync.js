@@ -88,7 +88,18 @@ export function useManualCashCountsSync({ enabled, onSnapshotChange }) {
         void flushDailyCashPersistImmediate();
       }
       const events = rows.map(manualCashCountRowToEvent).filter(Boolean);
-      push(events);
+      /* Deduplicate rows with identical (dateKey, ts) — these are artefacts from
+         a previous save-on-blur bug. Prefer the row with a comment when picking
+         which duplicate to keep. */
+      const seen = new Map();
+      for (const ev of events) {
+        const key = `${ev.dateKey}|${ev.ts}`;
+        const existing = seen.get(key);
+        if (!existing || (!existing.comment && ev.comment)) {
+          seen.set(key, ev);
+        }
+      }
+      push([...seen.values()]);
       return;
     }
 
