@@ -828,6 +828,8 @@ export default function DailyCash() {
   const bumpStoreTick = useCallback(() => setStoreTick((t) => t + 1), []);
   // Prevents the blur that fires when clicking the Save button from creating a duplicate row.
   const skipNextBlurRef = useRef(false);
+  // Prevents a second ManualCashCount row when blur + Save click land within the same async save.
+  const openingIsSavingRef = useRef(false);
   const { settings, isLocalOnlyMode, manualCountsError, manualCountsLoading, manualCountsRefetch } =
     useDailyCashStoreSync({ onStoreChange: bumpStoreTick });
   const appSettings = useMemo(() => getResolvedIntegrationSettings(settings[0] || {}), [settings]);
@@ -1158,10 +1160,8 @@ export default function DailyCash() {
         didWrite = true;
       } else {
         const n = parseFloat(trimmed.replace(",", "."));
-        if (Number.isFinite(n) && (forceRecord || oldPersisted !== n)) {
-          // Optimistically mark the opening as saved immediately so any concurrent
-          // blur/click (e.g. the blur that fires when clicking the Save button) sees
-          // the already-persisted value and does not create a duplicate row.
+        if (Number.isFinite(n) && (forceRecord || oldPersisted !== n) && !openingIsSavingRef.current) {
+          openingIsSavingRef.current = true;
           setOpeningBalance(formDayStr, n);
           const eventTs = mexicoBusinessDayCreatedAtIso(formDayStr);
           const expectedInfo = deriveManualCountExpectation(formDayStr, eventTs);
