@@ -70,6 +70,7 @@ import {
 } from "@/lib/dailyCashLocal";
 import { useDailyCashStoreSync } from "@/hooks/useDailyCashStoreSync";
 import { useMonthUrlSync } from "@/hooks/useMonthUrlSync";
+import { toast } from "@/components/ui/use-toast";
 
 function escapeCsvField(value) {
   const s = String(value);
@@ -321,6 +322,9 @@ export default function ShoppingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not save item", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const updateItem = useMutation({
@@ -333,6 +337,9 @@ export default function ShoppingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update item", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const deleteItem = useMutation({
@@ -340,6 +347,9 @@ export default function ShoppingList() {
       useLocalFinance ? localDeleteShoppingList(id) : base44.entities.ShoppingList.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
+    },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not delete item", description: e?.message || "Check your connection and try again." });
     },
   });
 
@@ -369,6 +379,9 @@ export default function ShoppingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not save expense", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const patchExpenseRow = useMutation({
@@ -382,6 +395,9 @@ export default function ShoppingList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update expense", description: e?.message || "Check your connection and try again." });
     },
   });
 
@@ -409,6 +425,9 @@ export default function ShoppingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["shoppingList"] });
+    },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not remove purchase", description: e?.message || "Check your connection and try again." });
     },
   });
 
@@ -758,7 +777,7 @@ export default function ShoppingList() {
       setLastRemovedShoppingSnapshot(null);
     } catch (e) {
       console.error(e);
-      alert("Could not restore the row. Try again.");
+      toast({ variant: "destructive", title: "Could not restore item", description: e?.message || "Check your connection and try again." });
     }
   };
 

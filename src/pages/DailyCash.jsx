@@ -916,6 +916,9 @@ export default function DailyCash() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not save transaction", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const deleteCompanyTx = useMutation({
@@ -923,6 +926,9 @@ export default function DailyCash() {
       useLocalFinance ? localDeleteCompanyTransaction(id) : base44.entities.CompanyTransaction.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
+    },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not delete transaction", description: e?.message || "Check your connection and try again." });
     },
   });
 
@@ -934,6 +940,9 @@ export default function DailyCash() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companyTransactions"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update description", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const saveOrderDetail = useMutation({
@@ -942,6 +951,9 @@ export default function DailyCash() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update order", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const saveExpenseDetail = useMutation({
@@ -949,6 +961,9 @@ export default function DailyCash() {
       useLocalFinance ? localUpdateExpense(id, data) : base44.entities.Expense.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update expense", description: e?.message || "Check your connection and try again." });
     },
   });
 
@@ -1700,6 +1715,7 @@ export default function DailyCash() {
           }
         } catch (e) {
           console.error("[ledger] Order.update (time)", e);
+          throw e;
         }
         if (dateKeyMexico === ledgerDay) {
           setLedgerTimeOverride(ledgerDay, rowId, iso);
@@ -1736,6 +1752,7 @@ export default function DailyCash() {
         if (refetch?.orders) queryClient.invalidateQueries({ queryKey: ["orders"] });
       } catch (err) {
         console.error("[ledgerTime] popover commit failed", err);
+        toast({ variant: "destructive", title: "Could not save time edit", description: err?.message || "Check your connection and try again." });
       }
     },
     [persistLedgerTimeCommit, queryClient],

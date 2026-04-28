@@ -11,6 +11,7 @@ import {
   initDailyCashPersistenceLocal,
   initDailyCashPersistenceRemote,
   setDailyCashPersistErrorHandler,
+  setRemoteManualCountSnapshot,
 } from "@/lib/dailyCashLocal";
 import { toast } from "@/components/ui/use-toast";
 import { useManualCashCountsSync } from "@/hooks/useManualCashCountsSync";
@@ -22,6 +23,10 @@ import {
   persistDailyCashLedgerPayload,
   pickDailyCashHydrationJsonString,
 } from "@/lib/dailyCashLedgerRepository";
+import {
+  MANUAL_CASH_COUNTS_QUERY_KEY,
+  manualCashCountRowToEvent,
+} from "@/lib/manualCashCountRepository";
 
 /**
  * Bootstraps the Daily Cash store (opening balances, ledger time overrides, manual lines).
@@ -169,6 +174,16 @@ export function useDailyCashStoreSync({ onStoreChange } = {}) {
         });
       });
       const { migrated, memoryMerged } = initDailyCashPersistenceRemote(serverJson, persist);
+      /* initDailyCashPersistenceRemote() clears the remote snapshot. When bootstrap re-runs
+         (ledger payload changed by a debounced persist from syncOpeningsAfterManualCountsReplace),
+         the ManualCashCount useEffect won't re-run (same q.dataUpdatedAt) — restore from cache
+         immediately so the history doesn't go blank. */
+      const cachedCounts = queryClient.getQueryData(MANUAL_CASH_COUNTS_QUERY_KEY);
+      if (Array.isArray(cachedCounts) && cachedCounts.length > 0) {
+        const cachedEvents = cachedCounts.map(manualCashCountRowToEvent).filter(Boolean);
+        cachedEvents.sort((a, b) => new Date(b?.ts || 0) - new Date(a?.ts || 0));
+        setRemoteManualCountSnapshot(cachedEvents, true);
+      }
       if (migrated || memoryMerged) {
         try {
           await flushDailyCashPersistImmediate();

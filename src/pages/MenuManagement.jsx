@@ -69,6 +69,9 @@ export default function MenuManagement() {
       setShowForm(false);
       setEditingItem(null);
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not save menu item", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const updateItem = useMutation({
@@ -97,6 +100,9 @@ export default function MenuManagement() {
       setShowForm(false);
       setEditingItem(null);
     },
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not update menu item", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const deleteItem = useMutation({
@@ -119,6 +125,9 @@ export default function MenuManagement() {
       return deleteMenuItem(id, (itemId) => base44.entities.MenuItem.delete(itemId));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["menuItems"] }),
+    onError: (e) => {
+      toast({ variant: "destructive", title: "Could not delete menu item", description: e?.message || "Check your connection and try again." });
+    },
   });
 
   const categories = [

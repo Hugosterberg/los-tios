@@ -28,6 +28,7 @@ import {
   persistLocale,
   readStoredLocale,
 } from "@/lib/restaurantPublicLocale";
+import { getMexicoNowDateKey } from "@/lib/mexicoTime";
 import { GOOGLE_MAPS_PLACE_URL, TRIPADVISOR_URL } from "@/lib/mapsPlace";
 
 const MAP_EMBED =
@@ -58,11 +59,8 @@ export default function CustomerOrder() {
   }, [siteLocale]);
 
   const isEventPast = (year, month, day) => {
-    const today = new Date();
-    const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const eventDate = new Date(year, month - 1, day);
-
-    return localToday > eventDate;
+    const eventKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return getMexicoNowDateKey() > eventKey;
   };
 
   const { data: menuItems = [], isLoading } = useQuery({
@@ -94,7 +92,7 @@ export default function CustomerOrder() {
       setCart([]);
     },
     onError: () => {
-      alert("Ordern kunde inte skapas. Kontrollera betalningslaget och forsok igen.");
+      alert("No se pudo crear la orden. Verifica el estado del pago e intenta de nuevo.\nCould not create the order. Check payment status and try again.");
     },
   });
 
@@ -263,7 +261,7 @@ export default function CustomerOrder() {
 
   const handleOpenClipCheckout = () => {
     if (!appSettings.clip_payment_link) {
-      alert("Clip-lank saknas. Lagg till den i admin under betalningsinstallningar.");
+      alert("Pago con Clip no disponible en este momento. Elige otro método de pago.\nClip payment not available right now. Please choose another payment method.");
       return;
     }
 
@@ -435,7 +433,7 @@ export default function CustomerOrder() {
                   <div className="bg-[#242424] border border-yellow-500/20 rounded-xl p-6">
                     <h3 className="font-bold text-lg mb-4 text-yellow-400">Checkout con Clip / Clip Checkout</h3>
                     <p className="text-sm text-gray-300 mb-4">
-                      Abre Clip en en ny flik, slutför kortbetalningen och kom sedan tillbaka hit för att bekräfta ordern.
+                      Abre Clip en una nueva pestaña, completa el pago con tarjeta y regresa aquí para confirmar tu orden. / Open Clip in a new tab, complete the card payment, then come back here to confirm your order.
                     </p>
                     <div className="mt-4 pt-4 border-t border-yellow-500/20">
                       <div className="flex justify-between items-center">
@@ -1215,7 +1213,6 @@ export default function CustomerOrder() {
                     })}
                 </>
               )}
-              {!isEventInPast("beerfestcondido") && (
               <div className="max-w-3xl mx-auto mb-8">
                 {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("beerfestcondido") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
@@ -1273,10 +1270,8 @@ export default function CustomerOrder() {
                 </div>
                 )}
               </div>
-              )}
 
-              {!isEventInPast("football-night") && (
-              <div className="max-w-3xl mx-auto">
+              <div className="max-w-3xl mx-auto mb-8">
                 {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
                   <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
@@ -1333,161 +1328,7 @@ export default function CustomerOrder() {
                 </div>
                 )}
               </div>
-              )}
 
-              {/* Event suggestion CTA */}
-              <div className="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-                <div id="event-contact" className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    Event idea? Reach out to us.
-                    We can host or bring pizza events to many locations.
-                    Contact us if you want to plan something together.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                   <a
-                     href="mailto:info@lostios.mx?subject=Propuesta de evento"
-                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
-                   >
-                     Contactanos
-                   </a>
-                  </div>
-                </div>
-                <div className="bg-[#242424] border border-yellow-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3">
-                  <p className="text-gray-300 text-sm leading-relaxed flex-1">
-                    Do you have an idea for an event with us?<br/><br/>
-                    At our restaurant in Centro, Puerto Escondido, we have our well-invested hybrid wood and gas oven, a serious investment for serious pizza.<br/><br/>
-                    Under our brand <span className="text-yellow-400 font-semibold">Los Tios Express</span> we can also bring portable pizza ovens almost anywhere, delivering results that are nearly just as incredible. The dough matters just as much as the oven!
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                   <a
-                     href="mailto:info@lostios.mx?subject=Event proposal&body=Hi Los Tios team, I would like to propose an event..."
-                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-transparent hover:bg-yellow-400/10 text-yellow-400 text-xs font-semibold transition-colors border border-yellow-400"
-                   >
-                     Contact us
-                   </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-yellow-500/10 my-8"></div>
-              <p className="text-center text-gray-500 text-sm mb-8 tracking-widest uppercase">{publicCopy.eventsPastSection}</p>
-              {isEventInPast("beerfestcondido") && (
-                <div className="max-w-3xl mx-auto mb-8">
-                  {siteLocale === "es" ? (
-                  <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
-                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
-                      <span className="font-black text-3xl leading-none">4-5</span>
-                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">ABRIL</span>
-                    </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
-                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio en Beerfestcondido</h3>
-                    <p className="leading-relaxed text-sm text-gray-300">
-                      El <span className="text-yellow-400 font-semibold">4 y 5 de abril</span> estuvimos en <span className="text-yellow-400 font-semibold">Beerfestcondido</span> en <span className="text-yellow-400 font-semibold">Nodo Brewery, Zicatela</span>, sirviendo nuestras <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Nuestra variante express: bolitas fritas hechas con nuestra propia masa de pizza real, doradas y crujientes por fuera, suavecitas por dentro. El festival estuvo cargado de chela artesanal, buena banda y esa vibra de playa que solo Puerto Escondido tiene. Una noche de esas que no se olvidan.
-                    </p>
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        { emoji: "🍺", line1: "Cerveza", line2: "artesanal" },
-                        { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
-                        { emoji: "✨", line1: "Buena", line2: "vibra" },
-                        { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
-                      ].map(({ emoji, line1, line2 }) => (
-                        <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 bg-gray-800/50 text-gray-500">
-                          <span className="text-base leading-none">{emoji}</span>
-                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
-                  </div>
-                  ) : (
-                  <div className="rounded-2xl p-6 border relative overflow-hidden transition-all bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale">
-                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
-                      <span className="font-black text-3xl leading-none">4-5</span>
-                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">APRIL</span>
-                    </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">BEERFESTCONDIDO · NODO BREWERY · ZICATELA</p>
-                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Bolas del Tio at Beerfestcondido</h3>
-                    <p className="leading-relaxed text-sm text-gray-300">
-                      On <span className="text-yellow-400 font-semibold">April 4-5</span> we were at <span className="text-yellow-400 font-semibold">Beerfestcondido</span> at <span className="text-yellow-400 font-semibold">Nodo Brewery in Zicatela</span>, serving our <span className="text-yellow-400 font-semibold">Bolas del Tio</span>. Our Los Tios Express creation: deep-fried pizza balls made from our real pizza dough, golden and crispy on the outside, pillowy soft on the inside. The festival was packed with craft beer, great people and that signature Puerto Escondido beach energy. Exactly the kind of night you don't forget.
-                    </p>
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        { emoji: "🍺", line1: "Craft", line2: "beer" },
-                        { emoji: "🍕", line1: "Bolas", line2: "del Tio" },
-                        { emoji: "✨", line1: "Great", line2: "vibe" },
-                        { emoji: "🎉", line1: "Nodo", line2: "Brewery" },
-                      ].map(({ emoji, line1, line2 }) => (
-                        <div key={line1} className="text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 bg-gray-800/50 text-gray-500">
-                          <span className="text-base leading-none">{emoji}</span>
-                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-xs text-gray-500">Beerfestcondido at Nodo Brewery, Zicatela, Puerto Escondido, Oax.</p>
-                  </div>
-                  )}
-                </div>
-              )}
-              {isEventInPast("football-night") && (
-                <div className="max-w-3xl mx-auto mb-8">
-                  {siteLocale === "es" ? (
-                  <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
-                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
-                      <span className="font-black text-5xl leading-none">28</span>
-                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARZO</span>
-                    </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM HASTA TARDE</p>
-                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
-                    <p className="leading-relaxed text-sm text-gray-300">
-                      Vive el partido con nosotros en una noche de futbol, buena vibra y pura fiesta. Tendremos pizzas recien hechas, cervezas bien frias y <span className="text-yellow-400 font-semibold">shots de mezcal</span> para subir el animo. Cada jugada se vive mejor aqui, con musica, energia y toda la banda apoyando. Perfecto para venir con los tíos, echar chela, gritar los goles y quedarte despues del partido. No es solo ver el juego... es vivirlo.
-                    </p>
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        { emoji: "🍺", line1: "Chela", line2: "fria" },
-                        { emoji: "🍕", line1: "Pizza", line2: "recien hecha" },
-                        { emoji: "🥃", line1: "Shots de", line2: "mezcal" },
-                        { emoji: "⚽", line1: "Futbol", line2: "en vivo" },
-                      ].map(({ emoji, line1, line2 }) => (
-                        <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
-                          <span className="text-base leading-none">{emoji}</span>
-                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
-                    <EventShareButtons title="Football Night at Los Tios - 28 Marzo" text="Ven a ver el partido, pizza, chela y mezcal!" url={`${window.location.origin}/#eventos`} />
-                  </div>
-                  ) : (
-                  <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("football-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
-                    <div className="absolute top-0 right-0 bg-yellow-400 text-[#1a1a1a] rounded-bl-2xl flex flex-col items-center px-4 py-2">
-                      <span className="font-black text-5xl leading-none">28</span>
-                      <span className="font-bold text-xs tracking-widest uppercase leading-tight">MARCH</span>
-                    </div>
-                    <p className="text-xs font-bold tracking-widest uppercase mb-4 text-yellow-400/60">4 PM TILL LATE</p>
-                    <h3 className="text-xl font-black mb-3 pr-20 text-white">Football Night at Los Tios</h3>
-                    <p className="leading-relaxed text-sm text-gray-300">
-                      Game night hits different at Los Tios. Come watch the match with us in a high-energy atmosphere full of good vibes and great people. Expect fresh pizza, ice-cold beers, and <span className="text-yellow-400 font-semibold">mezcal shots</span> to keep the energy going. Every moment of the game feels bigger here, with music, crowd hype, and nonstop action. Bring your crew, grab a drink, cheer loud, and stay after the match to keep the party going. This is not just watching the game... it is experiencing it.
-                    </p>
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        { emoji: "🍺", line1: "Cold", line2: "beer" },
-                        { emoji: "🍕", line1: "Fresh", line2: "pizza" },
-                        { emoji: "🥃", line1: "Mezcal", line2: "shots" },
-                        { emoji: "⚽", line1: "Live", line2: "football" },
-                      ].map(({ emoji, line1, line2 }) => (
-                        <div key={line1} className={`text-xs font-bold px-3 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 h-16 ${isEventInPast("football-night") ? 'bg-gray-800/50 text-gray-500' : 'bg-yellow-400/10 text-yellow-400'}`}>
-                          <span className="text-base leading-none">{emoji}</span>
-                          <span className="text-xs text-center leading-tight">{line1}<br/>{line2}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-xs text-gray-500">Av. Oaxaca 305, Centro, 71980 Puerto Escondido, Oax. <span className="text-gray-600">(PLAZA MONTE ALBAN)</span></p>
-                    <EventShareButtons title="Football Night at Los Tios - March 28" text="Come watch the match, fresh pizza, cold beers and mezcal shots!" lang="en" url={`${window.location.origin}/#eventos`} />
-                  </div>
-                  )}
-                </div>
-              )}
               <div className="max-w-3xl mx-auto">
                 {siteLocale === "es" ? (
                 <div className={`rounded-2xl p-6 border relative overflow-hidden transition-all ${isEventInPast("opening-night") ? 'bg-[#1e1e1e] border-gray-700/40 opacity-70 grayscale' : 'bg-[#242424] border-yellow-500/30'}`}>
