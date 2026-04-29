@@ -239,20 +239,16 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
     return <span className="tabular-nums text-gray-500">{row.timeLabel}</span>;
   }
 
-  const showReset = Boolean(overrideIso || pendingEdit);
-
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {showReset ? (
-        <button
-          type="button"
-          className="shrink-0 rounded p-0.5 text-gray-500 hover:text-red-400 transition-colors"
-          title="Restore original time and clear unsaved edits"
-          onClick={() => onReset(row.id)}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className="shrink-0 rounded p-0.5 text-gray-600 hover:text-red-400 transition-colors"
+        title="Restore original time and clear unsaved edits"
+        onClick={() => onReset(row.id)}
+      >
+        <X className="h-3 w-3" />
+      </button>
       <MexicoWallDatePicker
         value={dateKey}
         onChange={(k) => {
