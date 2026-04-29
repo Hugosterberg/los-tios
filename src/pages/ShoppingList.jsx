@@ -151,7 +151,13 @@ const REGISTERED_MONTH_SHORT = [
 const REGISTERED_PURCHASES_MIN_YEAR = 2020;
 
 export default function ShoppingList() {
-  const [mainTab, setMainTab] = useState("purchase");
+  const [mainTab, setMainTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("tab");
+      if (p === "list") return "list";
+    }
+    return "purchase";
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [lastRemovedShoppingSnapshot, setLastRemovedShoppingSnapshot] = useState(null);
@@ -174,6 +180,7 @@ export default function ShoppingList() {
 
   const [quickAddBusy, setQuickAddBusy] = useState(null); // null | "all" | ingredient name
   const [recentPurchaseEntries, setRecentPurchaseEntries] = useState([]); // { id, name, amount }
+  const [linkCopied, setLinkCopied] = useState(false);
   const [amountDraftById, setAmountDraftById] = useState({});
 
   const [formData, setFormData] = useState({
@@ -768,6 +775,17 @@ export default function ShoppingList() {
     if (!row) return;
     setLastRemovedShoppingSnapshot(shoppingListCreatePayloadFromRow(row));
     deleteItem.mutate(id);
+  };
+
+  const handleCopyShortcut = async () => {
+    const url = `${window.location.origin}/ShoppingList`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      window.prompt("Kopiera den här länken:", url);
+    }
   };
 
   const handleUndoLastRemove = async () => {
@@ -1586,12 +1604,33 @@ export default function ShoppingList() {
         {mainTab === "purchase" && (
           <>
             <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
-              <h2 className="text-sm font-bold text-yellow-400">Register purchase</h2>
-              <p className="mt-1 text-xs text-gray-400">
-                Pick <strong className="text-gray-300">Shopping</strong> for a custom name, or any menu line below. Then enter
-                amount, whether you paid <strong className="text-gray-300">cash</strong> or <strong className="text-gray-300">card</strong>, the
-                Mexico <strong className="text-gray-300">date and time</strong> of the purchase, then save. Use one date/time for several lines from the same trip.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-bold text-yellow-400">Register purchase</h2>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Pick <strong className="text-gray-300">Shopping</strong> for a custom name, or any menu line below. Then enter
+                    amount, whether you paid <strong className="text-gray-300">cash</strong> or <strong className="text-gray-300">card</strong>, the
+                    Mexico <strong className="text-gray-300">date and time</strong> of the purchase, then save.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyShortcut}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                    linkCopied
+                      ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300"
+                      : "border-yellow-500/25 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20",
+                  )}
+                  title="Kopiera länk till den här sidan — bokmärk den i mobilen"
+                >
+                  {linkCopied ? (
+                    <>&#10003; Kopierad!</>
+                  ) : (
+                    <>&#128279; Mobilgenväg</>
+                  )}
+                </button>
+              </div>
             </div>
 
             <Card className="border border-yellow-500/15 bg-[#242424] text-gray-200 shadow-none">
@@ -1610,17 +1649,16 @@ export default function ShoppingList() {
                       kitchen quick picks (English).
                     </p>
                   </div>
-                  <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-yellow-500/15 bg-[#1a1a1a]/80 p-3 [scrollbar-color:rgba(250,204,21,0.35)_transparent]">
+                  <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto rounded-lg border border-yellow-500/15 bg-[#1a1a1a]/80 p-3 [scrollbar-color:rgba(250,204,21,0.35)_transparent]">
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
                       title="Custom purchase — enter name below"
                       onClick={() => {
                         setQuickMenuIngredient(PURCHASE_PICK_SHOPPING);
                         queueMicrotask(() => quickShoppingNameInputRef.current?.focus());
                       }}
-                      className={filterPillClass(quickMenuIngredient === PURCHASE_PICK_SHOPPING)}
+                      className={cn(filterPillClass(quickMenuIngredient === PURCHASE_PICK_SHOPPING), "h-10 min-w-[4rem] sm:h-9")}
                     >
                       <span className="truncate">Shopping</span>
                     </Button>
@@ -1629,14 +1667,13 @@ export default function ShoppingList() {
                         key={`purchase-pick-${ing}`}
                         type="button"
                         variant="outline"
-                        size="sm"
                         title={ing}
                         onClick={() => {
                           setQuickMenuIngredient(ing);
                           setQuickShoppingLabel("");
                           queueMicrotask(() => quickAmountInputRef.current?.focus());
                         }}
-                        className={filterPillClass(quickMenuIngredient === ing)}
+                        className={cn(filterPillClass(quickMenuIngredient === ing), "h-10 sm:h-9")}
                       >
                         <span className="truncate">{ing}</span>
                       </Button>
@@ -1679,6 +1716,7 @@ export default function ShoppingList() {
                       onChange={(e) => setQuickAmount(e.target.value)}
                       placeholder="0"
                       className={cn(
+                        "h-12 text-lg sm:h-9 sm:text-sm",
                         "border-yellow-500/20 bg-[#1a1a1a] text-white placeholder:text-gray-500 [appearance:textfield] [-moz-appearance:textfield]",
                         "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                       )}
@@ -1793,11 +1831,11 @@ export default function ShoppingList() {
 
                 <Button
                   type="button"
-                  className="bg-yellow-400 text-black hover:bg-yellow-300"
+                  className="h-12 w-full bg-yellow-400 text-base font-bold text-black hover:bg-yellow-300 sm:h-10 sm:text-sm"
                   disabled={createItem.isPending || createExpense.isPending || updateItem.isPending}
                   onClick={handleQuickLogPurchase}
                 >
-                  Register purchase
+                  {createItem.isPending || createExpense.isPending ? "Saving…" : "Register purchase"}
                 </Button>
 
                 {recentPurchaseEntries.length > 0 && (
