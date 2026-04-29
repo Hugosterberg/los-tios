@@ -1181,6 +1181,7 @@ export default function DailyCash() {
               previousManualCountTs: expectedInfo.previousManualCount?.ts || null,
               comment: "",
             });
+            openingIsSavingRef.current = false;
           } else {
             void (async () => {
               try {
@@ -1231,6 +1232,8 @@ export default function DailyCash() {
                     "Fix: create the ManualCashCount collection in Base44 Data (see entities/ManualCashCount.jsonc). " +
                     `Error: ${e?.message || String(e)}`,
                 });
+              } finally {
+                openingIsSavingRef.current = false;
               }
             })();
           }
