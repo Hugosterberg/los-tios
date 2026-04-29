@@ -249,7 +249,7 @@ function getDefaultDashboardCalendarMonth() {
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [selectedDateRange, setSelectedDateRange] = React.useState(QUICK_RANGE_OPTIONS[0]);
-  const [calendarMonth, setCalendarMonth] = React.useState(getDefaultDashboardCalendarMonth);
+  const [calendarMonth, setCalendarMonth] = React.useState(null);
   const [calendarBrowseYear, setCalendarBrowseYear] = React.useState(() => getDefaultDashboardCalendarMonth().y);
   const [selectedDedupeWindow, setSelectedDedupeWindow] = React.useState(DEDUPE_WINDOW_OPTIONS[2]);
   const [selectedDedupePriority, setSelectedDedupePriority] = React.useState(DEDUPE_PRIORITY_OPTIONS[0]);
