@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { appendMonthParam, isValidMonthKey } from "@/hooks/useMonthUrlSync";
@@ -30,6 +31,20 @@ export default function Layout({ children }) {
   const [searchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const { logout } = useAuth();
+  const headerRef = React.useRef(null);
+  const [menuTop, setMenuTop] = React.useState(0);
+
+  React.useLayoutEffect(() => {
+    if (!mobileMenuOpen || !headerRef.current) return;
+    const update = () => {
+      if (headerRef.current) {
+        setMenuTop(headerRef.current.getBoundingClientRect().bottom);
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [mobileMenuOpen]);
 
   /* Propagate ?month=YYYY-MM across every sidebar link so the selected period persists
      through any navigation path (even via pages that don't themselves use the param).
@@ -83,7 +98,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a]">
-      <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-[#1a1a1a]">
+      <header ref={headerRef} className="sticky top-0 z-40 border-b border-yellow-500/20 bg-[#1a1a1a]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-10 items-center justify-between gap-2.5" lang="en">
             <div className="flex shrink-0 items-center gap-2">
@@ -143,13 +158,13 @@ export default function Layout({ children }) {
               <Link
                 to={shoppingUrl}
                 title="Shopping"
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-all xl:hidden ${
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border transition-all xl:hidden ${
                   isShoppingPage
                     ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-300"
                     : "border-yellow-500/20 text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <ShoppingCart className="h-4 w-4" />
+                <ShoppingCart className="h-5 w-5" />
               </Link>
               <button
                 onClick={handleLogout}
@@ -161,82 +176,17 @@ export default function Layout({ children }) {
               </button>
 
               <button
-                className="p-1.5 text-gray-400 hover:text-white xl:hidden"
+                className="flex h-11 w-11 items-center justify-center text-gray-400 hover:text-white xl:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               >
-                {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <>
-            <button
-              type="button"
-              aria-label="Close navigation"
-              className="fixed inset-0 z-40 bg-black/55 xl:hidden"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            <div className="relative z-50 border-t border-yellow-500/30 bg-[#1a1a1a] xl:hidden">
-            <nav className="space-y-2 px-4 py-4">
-              <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
-                <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Public</p>
-                <Link
-                  to={customerSiteUrl}
-                  className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
-                    isCustomerSitePage
-                      ? "bg-yellow-400 text-black"
-                      : "text-gray-300 hover:bg-white/10"
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Globe className="h-5 w-5" />
-                  <span className="font-medium">Customer Site</span>
-                </Link>
-              </div>
-              <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
-                <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Settings</p>
-                <Link
-                  to={withMonth("IntegrationsHub")}
-                  className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
-                    isActivePage("IntegrationsHub")
-                      ? "bg-yellow-400/10 text-yellow-400"
-                      : "text-gray-300 hover:bg-white/10"
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Settings2 className="h-5 w-5" />
-                  <span className="font-medium">Integrations</span>
-                </Link>
-              </div>
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.url}
-                  className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
-                    isActivePage(item.pageName)
-                      ? "bg-yellow-400/10 text-yellow-400"
-                      : "text-gray-300 hover:bg-white/10"
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="font-medium">{item.name}</span>
-                </Link>
-              ))}
-              <Button
-                variant="ghost"
-                onClick={handleLogout}
-                className="w-full justify-start px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white"
-              >
-                <LogOut className="mr-3 h-5 w-5" />
-                Sign Out
-              </Button>
-            </nav>
-            </div>
-          </>
-        )}
+        {/* Mobile menu rendered as portal to avoid iOS Safari tap issues with sticky+fixed */}
 
         <div className="border-t border-yellow-500/15 bg-[#161616] xl:hidden">
           <div className="overflow-x-auto px-3 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -261,6 +211,73 @@ export default function Layout({ children }) {
       </header>
 
       <main>{children}</main>
+
+      {mobileMenuOpen && menuTop > 0 && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            role="presentation"
+            className="fixed inset-0 z-50 bg-black/60 xl:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          {/* Menu panel — starts exactly where the header ends */}
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 overflow-y-auto border-t border-yellow-500/30 bg-[#1a1a1a] xl:hidden"
+            style={{ top: menuTop }}
+          >
+            <nav className="space-y-1 px-4 py-4">
+              <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
+                <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Public</p>
+                <Link
+                  to={customerSiteUrl}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base transition-all ${
+                    isCustomerSitePage ? "bg-yellow-400 text-black" : "text-gray-300 hover:bg-white/10"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Globe className="h-5 w-5" />
+                  <span className="font-medium">Customer Site</span>
+                </Link>
+              </div>
+              <div className="mb-3 rounded-lg border border-yellow-500/20 bg-black/20 p-2">
+                <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">Settings</p>
+                <Link
+                  to={withMonth("IntegrationsHub")}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base transition-all ${
+                    isActivePage("IntegrationsHub") ? "bg-yellow-400/10 text-yellow-400" : "text-gray-300 hover:bg-white/10"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Settings2 className="h-5 w-5" />
+                  <span className="font-medium">Integrations</span>
+                </Link>
+              </div>
+              {navItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.url}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base transition-all ${
+                    isActivePage(item.pageName) ? "bg-yellow-400/10 text-yellow-400" : "text-gray-300 hover:bg-white/10"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="font-medium">{item.name}</span>
+                </Link>
+              ))}
+              <Button
+                variant="ghost"
+                onClick={() => { setMobileMenuOpen(false); handleLogout(); }}
+                className="w-full justify-start px-4 py-3 text-base text-gray-300 hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="mr-3 h-5 w-5" />
+                Sign Out
+              </Button>
+            </nav>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }
