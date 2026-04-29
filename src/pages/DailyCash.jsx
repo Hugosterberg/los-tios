@@ -24,6 +24,7 @@ import {
   Plus,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
@@ -245,11 +246,11 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
       {showReset ? (
         <button
           type="button"
-          className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-amber-400/90 underline-offset-2 hover:text-amber-300 hover:underline"
+          className="shrink-0 rounded p-0.5 text-gray-500 hover:text-red-400 transition-colors"
           title="Restore original time and clear unsaved edits"
           onClick={() => onReset(row.id)}
         >
-          Reset
+          <X className="h-3 w-3" />
         </button>
       ) : null}
       <MexicoWallDatePicker
