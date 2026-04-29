@@ -129,8 +129,8 @@ export default function InsightTable({
         </TableHeader>
         <TableBody>
           {filteredRows.length ? (
-            filteredRows.map((row) => (
-              <TableRow key={row.id || row.source_system || JSON.stringify(row)} className="border-yellow-500/10 hover:bg-[#1f1f1f]">
+            filteredRows.map((row, idx) => (
+              <TableRow key={row.id || row.source_system || idx} className="border-yellow-500/10 hover:bg-[#1f1f1f]">
                 {columns.map((column) => (
                   <TableCell key={column.key} className="px-4 py-3 text-sm text-gray-200">
                     {column.render ? column.render(row[column.key], row) : row[column.key]}

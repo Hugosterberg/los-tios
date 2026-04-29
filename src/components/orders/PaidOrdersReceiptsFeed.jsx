@@ -18,7 +18,31 @@ import {
 } from "lucide-react";
 import { formatMexicoDateTimeMedium } from "@/lib/mexicoTime";
 import { cn } from "@/lib/utils";
-import { LoyverseReceiptRow } from "./LoyverseReceiptsSection";
+import { LoyverseReceiptRow, getReceiptChannelMeta } from "./LoyverseReceiptsSection";
+
+function receiptTotal(r) {
+  const raw = r.total_money ?? r.total_payment_money ?? r.total;
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string") return Number(raw) || 0;
+  if (raw && typeof raw === "object") return Number(raw.amount ?? raw.value) || 0;
+  return 0;
+}
+
+function paymentDisplayName(p) {
+  return String(p?.type ?? p?.name ?? p?.payment_type ?? "").trim() || "—";
+}
+
+function paymentMoneyAmt(p) {
+  if (typeof p.money_amount === "object" && p.money_amount?.amount != null) return p.money_amount.amount;
+  return p.money_amount ?? p.amount ?? 0;
+}
+
+function paymentIcon(name) {
+  const s = name.toLowerCase();
+  if (s.includes("cash") || s.includes("efectivo")) return Banknote;
+  if (s.includes("card") || s.includes("tarjeta") || s.includes("credit") || s.includes("debit") || s.includes("visa") || s.includes("master")) return CreditCard;
+  return null;
+}
 
 const formatMXN = (v) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(v || 0);
@@ -247,6 +271,41 @@ export default function PaidOrdersReceiptsFeed({
     [loyverseReceipts],
   );
 
+  const diningBreakdown = useMemo(() => {
+    const map = new Map();
+    for (const r of loyverseCompleted) {
+      const channel = getReceiptChannelMeta(r);
+      const baseLabel = channel.label.includes(" · ") ? channel.label.split(" · ")[0] : channel.label;
+      const cur = map.get(baseLabel) || { label: baseLabel, Icon: channel.Icon, badgeClass: channel.badgeClass, count: 0, amount: 0 };
+      cur.count += 1;
+      cur.amount += receiptTotal(r);
+      map.set(baseLabel, cur);
+    }
+    return [...map.values()].sort((a, b) => b.amount - a.amount);
+  }, [loyverseCompleted]);
+
+  const paymentBreakdown = useMemo(() => {
+    const map = new Map();
+    for (const r of loyverseCompleted) {
+      const payments = Array.isArray(r.payments) ? r.payments : [];
+      if (payments.length === 0) {
+        const cur = map.get("—") || { name: "—", count: 0, amount: 0 };
+        cur.count += 1;
+        cur.amount += receiptTotal(r);
+        map.set("—", cur);
+      } else {
+        for (const p of payments) {
+          const name = paymentDisplayName(p);
+          const cur = map.get(name) || { name, count: 0, amount: 0 };
+          cur.count += 1;
+          cur.amount += paymentMoneyAmt(p);
+          map.set(name, cur);
+        }
+      }
+    }
+    return [...map.values()].sort((a, b) => b.amount - a.amount);
+  }, [loyverseCompleted]);
+
   const merged = useMemo(() => {
     const app = paidAppOrders.map((order) => ({
       kind: "app",
@@ -316,6 +375,48 @@ export default function PaidOrdersReceiptsFeed({
           and customer names when Loyverse sends them (or when we can match a customer ID).
         </p>
       </div>
+
+      {(diningBreakdown.length > 0 || paymentBreakdown.length > 0) && (
+        <div className="mb-3 rounded-xl border border-yellow-500/15 bg-black/20 p-3 space-y-3">
+          {diningBreakdown.length > 0 && (
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-widest text-gray-500">Order type</p>
+              <div className="flex flex-wrap gap-2">
+                {diningBreakdown.map(({ label, Icon, count, amount }) => (
+                  <div key={label} className="flex-1 min-w-[110px] rounded-lg border border-yellow-500/10 bg-[#242424] px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Icon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                      <span className="text-xs text-gray-400 truncate">{label}</span>
+                    </div>
+                    <p className="text-sm font-bold text-yellow-400 tabular-nums">{formatMXN(amount)}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{count} receipt{count !== 1 ? "s" : ""}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {paymentBreakdown.length > 0 && (
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-widest text-gray-500">Payment method</p>
+              <div className="flex flex-wrap gap-2">
+                {paymentBreakdown.map(({ name, count, amount }) => {
+                  const PayIcon = paymentIcon(name);
+                  return (
+                    <div key={name} className="flex-1 min-w-[110px] rounded-lg border border-yellow-500/10 bg-[#242424] px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        {PayIcon ? <PayIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" /> : <span className="h-3.5 w-3.5 shrink-0" />}
+                        <span className="text-xs text-gray-400 truncate">{name}</span>
+                      </div>
+                      <p className="text-sm font-bold text-yellow-400 tabular-nums">{formatMXN(amount)}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">{count} payment{count !== 1 ? "s" : ""}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {hasLoyverseConfig && loyverseError && (
         <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-400">

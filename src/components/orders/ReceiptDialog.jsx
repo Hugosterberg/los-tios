@@ -11,12 +11,14 @@ export default function ReceiptDialog({ order, open, onClose }) {
   if (!order) return null;
 
   const handlePrint = () => {
-    const printContents = receiptRef.current.innerHTML;
-    const originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContents;
-    window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload();
+    const printWindow = window.open("", "_blank", "width=640,height=900");
+    if (!printWindow) return;
+    const css = `*{box-sizing:border-box}body{font-family:sans-serif;padding:24px;background:#fff;color:#000}.text-center{text-align:center}.text-right{text-align:right}.flex{display:flex}.justify-between{justify-content:space-between}.w-full{width:100%}.font-bold{font-weight:700}.font-semibold{font-weight:600}.font-medium{font-weight:500}.text-2xl{font-size:1.5rem;line-height:2rem}.text-xl{font-size:1.25rem}.text-lg{font-size:1.125rem}.text-sm{font-size:.875rem}.text-xs{font-size:.75rem}.text-gray-500{color:#6b7280}.text-gray-600{color:#4b5563}.text-red-600{color:#dc2626}.text-green-600{color:#16a34a}.text-purple-600{color:#9333ea}.border-b{border-bottom:1px solid #e5e7eb}.border-b-2{border-bottom:2px solid #e5e7eb}.border-t{border-top:1px solid #e5e7eb}.border-t-2{border-top:2px solid #e5e7eb}.border-double{border-style:double}.border-dashed{border-style:dashed}.mb-1{margin-bottom:.25rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mt-1{margin-top:.25rem}.pb-4{padding-bottom:1rem}.pt-4{padding-top:1rem}.p-6{padding:1.5rem}.py-2{padding:.5rem 0}.pl-4{padding-left:1rem}.ml-2{margin-left:.5rem}.ml-6{margin-left:1.5rem}.float-right{float:right}.max-w-\\[200px\\]{max-width:200px}table{width:100%;border-collapse:collapse}th,td{padding:.5rem}th{font-weight:600}@media print{@page{margin:10mm}}`;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Receipt - Los Tios</title><style>${css}</style></head><body>${receiptRef.current.innerHTML}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
 
   return (

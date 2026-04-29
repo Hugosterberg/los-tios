@@ -44,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatMexicoLongDateEn } from "@/lib/mexicoTime";
+import { toast } from "@/components/ui/use-toast";
 import { createEntityWithOptionalTimestamp } from "@/lib/businessTimestamps";
 import {
   isLocalFinanceMode,
@@ -325,7 +326,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetEmployeeForm();
     },
-    onError: (err) => alert(`Could not create employee: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not create employee", description: formatMutationError(err) }),
   });
 
   const updateEmployee = useMutation({
@@ -335,7 +336,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetEmployeeForm();
     },
-    onError: (err) => alert(`Could not update employee: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not update employee", description: formatMutationError(err) }),
   });
 
   const deleteEmployee = useMutation({
@@ -344,7 +345,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
     },
-    onError: (err) => alert(`Could not delete employee: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not delete employee", description: formatMutationError(err) }),
   });
 
   const createShift = useMutation({
@@ -353,7 +354,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
       resetShiftForm();
     },
-    onError: (err) => alert(`Could not save shift: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not save shift", description: formatMutationError(err) }),
   });
 
   const updateShift = useMutation({
@@ -363,7 +364,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
       resetShiftForm();
     },
-    onError: (err) => alert(`Could not update shift: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not update shift", description: formatMutationError(err) }),
   });
 
   const deleteShift = useMutation({
@@ -414,7 +415,7 @@ export default function EmployeeCalendar() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       resetShiftForm();
     },
-    onError: (err) => alert(`Could not delete shift: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not delete shift", description: formatMutationError(err) }),
   });
 
   const createExpense = useMutation({
@@ -428,7 +429,7 @@ export default function EmployeeCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
-    onError: (err) => alert(`Could not record expense: ${formatMutationError(err)}`),
+    onError: (err) => toast({ variant: "destructive", title: "Could not record expense", description: formatMutationError(err) }),
   });
 
   const weekDays = eachDayOfInterval({
@@ -629,7 +630,7 @@ export default function EmployeeCalendar() {
     e.preventDefault();
     const employee = employees.find((x) => x.id === shiftForm.employee_id);
     if (!employee) {
-      alert("Select an employee.");
+      toast({ variant: "destructive", title: "Select an employee." });
       return;
     }
     persistPreferredEmployeeId(employee.id);
@@ -664,17 +665,20 @@ export default function EmployeeCalendar() {
       notes: `Shift: ${shift.start_time} - ${shift.end_time} (${shift.hours_worked}h)`,
     };
 
-    const createdExpense = await createExpense.mutateAsync(expenseData);
-    await updateShift.mutateAsync({
-      id: shift.id,
-      data: sanitizeShiftPayload({
-        ...shift,
-        status: "paid",
-        expense_id: createdExpense.id,
-      }),
-    });
-
-    alert("Shift completed and salary added to expenses");
+    try {
+      const createdExpense = await createExpense.mutateAsync(expenseData);
+      await updateShift.mutateAsync({
+        id: shift.id,
+        data: sanitizeShiftPayload({
+          ...shift,
+          status: "paid",
+          expense_id: createdExpense.id,
+        }),
+      });
+      toast({ title: "Shift paid", description: `Salary of ${shift.amount ? `$${shift.amount}` : "—"} added to expenses.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Could not complete shift", description: err?.message || "Check your connection and try again." });
+    }
   };
 
   const requestDeleteShift = (shift, dateOverride = null) => {
@@ -762,7 +766,7 @@ export default function EmployeeCalendar() {
   const handleEmployeeSubmit = async (e) => {
     e.preventDefault();
     if (isoDaysFromChecks(employeeForm.workDays).length === 0) {
-      alert("Select at least one workday.");
+      toast({ variant: "destructive", title: "Select at least one workday." });
       return;
     }
     const merged = {
@@ -772,11 +776,11 @@ export default function EmployeeCalendar() {
     };
     const payload = buildEmployeePayload(merged);
     if (!payload.name) {
-      alert("Enter a name.");
+      toast({ variant: "destructive", title: "Enter a name." });
       return;
     }
     if (!editingEmployee && !String(payload.phone || "").trim()) {
-      alert("Enter a phone number.");
+      toast({ variant: "destructive", title: "Enter a phone number." });
       return;
     }
     if (editingEmployee) {
@@ -883,22 +887,20 @@ export default function EmployeeCalendar() {
 
   const applyWeekTemplate = async () => {
     if (!templateEmployeeId) {
-      alert("Select an employee first.");
+      toast({ variant: "destructive", title: "Select an employee first." });
       return;
     }
     const employee = employees.find((e) => e.id === templateEmployeeId);
     if (!employee || !employee.is_active) return;
 
     if (!getAutoRegisterShifts(employee)) {
-      alert(
-        'This employee is set to manual shifts only. Open their profile and enable "Auto-register shifts" to use bulk create, or add shifts with + on each day.',
-      );
+      toast({ variant: "destructive", title: "Manual shifts only", description: 'Open the employee\'s profile and enable "Auto-register shifts" to use bulk create.' });
       return;
     }
 
     const allowedIso = new Set(isoDaysFromChecks(parseWorkDaysFromEmployee(employee)));
     if (allowedIso.size === 0) {
-      alert("This employee has no workdays configured. Edit the employee and select weekdays.");
+      toast({ variant: "destructive", title: "No workdays configured", description: "Edit the employee and select weekdays." });
       return;
     }
 
@@ -932,14 +934,14 @@ export default function EmployeeCalendar() {
         created += 1;
       }
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
-      alert(
-        created > 0
-          ? `Created ${created} shift(s) for ${format(currentWeekStart, "MMM d", { locale: enUS })} – ${format(weekEnd, "MMM d, yyyy", { locale: enUS })}. Days that already had a shift were skipped.`
-          : "No new shifts — every matching workday already has a shift this week."
-      );
+      toast({
+        title: created > 0 ? `${created} shift(s) created` : "No new shifts",
+        description: created > 0
+          ? `For ${format(currentWeekStart, "MMM d", { locale: enUS })} – ${format(weekEnd, "MMM d, yyyy", { locale: enUS })}. Days that already had a shift were skipped.`
+          : "Every matching workday already has a shift this week.",
+      });
     } catch (err) {
-      console.error(err);
-      alert("Could not create all shifts. Try again.");
+      toast({ variant: "destructive", title: "Could not create all shifts", description: err?.message || "Try again." });
     } finally {
       setTemplateBusy(false);
     }

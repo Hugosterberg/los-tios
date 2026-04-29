@@ -28,6 +28,7 @@ import {
   omitDailyCashStoreJsonForAppSettingsUpdate,
 } from "@/lib/appSettings";
 import { appParams } from "@/lib/app-params";
+import { toast } from "@/components/ui/use-toast";
 
 const emptyForm = () => ({
   id: "",
@@ -229,12 +230,12 @@ export default function Events() {
       setForm(emptyForm());
       setEditingId("");
       setSaveError("");
-      alert(result?.local ? "Event saved locally." : "Event saved.");
+      toast({ title: result?.local ? "Event saved locally" : "Event saved" });
     },
     onError: (error) => {
       const message = error?.message || "Could not save the event. Check Base44 connection and try again.";
       setSaveError(message);
-      alert(`Event could not be saved: ${message}`);
+      toast({ variant: "destructive", title: "Could not save event", description: message });
     },
   });
 
@@ -250,7 +251,7 @@ export default function Events() {
     e.preventDefault();
     setSaveError("");
     if (!form.startDate || !form.titleEs || !form.titleEn || !form.descriptionEs || !form.descriptionEn) {
-      alert("Date, Spanish title/description, and English title/description are required.");
+      toast({ variant: "destructive", title: "Required fields missing", description: "Date, Spanish and English title + description are required." });
       return;
     }
     const nextEvent = normalizeForm(form);

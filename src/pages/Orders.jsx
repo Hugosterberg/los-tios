@@ -200,16 +200,20 @@ export default function Orders() {
 
     if (!paymentMethod) return;
 
-    const updated = await updateOrder.mutateAsync({
-      id: order.id,
-      data: {
-        status: "delivered",
-        payment_method: paymentMethod === "2" ? "card" : "cash",
-        payment_status: "paid",
-      },
-    });
-    const merged = { ...order, ...(updated || {}), status: "delivered", payment_status: "paid", payment_method: paymentMethod === "2" ? "card" : "cash" };
-    await pushOrderToLoyverseIfNeeded(merged);
+    try {
+      const updated = await updateOrder.mutateAsync({
+        id: order.id,
+        data: {
+          status: "delivered",
+          payment_method: paymentMethod === "2" ? "card" : "cash",
+          payment_status: "paid",
+        },
+      });
+      const merged = { ...order, ...(updated || {}), status: "delivered", payment_status: "paid", payment_method: paymentMethod === "2" ? "card" : "cash" };
+      await pushOrderToLoyverseIfNeeded(merged);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Could not complete order", description: err?.message || "Check your connection." });
+    }
   };
 
   const handleAddItemToTable = async (tableNumber, menuItem) => {
@@ -271,26 +275,30 @@ export default function Orders() {
   };
 
   const handleClearPaidTable = async (order, details) => {
-    const updated = await updateOrder.mutateAsync({
-      id: order.id,
-      data: {
+    try {
+      const updated = await updateOrder.mutateAsync({
+        id: order.id,
+        data: {
+          customer_name: details.customer_name,
+          special_instructions: details.special_instructions,
+          payment_method: details.payment_method,
+          payment_status: "paid",
+          status: "delivered",
+        },
+      });
+      const merged = {
+        ...order,
+        ...(updated || {}),
         customer_name: details.customer_name,
         special_instructions: details.special_instructions,
         payment_method: details.payment_method,
         payment_status: "paid",
         status: "delivered",
-      },
-    });
-    const merged = {
-      ...order,
-      ...(updated || {}),
-      customer_name: details.customer_name,
-      special_instructions: details.special_instructions,
-      payment_method: details.payment_method,
-      payment_status: "paid",
-      status: "delivered",
-    };
-    await pushOrderToLoyverseIfNeeded(merged);
+      };
+      await pushOrderToLoyverseIfNeeded(merged);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Could not clear table", description: err?.message || "Check your connection." });
+    }
   };
 
   return (

@@ -469,8 +469,7 @@ export default function ShoppingList() {
     try {
       await patchExpenseRow.mutateAsync({ id: r.id, amount: n });
     } catch (e) {
-      console.error(e);
-      alert("Could not save amount.");
+      toast({ variant: "destructive", title: "Could not save amount", description: e?.message });
     }
     setEditingRegisteredAmountId(null);
   };
@@ -493,8 +492,7 @@ export default function ShoppingList() {
         mexicoBusinessDayCreatedAtIso(v);
       await patchExpenseRow.mutateAsync({ id: r.id, date: v, created_date: nextCreatedIso, recorded_at: nextCreatedIso });
     } catch (e) {
-      console.error(e);
-      alert("Could not save date.");
+      toast({ variant: "destructive", title: "Could not save date", description: e?.message });
     }
     setEditingRegisteredDateId(null);
   };
@@ -569,7 +567,7 @@ export default function ShoppingList() {
       setLastRemovedShoppingSnapshot(null);
     } catch (e) {
       console.error(e);
-      alert("Could not add this item. Please try again.");
+      toast({ variant: "destructive", title: "Could not add item", description: e?.message || "Please try again." });
     } finally {
       setQuickAddBusy(null);
     }
@@ -586,7 +584,7 @@ export default function ShoppingList() {
       setLastRemovedShoppingSnapshot(null);
     } catch (e) {
       console.error(e);
-      alert("Could not finish adding all items. Check the list and try again.");
+      toast({ variant: "destructive", title: "Could not add all items", description: e?.message || "Check the list and try again." });
     } finally {
       setQuickAddBusy(null);
     }
@@ -654,7 +652,7 @@ export default function ShoppingList() {
   const handleQuickLogPurchase = async () => {
     const amount = parseDecimalInput(quickAmount, NaN);
     if (!Number.isFinite(amount) || amount <= 0) {
-      alert("Enter a valid amount greater than zero.");
+      toast({ variant: "destructive", title: "Enter a valid amount greater than zero." });
       return;
     }
 
@@ -662,7 +660,7 @@ export default function ShoppingList() {
     let shoppingCategory = "ingredients";
     if (quickMenuIngredient === PURCHASE_PICK_SHOPPING) {
       if (!quickShoppingLabel.trim()) {
-        alert("Enter a name for this purchase.");
+        toast({ variant: "destructive", title: "Enter a name for this purchase." });
         return;
       }
       itemName = quickShoppingLabel.trim();
@@ -671,7 +669,7 @@ export default function ShoppingList() {
       itemName = quickMenuIngredient.trim();
       shoppingCategory = "ingredients";
     } else {
-      alert("Pick Shopping or an ingredient above.");
+      toast({ variant: "destructive", title: "Pick Shopping or an ingredient above." });
       return;
     }
 
@@ -753,11 +751,7 @@ export default function ShoppingList() {
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         (typeof err?.response?.data === "string" ? err.response.data : null);
-      alert(
-        detail
-          ? `Could not log purchase: ${detail}`
-          : "Could not log purchase. Please try again.",
-      );
+      toast({ variant: "destructive", title: "Could not log purchase", description: detail || "Please try again." });
     }
   };
 
@@ -809,7 +803,7 @@ export default function ShoppingList() {
   const finalizePurchaseFromList = async (item, paymentSource) => {
     const actualCost = readPurchaseAmountForItem(item);
     if (!Number.isFinite(actualCost) || actualCost <= 0) {
-      window.alert("Enter an amount (MXN) in the row before marking as purchased.");
+      toast({ variant: "destructive", title: "Enter an amount (MXN) in the row before marking as purchased." });
       return;
     }
 
@@ -861,8 +855,7 @@ export default function ShoppingList() {
         },
       });
     } catch (error) {
-      console.error("Error:", error);
-      window.alert("Could not record purchase. Try again.");
+      toast({ variant: "destructive", title: "Could not record purchase", description: error?.message || "Try again." });
     }
   };
 
