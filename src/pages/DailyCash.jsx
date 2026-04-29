@@ -1982,7 +1982,7 @@ export default function DailyCash() {
               onReset={(rowId) => handleLedgerTimeReset(sectionDayStr, rowId)}
             />
           </td>
-          <td className={cn("px-3 py-2 text-gray-300", r.isManualCountReset && "font-semibold text-emerald-200")}>
+          <td className={cn("hidden px-3 py-2 text-gray-300 sm:table-cell", r.isManualCountReset && "font-semibold text-emerald-200")}>
             {r.source}
           </td>
           <td className="px-2 py-1 align-middle text-gray-400">
@@ -2117,15 +2117,15 @@ export default function DailyCash() {
       )}
 
       <div className="mt-3 max-h-[min(75vh,880px)] overflow-auto rounded-lg border border-yellow-500/15">
-        <table className="w-full min-w-[900px] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[24rem] border-collapse text-left text-[11px]">
           <thead>
             <tr className="border-b border-yellow-500/20 bg-yellow-500/10 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/90">
               <th className="px-2 py-2">Logged at (Mexico)</th>
-              <th className="px-2 py-2">Count day</th>
-              <th className="px-2 py-2">Expected source</th>
+              <th className="hidden px-2 py-2 sm:table-cell">Count day</th>
+              <th className="hidden px-2 py-2 sm:table-cell">Expected source</th>
               <th className="px-2 py-2">Comment</th>
-              <th className="px-2 py-2 text-right">Expected</th>
-              <th className="px-2 py-2 text-right">Actual manual</th>
+              <th className="hidden px-2 py-2 text-right sm:table-cell">Expected</th>
+              <th className="px-2 py-2 text-right">Actual</th>
               <th className="px-2 py-2 text-right">Diff</th>
               <th className="w-10 px-1 py-2" />
             </tr>
@@ -2157,11 +2157,11 @@ export default function DailyCash() {
                   <td className="px-2 py-1.5 align-top">
                     <ManualCountWhenCell ev={ev} onCommit={handleManualCountDateTimeCommit} />
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{ev.dateKey}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400">
+                  <td className="hidden whitespace-nowrap px-2 py-1.5 tabular-nums sm:table-cell">{ev.dateKey}</td>
+                  <td className="hidden whitespace-nowrap px-2 py-1.5 tabular-nums text-gray-400 sm:table-cell">
                     {ev.expectedSourceLabel || ev.priorCloseDayStr || "No prior count"}
                   </td>
-                  <td className="max-w-[240px] px-2 py-1.5">
+                  <td className="px-2 py-1.5">
                     <Input
                       defaultValue={ev.comment || ""}
                       onBlur={(e) => handleManualCountCommentCommit(ev.id, e.target.value)}
@@ -2169,10 +2169,10 @@ export default function DailyCash() {
                         if (e.key === "Enter") e.currentTarget.blur();
                       }}
                       placeholder="Why?"
-                      className="h-7 border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
+                      className="h-7 w-full min-w-[6rem] border-yellow-500/15 bg-black/20 px-2 text-[11px] text-gray-200 placeholder:text-gray-700"
                     />
                   </td>
-                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-400">
+                  <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-gray-400 sm:table-cell">
                     {ev.expectedEnd == null ? "-" : formatMx(ev.expectedEnd)}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono tabular-nums text-yellow-100/90">
@@ -2834,13 +2834,13 @@ export default function DailyCash() {
             Swipe sideways to see the full ledger. Time and save actions stay at the far right.
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] border-collapse text-sm">
+            <table className="w-full min-w-[32rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-yellow-500/20 bg-[#14120c] text-left text-[10px] font-semibold uppercase tracking-wider text-yellow-600/90">
                   <th className="w-10 px-1 py-2.5" aria-label="Expand" />
                   <th className="whitespace-nowrap px-3 py-2.5">Time</th>
-                  <th className="px-3 py-2.5">Source</th>
-                  <th className="min-w-[12rem] px-3 py-2.5">Detail</th>
+                  <th className="hidden px-3 py-2.5 sm:table-cell">Source</th>
+                  <th className="min-w-[8rem] px-3 py-2.5">Detail</th>
                   <th className="whitespace-nowrap px-3 py-2.5 text-right text-emerald-500/90">In</th>
                   <th className="whitespace-nowrap px-3 py-2.5 text-right text-rose-400/90">Out</th>
                   <th className="w-12 px-2 py-2.5" />

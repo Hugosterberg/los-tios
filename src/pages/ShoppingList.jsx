@@ -2040,14 +2040,14 @@ export default function ShoppingList() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto border-t border-yellow-500/15">
-                    <table className="w-full min-w-[860px] border-collapse text-left text-[11px] sm:text-xs">
+                    <table className="w-full min-w-[24rem] border-collapse text-left text-[11px] sm:text-xs">
                       <thead>
                         <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
                           <th className="border-r border-yellow-500/30 px-3 py-2.5">Purchase</th>
                           <th className="border-r border-yellow-500/20 px-3 py-2.5 text-right">Sum (MXN)</th>
                           <th className="border-r border-yellow-500/20 px-3 py-2.5">Date</th>
-                          <th className="border-r border-yellow-500/20 px-3 py-2.5">Time</th>
-                          <th className="border-r border-yellow-500/20 px-3 py-2.5">Paid with</th>
+                          <th className="hidden border-r border-yellow-500/20 px-3 py-2.5 sm:table-cell">Time</th>
+                          <th className="hidden border-r border-yellow-500/20 px-3 py-2.5 sm:table-cell">Paid with</th>
                           <th className="w-10 px-1 py-2.5 text-center">
                             <span className="sr-only">Delete</span>
                           </th>
@@ -2131,10 +2131,10 @@ export default function ShoppingList() {
                                 </button>
                               )}
                             </td>
-                            <td className="border-r border-yellow-500/15 px-3 py-2 text-gray-300">
-                              {r.createdDateIso ? formatMexicoTime(r.createdDateIso) : "â€”"}
+                            <td className="hidden border-r border-yellow-500/15 px-3 py-2 text-gray-300 sm:table-cell">
+                              {r.createdDateIso ? formatMexicoTime(r.createdDateIso) : "-"}
                             </td>
-                            <td className="border-r border-yellow-500/15 px-3 py-2">
+                            <td className="hidden border-r border-yellow-500/15 px-3 py-2 sm:table-cell">
                               <div className="flex flex-col gap-0.5">
                                 <span className="text-gray-200">{expensePaymentSourceLabel(r.paymentSource)}</span>
                                 <span className="text-[10px] uppercase tracking-wide text-gray-500">
