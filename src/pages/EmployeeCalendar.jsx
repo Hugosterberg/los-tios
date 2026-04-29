@@ -65,6 +65,7 @@ import {
   isoDaysFromChecks,
   anyActiveEmployeeWorksOnCalendarDate,
   employeeWorksOnCalendarDate,
+  defaultTemplateHoursForEmployee,
   mergeNotesWithDefaultHours,
   mergeNotesWithWorkDays,
   parseDefaultWorkHoursFromEmployee,
@@ -212,12 +213,40 @@ function dayShiftStats(date, shiftsList) {
   return { count, total, list };
 }
 
+function rosterWorkdayEntriesForDate(date, employees, shiftsList) {
+  const dateStr = format(date, "yyyy-MM-dd");
+  return employees
+    .filter((employee) => employee?.is_active !== false && employeeWorksOnCalendarDate(employee, date))
+    .filter(
+      (employee) =>
+        !shiftsList.some(
+          (shift) =>
+            shift.date === dateStr &&
+            shift.employee_id === employee.id &&
+            shift.status !== "cancelled",
+        ),
+    )
+    .map((employee) => {
+      const { defaultShiftStart, defaultShiftEnd } = parseDefaultWorkHoursFromEmployee(employee);
+      const hours = defaultTemplateHoursForEmployee(employee);
+      return {
+        employee,
+        name: String(employee.name || "").trim() || "Staff",
+        start: defaultShiftStart,
+        end: defaultShiftEnd,
+        amount: shiftAmountForEmployee(employee, hours),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+}
+
 export default function EmployeeCalendar() {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [scheduleView, setScheduleView] = useState(/** @type {"week" | "month"} */ ("month"));
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [showShiftDialog, setShowShiftDialog] = useState(false);
+  const [salaryDetailEmployeeId, setSalaryDetailEmployeeId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingShift, setEditingShift] = useState(null);
@@ -256,6 +285,16 @@ export default function EmployeeCalendar() {
     hours_worked: 8,
     amount: 0,
     status: "scheduled",
+    notes: "",
+  });
+
+  const [salaryRowForm, setSalaryRowForm] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    start_time: "16:00",
+    end_time: "23:00",
+    hours_worked: 7,
+    amount: 0,
+    payment_source: "company_cash",
     notes: "",
   });
 
@@ -500,6 +539,60 @@ export default function EmployeeCalendar() {
     return { total: shiftTotal + templateTotal, count };
   }, [shifts, employees, monthCursor]);
 
+  const monthSalarySummary = useMemo(() => {
+    const startStr = format(startOfMonth(monthCursor), "yyyy-MM-dd");
+    const endStr = format(endOfMonth(monthCursor), "yyyy-MM-dd");
+    const byEmployee = new Map();
+    for (const employee of employees) {
+      if (!employee?.id) continue;
+      byEmployee.set(employee.id, {
+        employee,
+        rows: [],
+        total: 0,
+        count: 0,
+      });
+    }
+    for (const shift of shifts) {
+      if (!shift.date || shift.status !== "paid" || isRemovedShift(shift)) continue;
+      if (shift.date < startStr || shift.date > endStr) continue;
+      const employeeId = shift.employee_id || `unknown:${shift.employee_name || "staff"}`;
+      const existing =
+        byEmployee.get(employeeId) ||
+        {
+          employee: {
+            id: employeeId,
+            name: shift.employee_name || "Unknown staff",
+            role: "other",
+            is_active: true,
+          },
+          rows: [],
+          total: 0,
+          count: 0,
+        };
+      const amount = Number(shift.amount || 0);
+      existing.rows.push(shift);
+      existing.total += Number.isFinite(amount) ? amount : 0;
+      existing.count += 1;
+      byEmployee.set(employeeId, existing);
+    }
+    return Array.from(byEmployee.values()).sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total;
+      return String(a.employee.name || "").localeCompare(String(b.employee.name || ""), "en", {
+        sensitivity: "base",
+      });
+    });
+  }, [employees, shifts, monthCursor]);
+
+  const monthSalaryTotal = useMemo(
+    () => monthSalarySummary.reduce((sum, row) => sum + row.total, 0),
+    [monthSalarySummary],
+  );
+
+  const salaryDetail = useMemo(
+    () => monthSalarySummary.find((row) => row.employee.id === salaryDetailEmployeeId) || null,
+    [monthSalarySummary, salaryDetailEmployeeId],
+  );
+
   const monthGridDays = useMemo(() => buildMonthGrid(monthCursor), [monthCursor]);
 
   const getShiftsForDay = (date) => {
@@ -573,6 +666,101 @@ export default function EmployeeCalendar() {
       notes: "Manual: from weekly template",
     });
     setShowShiftDialog(true);
+  };
+
+  const buildSalaryRowFormForEmployee = (employee, dateKey = format(monthCursor, "yyyy-MM-dd")) => {
+    const { defaultShiftStart, defaultShiftEnd } = parseDefaultWorkHoursFromEmployee(employee);
+    const hours = calculateHours(defaultShiftStart, defaultShiftEnd);
+    const hoursWorked = hours > 0 ? hours : defaultTemplateHoursForEmployee(employee);
+    return {
+      date: dateKey,
+      start_time: defaultShiftStart,
+      end_time: defaultShiftEnd,
+      hours_worked: hoursWorked,
+      amount: shiftAmountForEmployee(employee, hoursWorked) || 0,
+      payment_source: "company_cash",
+      notes: "",
+    };
+  };
+
+  const openSalaryDetail = (employee) => {
+    setSalaryDetailEmployeeId(employee.id);
+    setSalaryRowForm(buildSalaryRowFormForEmployee(employee));
+  };
+
+  const handleSalaryRowTimeChange = (field, value) => {
+    setSalaryRowForm((prev) => {
+      const next = { ...prev, [field]: value };
+      const employee = employees.find((e) => e.id === salaryDetailEmployeeId);
+      if (employee && next.start_time && next.end_time) {
+        const h = calculateHours(next.start_time, next.end_time);
+        next.hours_worked = h > 0 ? h : 0;
+        next.amount = shiftAmountForEmployee(employee, next.hours_worked) || 0;
+      }
+      return next;
+    });
+  };
+
+  const syncSalaryRowAmountFromEmployee = () => {
+    const employee = employees.find((e) => e.id === salaryDetailEmployeeId);
+    if (!employee) return;
+    setSalaryRowForm((prev) => ({
+      ...prev,
+      amount: shiftAmountForEmployee(employee, prev.hours_worked) || 0,
+    }));
+  };
+
+  const handleAddPaidSalaryRow = async (event) => {
+    event.preventDefault();
+    const employee = employees.find((e) => e.id === salaryDetailEmployeeId);
+    if (!employee) {
+      toast({ variant: "destructive", title: "Select an employee first." });
+      return;
+    }
+    const dateKey = String(salaryRowForm.date || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      toast({ variant: "destructive", title: "Enter a valid date." });
+      return;
+    }
+    const amount = Number(salaryRowForm.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ variant: "destructive", title: "Enter a salary amount greater than zero." });
+      return;
+    }
+
+    const expenseData = {
+      name: `Salary: ${employee.name} - ${format(parseISO(dateKey), "MM/dd/yyyy")}`,
+      category: "salaries",
+      amount,
+      date: dateKey,
+      payment_source: salaryRowForm.payment_source,
+      paid_by_company: true,
+      notes:
+        salaryRowForm.notes ||
+        `Manual salary row: ${salaryRowForm.start_time} - ${salaryRowForm.end_time} (${salaryRowForm.hours_worked}h)`,
+    };
+
+    try {
+      const createdExpense = await createExpense.mutateAsync(expenseData);
+      await createShift.mutateAsync(
+        sanitizeShiftPayload({
+          employee_id: employee.id,
+          employee_name: employee.name,
+          date: dateKey,
+          start_time: salaryRowForm.start_time,
+          end_time: salaryRowForm.end_time,
+          hours_worked: salaryRowForm.hours_worked,
+          amount,
+          status: "paid",
+          expense_id: createdExpense?.id || "",
+          notes: salaryRowForm.notes || "Manual salary row",
+        }),
+      );
+      setSalaryRowForm(buildSalaryRowFormForEmployee(employee, dateKey));
+      toast({ title: "Salary row added", description: `${employee.name}: ${formatMx(amount)}.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Could not add salary row", description: formatMutationError(err) });
+    }
   };
 
   const handleEmployeeSelect = (employeeId) => {
@@ -1328,10 +1516,9 @@ export default function EmployeeCalendar() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold text-gray-100">Month overview</CardTitle>
                   <p className="text-xs text-gray-400">
-                    Days that match an active employee&apos;s saved workdays are tinted. When an employee is selected in{" "}
-                    <strong className="font-medium text-gray-300">Weekly template</strong>, their workdays show{" "}
-                    <strong className="font-medium text-gray-300">name + times</strong> from the template (same as week view)
-                    until a shift exists. Other workdays show &quot;Workday&quot;. Scheduled shifts show name, hours, and total.
+                    Days that match active employees&apos; saved workdays are tinted and list everyone expected to work.
+                    Roster workdays show name, time, and expected pay until a shift exists. Scheduled shifts show name,
+                    hours, and total.
                     Click a day to open that week and add a shift.
                   </p>
                 </CardHeader>
@@ -1350,6 +1537,12 @@ export default function EmployeeCalendar() {
                       const isToday = isSameDay(day, new Date());
                       const isScheduledWeekday = anyActiveEmployeeWorksOnCalendarDate(activeEmployees, day);
                       const dayStr = format(day, "yyyy-MM-dd");
+                      const rosterEntries = rosterWorkdayEntriesForDate(day, activeEmployees, shifts);
+                      const visibleShiftRows = stats.list.slice(0, 3);
+                      const visibleRosterRows = rosterEntries.slice(0, Math.max(0, 3 - visibleShiftRows.length));
+                      const hiddenPeopleCount = Math.max(0, stats.list.length + rosterEntries.length - visibleShiftRows.length - visibleRosterRows.length);
+                      const expectedDayTotal =
+                        stats.total + rosterEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
                       const hasTemplateEmployeeShift =
                         templateEmployee &&
                         shifts.some(
@@ -1370,8 +1563,8 @@ export default function EmployeeCalendar() {
                               openShiftDialog(day, stats.list[0]);
                               return;
                             }
-                            if (stats.list.length === 0 && showMonthTemplateRoster) {
-                              openTemplateShiftDialog(day, templateEmployee);
+                            if (stats.list.length === 0 && rosterEntries.length === 1) {
+                              openTemplateShiftDialog(day, rosterEntries[0].employee);
                               return;
                             }
                             if (stats.list.length === 0) {
@@ -1379,7 +1572,7 @@ export default function EmployeeCalendar() {
                             }
                           }}
                           className={cn(
-                            "flex min-h-[4.5rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[5.25rem] sm:p-2",
+                            "flex min-h-[5rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[6.25rem] sm:p-2",
                             "border-yellow-500/15 bg-[#141210] hover:border-yellow-400/40 hover:bg-yellow-400/5",
                             isScheduledWeekday && !isToday && "border-yellow-500/40 bg-yellow-400/[0.07]",
                             !inMonth && "opacity-35",
@@ -1394,9 +1587,9 @@ export default function EmployeeCalendar() {
                           >
                             {format(day, "d")}
                           </span>
-                          {stats.count > 0 ? (
+                          {stats.count > 0 || rosterEntries.length > 0 ? (
                             <span className="mt-auto flex min-w-0 flex-col gap-0.5 text-[9px] leading-tight">
-                              {stats.list.map((s) => (
+                              {visibleShiftRows.map((s) => (
                                 <span key={s.id} className="flex min-w-0 flex-col">
                                   <span className="truncate font-medium text-gray-200">
                                     {s.employee_name}
@@ -1408,9 +1601,26 @@ export default function EmployeeCalendar() {
                                   <span className="tabular-nums text-yellow-500/80">{formatMx(Number(s.amount || 0))}</span>
                                 </span>
                               ))}
-                              {stats.count > 1 && (
+                              {visibleRosterRows.map((entry) => (
+                                <span key={`roster-${entry.employee.id}`} className="flex min-w-0 flex-col">
+                                  <span className="truncate font-medium text-gray-200">
+                                    {entry.name}
+                                    <span className="font-normal text-gray-500"> · </span>
+                                    <span className="tabular-nums text-gray-400">
+                                      {formatShiftClock(entry.start)}–{formatShiftClock(entry.end)}
+                                    </span>
+                                  </span>
+                                  <span className="tabular-nums text-yellow-500/80">{formatMx(entry.amount)}</span>
+                                </span>
+                              ))}
+                              {hiddenPeopleCount > 0 && (
+                                <span className="mt-0.5 text-[8px] font-semibold text-gray-400">
+                                  +{hiddenPeopleCount} more
+                                </span>
+                              )}
+                              {stats.count + rosterEntries.length > 1 && (
                                 <span className="mt-0.5 tabular-nums text-[8px] font-semibold text-yellow-400/70">
-                                  Total {formatMx(stats.total)}
+                                  Total {formatMx(expectedDayTotal)}
                                 </span>
                               )}
                             </span>
@@ -1511,6 +1721,54 @@ export default function EmployeeCalendar() {
           </TabsContent>
 
           <TabsContent value="employees" className="space-y-5">
+            <Card className={panelClass}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base font-semibold text-gray-100">
+                      Monthly salary overview
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Paid salary rows for {format(monthCursor, "MMMM yyyy", { locale: dateLocale })}. Click a person to see days,
+                      amounts, and add or remove rows.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-yellow-500/20 bg-black/25 px-4 py-2 text-right">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Month total</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-yellow-200">{formatMx(monthSalaryTotal)}</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {monthSalarySummary.map((row) => (
+                    <button
+                      key={row.employee.id}
+                      type="button"
+                      onClick={() => openSalaryDetail(row.employee)}
+                      className="rounded-xl border border-yellow-500/15 bg-black/25 p-4 text-left transition-colors hover:border-yellow-400/45 hover:bg-yellow-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-100">{row.employee.name || "Unknown staff"}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {row.count} {row.count === 1 ? "paid row" : "paid rows"}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className={cn("shrink-0 text-[10px]", roleColors[row.employee.role] || roleColors.other)}>
+                          {roleLabels[row.employee.role] || "Staff"}
+                        </Badge>
+                      </div>
+                      <p className="mt-4 text-2xl font-bold tabular-nums text-yellow-200">{formatMx(row.total)}</p>
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        {monthSalaryTotal > 0 ? `${((row.total / monthSalaryTotal) * 100).toFixed(1)}% of salaries` : "No salary paid this month"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex justify-end">
               <Button
                 type="button"
@@ -1597,6 +1855,181 @@ export default function EmployeeCalendar() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog
+        open={Boolean(salaryDetail)}
+        onOpenChange={(open) => {
+          if (!open) setSalaryDetailEmployeeId(null);
+        }}
+      >
+        <DialogContent className="pointer-events-auto max-h-[min(90vh,760px)] max-w-3xl overflow-y-auto border border-yellow-500/20 bg-[#141210] p-5 text-gray-100 shadow-2xl z-[200] sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-gray-100">
+              Salary detail{salaryDetail?.employee?.name ? ` · ${salaryDetail.employee.name}` : ""}
+            </DialogTitle>
+            <DialogDescription className="text-left text-sm text-gray-400">
+              Paid salary rows for {format(monthCursor, "MMMM yyyy", { locale: dateLocale })}. These rows feed salary expense
+              totals in Finance, Daily Cash, and Dashboard.
+            </DialogDescription>
+          </DialogHeader>
+
+          {salaryDetail ? (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-yellow-500/15 bg-black/25 p-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Paid this month</p>
+                <p className="mt-1 text-3xl font-bold tabular-nums text-yellow-200">{formatMx(salaryDetail.total)}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {salaryDetail.count} {salaryDetail.count === 1 ? "salary row" : "salary rows"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Rows</p>
+                {salaryDetail.rows.length ? (
+                  <div className="space-y-2">
+                    {[...salaryDetail.rows]
+                      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+                      .map((shift) => (
+                        <div
+                          key={shift.id}
+                          className="flex flex-col gap-3 rounded-xl border border-yellow-500/15 bg-black/25 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold tabular-nums text-gray-100">
+                              {shift.date} · {formatShiftClock(shift.start_time)}–{formatShiftClock(shift.end_time)}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {Number(shift.hours_worked || 0)} h
+                              {shift.expense_id ? " · linked salary expense" : " · no linked expense id"}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                            <span className="font-bold tabular-nums text-yellow-200">{formatMx(shift.amount)}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={deleteShift.isPending}
+                              onClick={() => {
+                                if (!window.confirm(`Delete salary row for ${salaryDetail.employee.name} on ${shift.date}? This also removes the linked salary expense.`)) return;
+                                deleteShift.mutate({ shift, keepLaborBlocker: false });
+                              }}
+                              className="border-red-500/40 bg-red-950/20 text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-yellow-500/20 bg-black/20 px-4 py-8 text-center text-sm text-gray-500">
+                    No paid salary rows for this employee in this month.
+                  </p>
+                )}
+              </div>
+
+              <form onSubmit={handleAddPaidSalaryRow} className="rounded-xl border border-yellow-500/15 bg-[#1c1914] p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">Add salary row</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">Date</Label>
+                    <Input
+                      type="date"
+                      value={salaryRowForm.date}
+                      onChange={(e) => setSalaryRowForm((prev) => ({ ...prev, date: e.target.value }))}
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">Start</Label>
+                    <Input
+                      type="time"
+                      value={salaryRowForm.start_time}
+                      onChange={(e) => handleSalaryRowTimeChange("start_time", e.target.value)}
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">End</Label>
+                    <Input
+                      type="time"
+                      value={salaryRowForm.end_time}
+                      onChange={(e) => handleSalaryRowTimeChange("end_time", e.target.value)}
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">Hours</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={salaryRowForm.hours_worked}
+                      onChange={(e) =>
+                        setSalaryRowForm((prev) => ({ ...prev, hours_worked: parseFloat(e.target.value) || 0 }))
+                      }
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">Amount</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={salaryRowForm.amount}
+                      onChange={(e) =>
+                        setSalaryRowForm((prev) => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))
+                      }
+                      className={calendarFieldClass}
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-300">Paid from</Label>
+                    <Select
+                      value={salaryRowForm.payment_source}
+                      onValueChange={(value) => setSalaryRowForm((prev) => ({ ...prev, payment_source: value }))}
+                    >
+                      <SelectTrigger className={calendarFieldClass}>
+                        <SelectValue placeholder="Payment source" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[300] border-yellow-500/20 bg-[#1a1810] text-gray-100">
+                        <SelectItem value="company_cash">Company cash</SelectItem>
+                        <SelectItem value="company_account">Company account / card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={syncSalaryRowAmountFromEmployee}
+                    className="border-yellow-500/30 bg-black/20 text-yellow-100 hover:bg-yellow-400/10"
+                  >
+                    Sync amount from wage
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-1.5">
+                  <Label className="text-xs text-gray-300">Note</Label>
+                  <Input
+                    value={salaryRowForm.notes}
+                    onChange={(e) => setSalaryRowForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Optional note"
+                    className={calendarFieldClass}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={createShift.isPending || createExpense.isPending}
+                  className="mt-4 w-full rounded-xl bg-yellow-400 font-semibold text-black hover:bg-yellow-300 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add paid salary row
+                </Button>
+              </form>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={showEmployeeForm}

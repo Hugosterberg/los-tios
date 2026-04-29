@@ -37,6 +37,21 @@ function isRefundReceipt(r) {
   return getReceiptTotal(r) < -0.009;
 }
 
+export function getSignedReceiptTotal(r) {
+  const amount = getReceiptTotal(r);
+  return isRefundReceipt(r) && amount > 0 ? -amount : amount;
+}
+
+export function getPaymentMoneyAmount(p) {
+  if (typeof p?.money_amount === "object" && p.money_amount?.amount != null) return Number(p.money_amount.amount) || 0;
+  return Number(p?.money_amount ?? p?.amount ?? 0) || 0;
+}
+
+export function getSignedPaymentMoneyAmount(receipt, payment) {
+  const amount = getPaymentMoneyAmount(payment);
+  return isRefundReceipt(receipt) && amount > 0 ? -amount : amount;
+}
+
 function getItems(r) {
   return r.line_items || r.receipt_items || r.items || r.positions || [];
 }
@@ -246,18 +261,6 @@ export function getReceiptChannelMeta(receipt) {
     return { ...meta, label: `${baseLabel} · ${serviceName}`, serviceName };
   };
 
-  if (
-    value.includes("dine") ||
-    value.includes("eat_in") ||
-    value.includes("eatin") ||
-    value === "in_store" ||
-    value.includes("restaurant")
-  ) {
-    return withService("Dine-in", {
-      Icon: UtensilsCrossed,
-      badgeClass: "bg-amber-500/15 text-amber-200",
-    });
-  }
   if (receiptLooksLikeDelivery(receipt, value)) {
     return withService("Delivery", { Icon: Truck, badgeClass: "bg-violet-500/15 text-violet-200" });
   }
@@ -273,6 +276,18 @@ export function getReceiptChannelMeta(receipt) {
   }
   if (value.includes("web") || value.includes("online") || value.includes("ecommerce") || value.includes("shopify")) {
     return withService("Online", { Icon: ShoppingBag, badgeClass: "bg-emerald-500/15 text-emerald-200" });
+  }
+  if (
+    value.includes("dine") ||
+    value.includes("eat_in") ||
+    value.includes("eatin") ||
+    value === "in_store" ||
+    value.includes("restaurant")
+  ) {
+    return withService("Dine-in", {
+      Icon: UtensilsCrossed,
+      badgeClass: "bg-amber-500/15 text-amber-200",
+    });
   }
 
   const display =
@@ -353,7 +368,7 @@ export function LoyverseReceiptRow({
 }) {
   const [open, setOpen] = useState(false);
   const status = getReceiptStatus(receipt);
-  const total = getReceiptTotal(receipt);
+  const total = getSignedReceiptTotal(receipt);
   const items = getItems(receipt);
   const isCancelled = status.includes("cancel");
   const isRefund = isRefundReceipt(receipt);
@@ -496,9 +511,7 @@ export function LoyverseReceiptRow({
                     </span>
                     <span className="text-yellow-400 font-semibold tabular-nums shrink-0">
                       {formatMXN(
-                        typeof p.money_amount === "object" && p.money_amount?.amount != null
-                          ? p.money_amount.amount
-                          : p.money_amount ?? p.amount ?? 0,
+                        getSignedPaymentMoneyAmount(receipt, p),
                       )}
                     </span>
                   </div>
@@ -540,7 +553,9 @@ export function LoyverseReceiptRow({
 
           <div className="pt-2 border-t border-yellow-500/10 flex justify-between font-bold text-base">
             <span className="text-gray-300">Total</span>
-            <span className="text-yellow-400">{formatMXN(total)}</span>
+            <span className={cn("tabular-nums", isRefund ? "text-rose-300" : "text-yellow-400")}>
+              {formatMXN(total)}
+            </span>
           </div>
         </div>
       )}

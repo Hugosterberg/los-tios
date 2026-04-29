@@ -36,7 +36,7 @@ function Row({ label, value, muted, emphasize }) {
 export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSummary, breakdown }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90vh,720px)] max-w-2xl overflow-y-auto border-yellow-500/20 bg-[#161616] text-gray-100 shadow-2xl">
+      <DialogContent className="max-h-[min(90vh,720px)] w-[calc(100vw-2rem)] max-w-2xl overflow-x-hidden overflow-y-auto border-yellow-500/20 bg-[#161616] text-gray-100 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-yellow-50">{title || "KPI details"}</DialogTitle>
           {filterSummary ? (
@@ -65,6 +65,43 @@ export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSu
                   collapsed using your priority rule so Loyverse + Clip double-posts do not inflate totals.
                 </p>
               </section>
+              {breakdown.eventRows?.length ? (
+                <section>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                    Included sales (newest first, max {fmtNum(breakdown.eventRows.length)} shown)
+                  </p>
+                  <div className="max-h-72 overflow-y-auto overflow-x-hidden rounded-lg border border-white/10">
+                    <table className="w-full table-fixed text-left text-[11px]">
+                      <thead className="sticky top-0 bg-[#1f1f1f] text-[10px] uppercase tracking-wider text-gray-500">
+                        <tr>
+                          <th className="px-2 py-1.5">Time</th>
+                          <th className="px-2 py-1.5">Source</th>
+                          <th className="px-2 py-1.5">Amount</th>
+                          <th className="px-2 py-1.5">Pay</th>
+                          <th className="px-2 py-1.5">Channel</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        {breakdown.eventRows.map((r, i) => (
+                          <tr key={`${r.id}-${i}`} className="border-t border-white/5">
+                            <td className="break-words px-2 py-1.5">{r.time}</td>
+                            <td className="break-words px-2 py-1.5">{r.source}</td>
+                            <td className="break-words px-2 py-1.5 tabular-nums">{r.amount}</td>
+                            <td className="break-words px-2 py-1.5" title={r.payment}>
+                              {r.payment}
+                            </td>
+                            <td className="break-words px-2 py-1.5" title={r.channel}>
+                              {r.channel}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : (
+                <p className="text-[11px] text-gray-500">No included sales rows in the selected period.</p>
+              )}
               <section>
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Deduplication</p>
                 <div className="rounded-xl border border-yellow-500/10 bg-black/25 px-3">
@@ -80,8 +117,8 @@ export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSu
                     <p className="mb-1 text-[11px] text-gray-500">
                       Sample matches (up to {breakdown.dedupeRows.length} of {fmtNum(breakdown.dedupeFilteredCount)} filtered)
                     </p>
-                    <div className="max-h-48 overflow-auto rounded-lg border border-white/10">
-                      <table className="w-full text-left text-[11px]">
+                    <div className="max-h-48 overflow-y-auto overflow-x-hidden rounded-lg border border-white/10">
+                      <table className="w-full table-fixed text-left text-[11px]">
                         <thead className="sticky top-0 bg-[#1f1f1f] text-[10px] uppercase tracking-wider text-gray-500">
                           <tr>
                             <th className="px-2 py-1.5">Removed</th>
@@ -93,10 +130,10 @@ export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSu
                         <tbody className="text-gray-300">
                           {breakdown.dedupeRows.map((r) => (
                             <tr key={r.id} className="border-t border-white/5">
-                              <td className="px-2 py-1.5">{r.removed_source}</td>
-                              <td className="px-2 py-1.5">{r.kept_source}</td>
-                              <td className="px-2 py-1.5 tabular-nums">{r.amount}</td>
-                              <td className="px-2 py-1.5">{r.matched_window}</td>
+                              <td className="break-words px-2 py-1.5">{r.removed_source}</td>
+                              <td className="break-words px-2 py-1.5">{r.kept_source}</td>
+                              <td className="break-words px-2 py-1.5 tabular-nums">{r.amount}</td>
+                              <td className="break-words px-2 py-1.5">{r.matched_window}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -130,8 +167,8 @@ export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSu
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
                     Events (newest first, max {fmtNum(breakdown.eventRows.length)} shown)
                   </p>
-                  <div className="max-h-56 overflow-auto rounded-lg border border-white/10">
-                    <table className="w-full text-left text-[11px]">
+                  <div className="max-h-56 overflow-y-auto overflow-x-hidden rounded-lg border border-white/10">
+                    <table className="w-full table-fixed text-left text-[11px]">
                       <thead className="sticky top-0 bg-[#1f1f1f] text-[10px] uppercase tracking-wider text-gray-500">
                         <tr>
                           <th className="px-2 py-1.5">Time</th>
@@ -144,13 +181,13 @@ export default function KpiBreakdownDialog({ open, onOpenChange, title, filterSu
                       <tbody className="text-gray-300">
                         {breakdown.eventRows.map((r, i) => (
                           <tr key={`${r.id}-${i}`} className="border-t border-white/5">
-                            <td className="whitespace-nowrap px-2 py-1.5">{r.time}</td>
-                            <td className="px-2 py-1.5">{r.source}</td>
-                            <td className="px-2 py-1.5 tabular-nums">{r.amount}</td>
-                            <td className="max-w-[100px] truncate px-2 py-1.5" title={r.payment}>
+                            <td className="break-words px-2 py-1.5">{r.time}</td>
+                            <td className="break-words px-2 py-1.5">{r.source}</td>
+                            <td className="break-words px-2 py-1.5 tabular-nums">{r.amount}</td>
+                            <td className="break-words px-2 py-1.5" title={r.payment}>
                               {r.payment}
                             </td>
-                            <td className="max-w-[120px] truncate px-2 py-1.5 font-mono text-[10px]" title={r.id}>
+                            <td className="break-all px-2 py-1.5 font-mono text-[10px]" title={r.id}>
                               {r.id}
                             </td>
                           </tr>

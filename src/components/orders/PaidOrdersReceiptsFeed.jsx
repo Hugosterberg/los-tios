@@ -15,26 +15,23 @@ import {
   RefreshCw,
   ShoppingBag,
   Truck,
+  UtensilsCrossed,
 } from "lucide-react";
 import { formatMexicoDateTimeMedium } from "@/lib/mexicoTime";
 import { cn } from "@/lib/utils";
-import { LoyverseReceiptRow, getReceiptChannelMeta } from "./LoyverseReceiptsSection";
+import {
+  LoyverseReceiptRow,
+  getReceiptChannelMeta,
+  getSignedPaymentMoneyAmount,
+  getSignedReceiptTotal,
+} from "./LoyverseReceiptsSection";
 
 function receiptTotal(r) {
-  const raw = r.total_money ?? r.total_payment_money ?? r.total;
-  if (typeof raw === "number") return raw;
-  if (typeof raw === "string") return Number(raw) || 0;
-  if (raw && typeof raw === "object") return Number(raw.amount ?? raw.value) || 0;
-  return 0;
+  return getSignedReceiptTotal(r);
 }
 
 function paymentDisplayName(p) {
   return String(p?.type ?? p?.name ?? p?.payment_type ?? "").trim() || "—";
-}
-
-function paymentMoneyAmt(p) {
-  if (typeof p.money_amount === "object" && p.money_amount?.amount != null) return p.money_amount.amount;
-  return p.money_amount ?? p.amount ?? 0;
 }
 
 function paymentIcon(name) {
@@ -52,6 +49,22 @@ const RANGE_OPTIONS = [
   { id: "week", label: "Week" },
   { id: "month", label: "Month" },
 ];
+
+const ORDER_TYPE_BUCKETS = [
+  { key: "dine-in", label: "Dine-in", Icon: UtensilsCrossed, badgeClass: "bg-amber-500/15 text-amber-200" },
+  { key: "delivery", label: "Delivery", Icon: Truck, badgeClass: "bg-violet-500/15 text-violet-200" },
+  { key: "takeout", label: "Takeout", Icon: ShoppingBag, badgeClass: "bg-sky-500/15 text-sky-200" },
+];
+
+function orderTypeBucketKey(label) {
+  const s = String(label || "").toLowerCase();
+  if (s.includes("delivery")) return "delivery";
+  if (s.includes("take") || s.includes("pickup") || s.includes("carry") || s.includes("to-go") || s.includes("togo")) {
+    return "takeout";
+  }
+  if (s.includes("dine") || s.includes("restaurant") || s.includes("eat")) return "dine-in";
+  return "";
+}
 
 function recordInWindow(iso, start, end) {
   if (!iso) return false;
@@ -272,17 +285,35 @@ export default function PaidOrdersReceiptsFeed({
   );
 
   const diningBreakdown = useMemo(() => {
-    const map = new Map();
+    const map = new Map(
+      ORDER_TYPE_BUCKETS.map((bucket) => [
+        bucket.key,
+        { ...bucket, count: 0, amount: 0 },
+      ]),
+    );
     for (const r of loyverseCompleted) {
       const channel = getReceiptChannelMeta(r);
       const baseLabel = channel.label.includes(" · ") ? channel.label.split(" · ")[0] : channel.label;
-      const cur = map.get(baseLabel) || { label: baseLabel, Icon: channel.Icon, badgeClass: channel.badgeClass, count: 0, amount: 0 };
+      const bucketKey = orderTypeBucketKey(baseLabel);
+      if (!bucketKey) continue;
+      const cur = map.get(bucketKey);
       cur.count += 1;
       cur.amount += receiptTotal(r);
-      map.set(baseLabel, cur);
+      map.set(bucketKey, cur);
     }
-    return [...map.values()].sort((a, b) => b.amount - a.amount);
+    return ORDER_TYPE_BUCKETS.map((bucket) => map.get(bucket.key));
   }, [loyverseCompleted]);
+  const orderTypeTotal = useMemo(
+    () =>
+      diningBreakdown.reduce(
+        (total, row) => ({
+          count: total.count + Number(row?.count || 0),
+          amount: total.amount + Number(row?.amount || 0),
+        }),
+        { count: 0, amount: 0 },
+      ),
+    [diningBreakdown],
+  );
 
   const paymentBreakdown = useMemo(() => {
     const map = new Map();
@@ -298,7 +329,7 @@ export default function PaidOrdersReceiptsFeed({
           const name = paymentDisplayName(p);
           const cur = map.get(name) || { name, count: 0, amount: 0 };
           cur.count += 1;
-          cur.amount += paymentMoneyAmt(p);
+          cur.amount += getSignedPaymentMoneyAmount(r, p);
           map.set(name, cur);
         }
       }
@@ -381,6 +412,16 @@ export default function PaidOrdersReceiptsFeed({
           {diningBreakdown.length > 0 && (
             <div>
               <p className="mb-2 text-[10px] uppercase tracking-widest text-gray-500">Order type</p>
+              <div className="mb-2 rounded-lg border border-yellow-500/15 bg-yellow-400/[0.06] px-3 py-2.5">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Receipt className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  <span className="text-xs text-gray-400">Total order type</span>
+                </div>
+                <p className="text-base font-bold tabular-nums text-yellow-400">{formatMXN(orderTypeTotal.amount)}</p>
+                <p className="mt-0.5 text-[11px] text-gray-500">
+                  {orderTypeTotal.count} receipt{orderTypeTotal.count !== 1 ? "s" : ""} across dine-in, delivery, and takeout
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {diningBreakdown.map(({ label, Icon, count, amount }) => (
                   <div key={label} className="flex-1 min-w-[110px] rounded-lg border border-yellow-500/10 bg-[#242424] px-3 py-2.5">

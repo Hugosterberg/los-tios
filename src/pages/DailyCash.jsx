@@ -24,7 +24,6 @@ import {
   Plus,
   Trash2,
   Undo2,
-  X,
 } from "lucide-react";
 import { getLoyverseOverview, hasLoyverseApiConfig } from "@/api/loyverse";
 import { getResolvedIntegrationSettings } from "@/lib/integrationSettings";
@@ -163,7 +162,7 @@ function ManualCountWhenCell({ ev, onCommit }) {
  * Editable TIME for ledger rows — stages changes until "Save time changes" below.
  * Loyverse / labor rows still use AppSettings overrides on save.
  */
-function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onCommit, onReset }) {
+function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPending, onCommit }) {
   const overrideIso = getLedgerTimeOverrides(ledgerDay)[row.id];
   const refIso = (() => {
     if (pendingEdit) {
@@ -240,15 +239,7 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <button
-        type="button"
-        className="shrink-0 rounded p-0.5 text-gray-600 hover:text-red-400 transition-colors"
-        title="Restore original time and clear unsaved edits"
-        onClick={() => onReset(row.id)}
-      >
-        <X className="h-3 w-3" />
-      </button>
+    <div className="flex flex-wrap items-center gap-1.5">
       <MexicoWallDatePicker
         value={dateKey}
         onChange={(k) => {
@@ -1433,6 +1424,91 @@ export default function DailyCash() {
     buildLedgerRowsForMexicoDay,
   ]);
 
+  const cashPeriodStartDayStr = periodMode === "month" ? dayKey(startOfMonth(selectedDate)) : formDayStr;
+  const requestedCashPeriodEndDayStr = periodMode === "month" ? dayKey(endOfMonth(selectedDate)) : formDayStr;
+  const cashPeriodEndDayStr =
+    requestedCashPeriodEndDayStr > todayStr ? todayStr : requestedCashPeriodEndDayStr;
+
+  const cashPeriodEndIso = useMemo(() => {
+    const nextDayStartIso = mexicoWallDateTimeToUtcIso(offsetMexicoDateKey(cashPeriodEndDayStr, 1), "00:00");
+    const nextDayStartMs = new Date(nextDayStartIso || 0).getTime();
+    if (!Number.isFinite(nextDayStartMs)) return null;
+    return new Date(nextDayStartMs - 1).toISOString();
+  }, [cashPeriodEndDayStr]);
+
+  const hasDrawerTransactionsAfterCashPeriod = useMemo(() => {
+    if (!cashPeriodEndIso || cashPeriodEndDayStr >= todayStr) return false;
+    const periodEndMs = new Date(cashPeriodEndIso).getTime();
+    if (!Number.isFinite(periodEndMs)) return false;
+
+    let cursor = offsetMexicoDateKey(cashPeriodEndDayStr, 1);
+    for (let i = 0; i < 370 && cursor <= todayStr; i++) {
+      const rows = buildRawLedgerRowsForMexicoDay(cursor);
+      if (
+        rows.some((row) => {
+          const t = Number(row.sortTime);
+          if (!Number.isFinite(t) || t <= periodEndMs) return false;
+          return Number(row.inAmount || 0) > 0 || Number(row.outAmount || 0) > 0;
+        })
+      ) {
+        return true;
+      }
+      if (cursor === todayStr) break;
+      cursor = offsetMexicoDateKey(cursor, 1);
+    }
+    return false;
+  }, [cashPeriodEndIso, cashPeriodEndDayStr, todayStr, buildRawLedgerRowsForMexicoDay]);
+
+  const endCashDisplay = useMemo(() => {
+    if (!cashPeriodEndIso) {
+      return { value: totals.end, anchor: selectedDayManualCount, isExpected: false };
+    }
+
+    const anchor = latestManualCountBeforeCalc(openingCountDiffHistory, cashPeriodEndIso);
+    if (anchor) {
+      const delta = sumDrawerCashBetweenInstants(anchor.ts, cashPeriodEndIso);
+      return {
+        value: Number(anchor.enteredOpening) + delta.net,
+        anchor,
+        isExpected: hasDrawerTransactionsAfterCashPeriod,
+      };
+    }
+
+    const fallbackOpening = getOpeningBalance(cashPeriodStartDayStr);
+    if (fallbackOpening !== null && Number.isFinite(Number(fallbackOpening))) {
+      const startIso = mexicoWallDateTimeToUtcIso(cashPeriodStartDayStr, "00:00");
+      const delta = sumDrawerCashBetweenInstants(startIso, cashPeriodEndIso);
+      return {
+        value: Number(fallbackOpening) + delta.net,
+        anchor: null,
+        isExpected: hasDrawerTransactionsAfterCashPeriod,
+      };
+    }
+
+    return { value: totals.end, anchor: selectedDayManualCount, isExpected: hasDrawerTransactionsAfterCashPeriod };
+  }, [
+    cashPeriodEndIso,
+    cashPeriodStartDayStr,
+    openingCountDiffHistory,
+    hasDrawerTransactionsAfterCashPeriod,
+    sumDrawerCashBetweenInstants,
+    totals.end,
+    selectedDayManualCount,
+    storeTick,
+  ]);
+
+  const endCashStatusText = useMemo(() => {
+    if (endCashDisplay.isExpected) {
+      return periodMode === "month"
+        ? `Expected end cash for selected month · later cash transactions exist`
+        : `Expected end cash for ${cashPeriodEndDayStr} · later cash transactions exist`;
+    }
+    if (endCashDisplay.anchor?.ts) {
+      return `Manually counted and updated at ${formatMexicoDateShort(endCashDisplay.anchor.ts)} ${formatMexicoTime(endCashDisplay.anchor.ts)}`;
+    }
+    return "Manually calculated and updated";
+  }, [endCashDisplay, periodMode, cashPeriodEndDayStr]);
+
   const goPrevMonth = () => setSelectedDate((d) => subMonths(d, 1));
   const goNextMonth = () => setSelectedDate((d) => addMonths(d, 1));
   const goPrevDay = () => setSelectedDate((d) => addDays(d, -1));
@@ -1936,6 +2012,10 @@ export default function DailyCash() {
       const expandKey = `${sectionDayStr}::${r.id}`;
       const isExpanded = expandedLedgerKey === expandKey;
       const canExpand = Boolean(r.receipt || r.order);
+      const pendingTimeKey = ledgerPendingKey(sectionDayStr, r.id);
+      const hasPendingTimeEdit = Boolean(pendingLedgerTimes[pendingTimeKey]);
+      const hasSavedTimeOverride = Boolean(getLedgerTimeOverrides(sectionDayStr)[r.id]);
+      const canResetLedgerTime = !r.isManualCountReset && (hasPendingTimeEdit || hasSavedTimeOverride);
       const rowStripe = i % 2 === 1 ? "bg-black/20" : "bg-transparent";
       const excludedByManualCount =
         sectionResetTime != null && !r.isManualCountReset && Number.isFinite(r.sortTime) && r.sortTime <= sectionResetTime;
@@ -1976,7 +2056,6 @@ export default function DailyCash() {
               onStageChange={handleStageLedgerTime}
               onClearPending={handleClearPendingLedgerTime}
               onCommit={handleCommitLedgerTime}
-              onReset={(rowId) => handleLedgerTimeReset(sectionDayStr, rowId)}
             />
           </td>
           <td className={cn("hidden px-3 py-2 text-gray-300 sm:table-cell", r.isManualCountReset && "font-semibold text-emerald-200")}>
@@ -2014,22 +2093,37 @@ export default function DailyCash() {
                 ? formatMx(r.ledgerOutAmount)
                 : "—"}
           </td>
-          <td className="px-1 py-1 text-right">
-            {r.isManual || r.isRegisteredManual ? (
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                disabled={deleteCompanyTx.isPending}
-                className="h-8 w-8 text-gray-500 hover:bg-rose-950/40 hover:text-rose-400 disabled:opacity-40"
-                onClick={() => handleRemoveRow(r)}
-                aria-label={r.isRegisteredManual ? "Remove registered cash entry" : "Remove manual line"}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <span className="inline-block w-8" />
-            )}
+          <td className="px-2 py-1 text-right">
+            <div className="flex min-w-16 items-center justify-end gap-1">
+              {canResetLedgerTime ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-gray-500 hover:bg-yellow-500/10 hover:text-yellow-200"
+                  onClick={() => handleLedgerTimeReset(sectionDayStr, r.id)}
+                  aria-label="Restore original time and clear unsaved edits"
+                  title="Restore original time and clear unsaved edits"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
+              {r.isManual || r.isRegisteredManual ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  disabled={deleteCompanyTx.isPending}
+                  className="h-8 w-8 text-gray-500 hover:bg-rose-950/40 hover:text-rose-400 disabled:opacity-40"
+                  onClick={() => handleRemoveRow(r)}
+                  aria-label={r.isRegisteredManual ? "Remove registered cash entry" : "Remove manual line"}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                !canResetLedgerTime ? <span className="inline-block w-8" /> : null
+              )}
+            </div>
           </td>
         </tr>
       );
@@ -2677,19 +2771,13 @@ export default function DailyCash() {
           </div>
           <div className="rounded-xl border border-yellow-500/20 bg-gradient-to-br from-[#1f1c12] to-[#14120c] p-4 shadow-[0_0_40px_rgba(250,204,21,0.06)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-600/90">
-              {periodMode === "month" ? "End cash (use Today)" : "End cash"}
+              {endCashDisplay.isExpected ? "Expected end cash" : "End cash"}
             </p>
             <p className="mt-1 text-2xl font-bold tabular-nums text-yellow-200">
-              {totals.end !== null ? formatMx(totals.end) : "—"}
+              {endCashDisplay.value !== null ? formatMx(endCashDisplay.value) : "—"}
             </p>
             <p className="mt-2 text-[11px] text-yellow-700/80">
-              {periodMode === "month"
-                ? "Manual counts apply per day in Today view"
-                : totals.opening !== null
-                  ? selectedDayManualCount
-                    ? "Manual count + net after that time"
-                    : "Manual count + net for the day"
-                  : "Manual counting not done this day"}
+              {endCashStatusText}
             </p>
           </div>
         </div>
@@ -2840,7 +2928,7 @@ export default function DailyCash() {
                   <th className="min-w-[8rem] px-3 py-2.5">Detail</th>
                   <th className="whitespace-nowrap px-3 py-2.5 text-right text-emerald-500/90">In</th>
                   <th className="whitespace-nowrap px-3 py-2.5 text-right text-rose-400/90">Out</th>
-                  <th className="w-12 px-2 py-2.5" />
+                  <th className="w-20 px-2 py-2.5" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>

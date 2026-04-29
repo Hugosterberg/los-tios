@@ -196,10 +196,10 @@ function ProductList({ title, items = [], source = "mock" }) {
           items.map((item, index) => (
             <div
               key={item.id || `${title}-${index}`}
-              className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4"
+              className="min-w-0 overflow-hidden rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4"
             >
-              <p className="text-sm font-semibold text-white">{item.product || "Unknown product"}</p>
-              <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+              <p className="break-words text-sm font-semibold text-white">{item.product || "Unknown product"}</p>
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-gray-400">
                 <span>{formatNumber(item.units || 0)} units</span>
                 <span className="text-yellow-500/50">-</span>
                 <span>{item.revenue || formatCurrency(0)}</span>
@@ -434,6 +434,41 @@ export default function Dashboard() {
   ]);
 
   const kpiSalesTotal = React.useMemo(() => sumEventAmounts(kpiCanonicalEvents), [kpiCanonicalEvents]);
+  const kpiGlanceEventRows = React.useMemo(
+    () =>
+      [...kpiCanonicalEvents]
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        .slice(0, 250)
+        .map((e) => ({
+          id: String(e.id),
+          time: formatDateSafe(e.timestamp, "yyyy-MM-dd HH:mm"),
+          source: formatSourceName(e.source),
+          amount: formatCurrency(e.amount),
+          payment: String(e.paymentMethod || "-"),
+          branch: e.branch || "Centro",
+          channel: e.channel || "Unknown",
+        })),
+    [kpiCanonicalEvents],
+  );
+  const kpiGlanceSalesBreakdown = React.useMemo(() => {
+    const bySource = { loyverse: 0, clip: 0, manual: 0 };
+    for (const event of kpiCanonicalEvents) {
+      if (event.source === "loyverse" || event.source === "clip" || event.source === "manual") {
+        bySource[event.source] += event.amount;
+      }
+    }
+    return {
+      type: "net-sales",
+      loyverse: bySource.loyverse,
+      clip: bySource.clip,
+      manual: bySource.manual,
+      total: kpiSalesTotal,
+      dedupeFilteredCount: 0,
+      dedupeTotalCount: 0,
+      dedupeRows: [],
+      eventRows: kpiGlanceEventRows,
+    };
+  }, [kpiCanonicalEvents, kpiGlanceEventRows, kpiSalesTotal]);
 
   const kpiExpensesTotal = React.useMemo(() => {
     if (!glanceRangeStartKey || !glanceRangeEndKey) return 0;
@@ -1193,6 +1228,7 @@ export default function Dashboard() {
         dedupeFilteredCount: filteredDeduplicatedSalesCount,
         dedupeTotalCount: deduplicatedSalesCount,
         dedupeRows: filteredDeduplicationRows,
+        eventRows: kpiEventDebugRows,
       },
     },
     {
@@ -1541,7 +1577,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="min-h-screen overflow-x-hidden bg-[#1a1a1a] text-white [overflow-wrap:anywhere]">
       <KpiBreakdownDialog
         open={Boolean(kpiDetailItem)}
         onOpenChange={(open) => {
@@ -1552,9 +1588,9 @@ export default function Dashboard() {
         breakdown={kpiDetailItem?.breakdown}
       />
       <div className="border-b border-yellow-500/20">
-        <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-4xl">
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 max-w-4xl">
               <Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300">Los Tios Management Dashboard</Badge>
               <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
                 Los Tios management dashboard
@@ -1564,14 +1600,14 @@ export default function Dashboard() {
                 Cards marked <span className="text-yellow-300">Limited data</span> still rely on partial coverage and should be read as directional rather than final.
               </p>
               <div className="mt-8 rounded-2xl border border-yellow-500/15 bg-[#141414]/90 p-4 sm:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
+                <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-500/70">Calendar month</p>
                     <p className="mt-1 text-xs text-gray-500 sm:text-sm">
                       Select a month to align every KPI with that full calendar window, or use a quick range.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -1657,7 +1693,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[460px]">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:w-full xl:w-[460px]">
               <div className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Live sources connected</p>
                 <p className="mt-2 text-2xl font-bold text-yellow-400">
@@ -1729,10 +1765,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
         <section id="money-at-a-glance" className="mb-8">
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
+          <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Selected period</p>
               <h2 className="mt-1 text-2xl font-bold text-yellow-400">Money at a glance</h2>
               <p className="mt-1 text-xs text-gray-500">
@@ -1760,9 +1796,9 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
             <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
                   Cash in drawer
                 </p>
@@ -1785,8 +1821,17 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
-              <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setKpiDetailItem({
+                  label: `Sales - ${displayPeriodLabel}`,
+                  breakdown: kpiGlanceSalesBreakdown,
+                })
+              }
+              className="group rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 text-left shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)] transition-colors hover:border-yellow-300/70 hover:from-yellow-500/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/50"
+            >
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
                   Sales
                 </p>
@@ -1800,10 +1845,13 @@ export default function Dashboard() {
                 {formatNumber(kpiCanonicalEvents.length)}{" "}
                 {kpiCanonicalEvents.length === 1 ? "sale" : "sales"} in this period (Clip + Loyverse + manual inflows)
               </p>
-            </div>
+              <p className="mt-2 text-[11px] font-medium text-yellow-400/80 transition-colors group-hover:text-yellow-300">
+                View included details -&gt;
+              </p>
+            </button>
 
             <div className="rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-br from-yellow-500/[0.10] via-[#1a1808] to-[#141410] p-5 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.15)]">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400/75">
                   Net
                 </p>
@@ -1823,8 +1871,8 @@ export default function Dashboard() {
         </section>
 
         <section id="cash-variance" className="mb-8">
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
+          <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Cash health</p>
               <h2 className="mt-1 text-2xl font-bold text-yellow-400">Cash variance — last 30 days</h2>
               <p className="mt-1 text-xs text-gray-500">
@@ -1938,10 +1986,10 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
-              <div className="flex items-center justify-between gap-2 border-b border-yellow-500/15 px-5 py-3">
-                <div className="flex items-center gap-2">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
+              <div className="flex min-w-0 flex-col gap-2 border-b border-yellow-500/15 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <h3 className="text-sm font-semibold text-yellow-200">Top spend by item</h3>
                   <SourceBadge source="finance_ledger" />
                 </div>
@@ -1958,12 +2006,12 @@ export default function Dashboard() {
                 </p>
               ) : (
                 <>
-                <div className="space-y-3 p-4 sm:hidden">
+                <div className="space-y-3 p-4 lg:hidden">
                   {topExpensesByName.map((row, idx) => {
                     const share = topExpensesTotal > 0 ? (row.total / topExpensesTotal) * 100 : 0;
                     return (
                       <div key={row.key} className="rounded-xl border border-yellow-500/10 bg-black/20 p-3">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">#{idx + 1}</p>
                             <p className="mt-1 truncate text-sm font-semibold text-yellow-50">{row.name}</p>
@@ -1980,8 +2028,8 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
-                <div className="hidden overflow-x-auto sm:block">
-                  <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+                <div className="hidden lg:block">
+                  <table className="w-full table-fixed border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-yellow-500/15 bg-black/25 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/80">
                         <th className="px-4 py-2">#</th>
@@ -1999,7 +2047,7 @@ export default function Dashboard() {
                             className={`border-b border-yellow-500/10 ${idx % 2 === 1 ? "bg-black/20" : ""}`}
                           >
                             <td className="px-4 py-2 tabular-nums text-gray-500">{idx + 1}</td>
-                            <td className="px-4 py-2 font-medium text-yellow-50">
+                            <td className="min-w-0 break-words px-4 py-2 font-medium text-yellow-50">
                               {row.name}
                               {row.category && row.category !== "other" && (
                                 <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-gray-500">
@@ -2026,9 +2074,9 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
-              <div className="flex items-center justify-between gap-2 border-b border-yellow-500/15 px-5 py-3">
-                <div className="flex items-center gap-2">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-yellow-500/20 bg-[#1e1e1e]">
+              <div className="flex min-w-0 flex-col gap-2 border-b border-yellow-500/15 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <h3 className="text-sm font-semibold text-yellow-200">Top sales by dish</h3>
                   <SourceBadge source="loyverse" />
                 </div>
@@ -2047,12 +2095,12 @@ export default function Dashboard() {
                 </p>
               ) : (
                 <>
-                <div className="space-y-3 p-4 sm:hidden">
+                <div className="space-y-3 p-4 lg:hidden">
                   {topDishesInPeriod.map((row, idx) => {
                     const share = topDishesRevenue > 0 ? (row.revenue / topDishesRevenue) * 100 : 0;
                     return (
                       <div key={row.name} className="rounded-xl border border-yellow-500/10 bg-black/20 p-3">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">#{idx + 1}</p>
                             <p className="mt-1 truncate text-sm font-semibold text-yellow-50">{row.name}</p>
@@ -2067,8 +2115,8 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
-                <div className="hidden overflow-x-auto sm:block">
-                  <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+                <div className="hidden lg:block">
+                  <table className="w-full table-fixed border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-yellow-500/15 bg-black/25 text-[10px] font-semibold uppercase tracking-wide text-yellow-200/80">
                         <th className="px-4 py-2">#</th>
@@ -2086,7 +2134,7 @@ export default function Dashboard() {
                             className={`border-b border-yellow-500/10 ${idx % 2 === 1 ? "bg-black/20" : ""}`}
                           >
                             <td className="px-4 py-2 tabular-nums text-gray-500">{idx + 1}</td>
-                            <td className="px-4 py-2 font-medium text-yellow-50">{row.name}</td>
+                            <td className="min-w-0 break-words px-4 py-2 font-medium text-yellow-50">{row.name}</td>
                             <td className="px-4 py-2 text-right font-mono tabular-nums text-amber-200/90">
                               {formatCurrency(row.revenue)}
                               {share > 0 && (
@@ -2113,16 +2161,16 @@ export default function Dashboard() {
         <section id="executive-summary">
 
           <details className="mb-4 group">
-            <summary className="flex cursor-pointer items-center gap-2 rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-2.5 text-xs uppercase tracking-[0.2em] text-gray-500 hover:bg-[#242424] select-none list-none">
+            <summary className="flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-2.5 text-xs uppercase tracking-[0.2em] text-gray-500 hover:bg-[#242424] select-none list-none">
               <span className="mr-1 text-yellow-500/60 group-open:rotate-90 transition-transform inline-block">▶</span>
               Period Comparisons
             </summary>
-            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-2 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {comparisonCards.map((item) => (
                 <div key={item.id} className="rounded-xl border border-yellow-500/10 bg-[#1e1e1e] px-4 py-3">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-gray-600">{item.label}</p>
                   <p className="mt-1.5 text-lg font-bold text-white">{item.currentLabel}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
+                  <div className="mt-1 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                     <p className={`text-xs font-medium ${item.trend === "up" ? "text-yellow-400" : "text-red-400"}`}>{item.deltaLabel}</p>
                     <p className="text-[10px] text-gray-600">Prev: {item.previousLabel}</p>
                   </div>
@@ -2130,7 +2178,7 @@ export default function Dashboard() {
               ))}
             </div>
           </details>
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {executiveKpis.map((item) => (
               <KpiCard key={item.id} item={item} onOpenBreakdown={item.breakdown ? setKpiDetailItem : undefined} />
             ))}
@@ -2138,8 +2186,8 @@ export default function Dashboard() {
         </section>
 
         <section id="live-operations" className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
+          <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Live Operations</p>
               <h2 className="mt-1 text-2xl font-bold text-yellow-400">
                 {leanOpsMode
@@ -2156,12 +2204,12 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {liveOperations.map((item) => (
               <Link
                 key={item.id}
                 to={item.href}
-                className="rounded-xl border border-yellow-500/20 bg-[#242424] p-4 transition-all hover:border-yellow-400/30 hover:bg-[#2b2b2b]"
+                className="min-w-0 overflow-hidden rounded-xl border border-yellow-500/20 bg-[#242424] p-4 transition-all hover:border-yellow-400/30 hover:bg-[#2b2b2b]"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{item.label}</p>
@@ -2174,14 +2222,14 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.8fr_1fr]">
+        <div className="mt-8 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
           <DashboardPanel
             title="Sales & Trends"
             description="Revenue cadence, order timing, and sales mix."
             sourceBadge={<SourceBadge source={salesPipelineDataSource} />}
             action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><BarChart3 className="mr-1 h-3 w-3" />Source-tagged sales events</Badge>}
           >
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-2">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <p className="text-sm font-semibold text-yellow-400">Revenue trend (latest 7 days within selection)</p>
                 <div className="mt-4 h-[260px]">
@@ -2282,7 +2330,7 @@ export default function Dashboard() {
           </DashboardPanel>
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-3">
           <ProductList title="Best selling products" items={bestSellingProducts} source={bestSellingSource} />
           {leanOpsMode ? (
             <ProductList title="Focus products" items={bestSellingProducts} source={bestSellingSource} />
@@ -2292,7 +2340,7 @@ export default function Dashboard() {
           <ProductList title="Worst performing products" items={worstPerformingProducts} source={worstPerformingSource} />
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+        <div className="mt-8 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <DashboardPanel
             id="payments-reconciliation"
             title="Payments & Reconciliation"
@@ -2300,7 +2348,7 @@ export default function Dashboard() {
             sourceBadge={<SourceBadge source={salesPipelineDataSource} />}
             action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><CreditCard className="mr-1 h-3 w-3" />Clip + app</Badge>}
           >
-            <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mb-4 grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Duplicate matches removed</p>
                 <p className="mt-2 text-2xl font-bold text-white">{formatNumber(deduplicatedSalesCount)}</p>
@@ -2325,7 +2373,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               {paymentSummary.map((item) => (
                 <div key={item.label} className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2338,7 +2386,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <div className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            <div className="mt-6 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Cash vs card vs Clip</p>
@@ -2397,7 +2445,7 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-yellow-400">Clip API response</p>
@@ -2420,7 +2468,7 @@ export default function Dashboard() {
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
                     First Clip payment payload
                   </summary>
-                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-300">
+                  <pre className="mt-3 max-w-full whitespace-pre-wrap break-words text-xs text-gray-300">
                     {JSON.stringify(firstApprovedClipPayment || clipPaymentsPayload || { message: "No Clip payment payload returned." }, null, 2)}
                   </pre>
                 </details>
@@ -2445,7 +2493,7 @@ export default function Dashboard() {
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
                     First Loyverse receipt payload
                   </summary>
-                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-300">
+                  <pre className="mt-3 max-w-full whitespace-pre-wrap break-words text-xs text-gray-300">
                     {JSON.stringify(firstFilteredReceipt || { message: "No Loyverse receipt payload returned." }, null, 2)}
                   </pre>
                 </details>
@@ -2453,7 +2501,7 @@ export default function Dashboard() {
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
                     Raw Clip settlements payload
                   </summary>
-                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-300">
+                  <pre className="mt-3 max-w-full whitespace-pre-wrap break-words text-xs text-gray-300">
                     {JSON.stringify(clipSettlementsPayload || { message: "No Clip settlements payload returned." }, null, 2)}
                   </pre>
                 </details>
@@ -2534,7 +2582,7 @@ export default function Dashboard() {
           </DashboardPanel>
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr_0.85fr]">
+        <div className="mt-8 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)]">
           <DashboardPanel
             id="inventory"
             title="Inventory"
@@ -2564,7 +2612,7 @@ export default function Dashboard() {
                 <div key={purchase.id} className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                   <p className="text-sm font-semibold text-white">{purchase.item}</p>
                   <p className="mt-1 text-sm text-gray-400">{purchase.supplier}</p>
-                  <div className="mt-3 flex items-center justify-between text-sm">
+                  <div className="mt-3 flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-yellow-400">{purchase.cost}</span>
                     <span className="text-gray-500">{purchase.received}</span>
                   </div>
@@ -2586,7 +2634,7 @@ export default function Dashboard() {
           </DashboardPanel>
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="mt-8 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <DashboardPanel
             id="staff"
             title="Staff"
@@ -2594,7 +2642,7 @@ export default function Dashboard() {
             sourceBadge={<SourceBadge source={staffDataSource} />}
             action={<Badge className="border border-yellow-500/20 bg-yellow-400/10 text-yellow-300"><Users className="mr-1 h-3 w-3" />Staff</Badge>}
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-5">
               {staffMetrics.map((metric) => (
                 <div key={metric.label} className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-4">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2638,13 +2686,13 @@ export default function Dashboard() {
                 <Link
                   key={item.title}
                   to={item.href}
-                  className="flex items-center justify-between rounded-xl border border-yellow-500/20 bg-[#1a1a1a] p-4 transition-all hover:border-yellow-400/30 hover:bg-[#202020]"
+                  className="flex min-w-0 flex-col gap-3 rounded-xl border border-yellow-500/20 bg-[#1a1a1a] p-4 transition-all hover:border-yellow-400/30 hover:bg-[#202020] sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className="rounded-xl border border-yellow-500/10 bg-black/20 p-3">
                       <item.icon className="h-5 w-5 text-yellow-400" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-white">{item.title}</p>
                       <p className="text-sm text-gray-400">{item.subtitle}</p>
                     </div>

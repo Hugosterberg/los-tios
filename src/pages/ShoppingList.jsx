@@ -924,7 +924,7 @@ export default function ShoppingList() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="min-h-screen overflow-x-hidden bg-[#1a1a1a] text-white">
       <div className="border-b border-yellow-500/20 bg-[#1a1a1a] py-5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
@@ -1036,24 +1036,24 @@ export default function ShoppingList() {
               {totalEstimatedCost > 0 ? ` · $${formatMoneyCompact(totalEstimatedCost)} MXN estimated` : ""}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Button
               type="button"
               variant="outline"
               disabled={!lastRemovedShoppingSnapshot || createItem.isPending}
               onClick={handleUndoLastRemove}
-              className="h-9 gap-2 border-yellow-500/35 text-gray-100 hover:bg-yellow-500/10 disabled:opacity-40"
+              className="h-10 min-w-0 gap-2 border-yellow-500/35 px-2 text-xs text-gray-100 hover:bg-yellow-500/10 disabled:opacity-40 sm:h-9 sm:px-4 sm:text-sm"
             >
               <Undo2 className="h-4 w-4" />
-              Undo delete
+              <span className="truncate">Undo delete</span>
             </Button>
             <Button
               type="button"
               onClick={() => setShowForm(!showForm)}
-              className="h-9 gap-2 bg-yellow-400 text-black hover:bg-yellow-300"
+              className="h-10 min-w-0 gap-2 bg-yellow-400 px-2 text-xs text-black hover:bg-yellow-300 sm:h-9 sm:px-4 sm:text-sm"
             >
               <Plus className="h-4 w-4" />
-              {showForm ? "Close form" : "Add to list"}
+              <span className="truncate">{showForm ? "Close form" : "Add to list"}</span>
             </Button>
           </div>
         </div>
@@ -1292,7 +1292,7 @@ export default function ShoppingList() {
                     <strong className="text-gray-400">Register purchase</strong> to post straight to Finance.
                   </p>
 
-                  <div className="flex gap-3 justify-end">
+                  <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
                     <Button type="button" variant="outline" onClick={resetForm} className="border-yellow-500/30 text-gray-200 hover:bg-yellow-500/10">
                       Cancel
                     </Button>
@@ -1390,7 +1390,7 @@ export default function ShoppingList() {
                           variant="outline"
                           disabled={updateItem.isPending || createExpense.isPending}
                           onClick={() => finalizePurchaseFromList(item, "company_cash")}
-                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                          className="h-11 min-w-0 flex-col gap-0.5 border-yellow-500/35 px-1 text-[11px] leading-none text-yellow-200 hover:bg-yellow-500/15"
                         >
                           <Banknote className="h-4 w-4" />
                           Cash
@@ -1400,7 +1400,7 @@ export default function ShoppingList() {
                           variant="outline"
                           disabled={updateItem.isPending || createExpense.isPending}
                           onClick={() => finalizePurchaseFromList(item, "company_account")}
-                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                          className="h-11 min-w-0 flex-col gap-0.5 border-yellow-500/35 px-1 text-[11px] leading-none text-yellow-200 hover:bg-yellow-500/15"
                         >
                           <Landmark className="h-4 w-4" />
                           Card
@@ -1410,7 +1410,7 @@ export default function ShoppingList() {
                           variant="outline"
                           disabled={updateItem.isPending || createExpense.isPending}
                           onClick={() => finalizePurchaseFromList(item, "individual")}
-                          className="h-10 gap-2 border-yellow-500/35 text-yellow-200 hover:bg-yellow-500/15"
+                          className="h-11 min-w-0 flex-col gap-0.5 border-yellow-500/35 px-1 text-[11px] leading-none text-yellow-200 hover:bg-yellow-500/15"
                         >
                           <User className="h-4 w-4" />
                           Person
@@ -1866,20 +1866,20 @@ export default function ShoppingList() {
                 variant="outline"
                 disabled={registeredPurchasesForMonth.length === 0}
                 onClick={handleExportShoppingPurchasesCsv}
-                className="no-print h-9 shrink-0 gap-2 border border-yellow-400/40 bg-yellow-500/20 text-xs text-yellow-100 hover:bg-yellow-500/30 disabled:opacity-40"
+                className="no-print h-10 w-full shrink-0 gap-2 border border-yellow-400/40 bg-yellow-500/20 text-xs text-yellow-100 hover:bg-yellow-500/30 disabled:opacity-40 sm:h-9 sm:w-auto"
               >
                 <FileSpreadsheet className="h-4 w-4" />
                 Open in Excel
               </Button>
             </div>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-1.5">
+            <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between">
+              <div className="min-w-0 space-y-1.5">
                 <Label className="text-[11px] font-medium text-yellow-200/85">Month</Label>
                 <Popover open={registeredMonthPopoverOpen} onOpenChange={setRegisteredMonthPopoverOpen}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="flex h-9 min-w-[12.5rem] items-center justify-between gap-2 rounded-lg border border-yellow-500/25 bg-[#1a1a1a] px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-yellow-500/40 hover:bg-[#222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/35"
+                      className="flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-yellow-500/25 bg-[#1a1a1a] px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-yellow-500/40 hover:bg-[#222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/35 sm:h-9 sm:min-w-[12.5rem]"
                       aria-label="Select month for registered purchases"
                     >
                       <span className="tabular-nums text-gray-100">{registeredMonthLabel}</span>
@@ -1944,7 +1944,7 @@ export default function ShoppingList() {
               <div
                 role="tablist"
                 aria-label="Registered purchases view"
-                className="inline-flex h-9 shrink-0 items-center rounded-lg border border-yellow-500/25 bg-[#1a1a1a] p-0.5"
+                className="inline-flex h-10 w-full min-w-0 shrink-0 items-center rounded-lg border border-yellow-500/25 bg-[#1a1a1a] p-0.5 sm:h-9 sm:w-auto"
               >
                 <button
                   type="button"
@@ -1952,7 +1952,7 @@ export default function ShoppingList() {
                   aria-selected={registeredView === "rows"}
                   onClick={() => setRegisteredView("rows")}
                   className={cn(
-                    "h-8 rounded-md px-3 text-xs font-medium transition-colors",
+                    "h-9 min-w-0 flex-1 rounded-md px-2 text-xs font-medium transition-colors sm:h-8 sm:flex-none sm:px-3",
                     registeredView === "rows"
                       ? "bg-yellow-400 text-black shadow-sm"
                       : "text-gray-300 hover:bg-yellow-500/10 hover:text-yellow-50",
@@ -1966,7 +1966,7 @@ export default function ShoppingList() {
                   aria-selected={registeredView === "products"}
                   onClick={() => setRegisteredView("products")}
                   className={cn(
-                    "h-8 rounded-md px-3 text-xs font-medium transition-colors",
+                    "h-9 min-w-0 flex-1 rounded-md px-2 text-xs font-medium transition-colors sm:h-8 sm:flex-none sm:px-3",
                     registeredView === "products"
                       ? "bg-yellow-400 text-black shadow-sm"
                       : "text-gray-300 hover:bg-yellow-500/10 hover:text-yellow-50",
@@ -2017,7 +2017,35 @@ export default function ShoppingList() {
                     No purchases in {registeredMonthLabel}. Choose another month or register a purchase for this period.
                   </p>
                 ) : registeredView === "products" ? (
-                  <div className="overflow-x-auto border-t border-yellow-500/15">
+                  <>
+                  <div className="space-y-3 border-t border-yellow-500/15 p-3 sm:hidden">
+                    {registeredProductsForMonth.map((p) => {
+                      const share =
+                        registeredPurchasesMonthTotal > 0
+                          ? (p.total / registeredPurchasesMonthTotal) * 100
+                          : 0;
+                      return (
+                        <div
+                          key={p.key}
+                          className="rounded-lg border border-yellow-500/15 bg-[#242424] p-3 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.06)]"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-yellow-100">{p.name}</p>
+                              <p className="mt-1 text-[11px] text-gray-500">
+                                {p.count} {p.count === 1 ? "purchase" : "purchases"}
+                                {share > 0 ? ` · ${share.toFixed(1)}% of month` : ""}
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-right font-mono text-sm font-semibold tabular-nums text-amber-200">
+                              ${formatMoneyCompact(p.total)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="hidden overflow-x-auto border-t border-yellow-500/15 sm:block">
                     <table className="w-full min-w-[480px] border-collapse text-left text-[11px] sm:text-xs">
                       <thead>
                         <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
@@ -2069,8 +2097,114 @@ export default function ShoppingList() {
                       </tfoot>
                     </table>
                   </div>
+                  </>
                 ) : (
-                  <div className="overflow-x-auto border-t border-yellow-500/15">
+                  <>
+                  <div className="space-y-3 border-t border-yellow-500/15 p-3 sm:hidden">
+                    {registeredPurchasesForMonth.map((r) => (
+                      <div
+                        key={r.id}
+                        className="rounded-lg border border-yellow-500/15 bg-[#242424] p-3 shadow-[inset_0_1px_0_0_rgba(250,204,21,0.06)]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-yellow-100">{r.name}</p>
+                            <p className="mt-1 text-[11px] text-gray-500">
+                              {r.createdDateIso ? formatMexicoTime(r.createdDateIso) : "-"} · {expensePaymentSourceLabel(r.paymentSource)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={removeRegisteredPurchase.isPending || patchExpenseRow.isPending}
+                            onClick={() => handleDeleteRegisteredRow(r)}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-500/20 text-red-400 transition-colors hover:bg-red-950/45 hover:text-red-300 disabled:opacity-30"
+                            aria-label="Delete row"
+                          >
+                            <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                          </button>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <Label className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                              Sum
+                            </Label>
+                            {editingRegisteredAmountId === r.id ? (
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                autoFocus
+                                disabled={patchExpenseRow.isPending}
+                                value={editingRegisteredAmountDraft}
+                                onChange={(e) => setEditingRegisteredAmountDraft(e.target.value)}
+                                onBlur={(e) => void commitRegisteredAmountEdit(r, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void commitRegisteredAmountEdit(r, e.currentTarget.value);
+                                  }
+                                  if (e.key === "Escape") {
+                                    setEditingRegisteredAmountId(null);
+                                  }
+                                }}
+                                className={cn(
+                                  "h-10 border-yellow-500/40 bg-[#141410] text-right font-mono text-sm text-amber-200 [appearance:textfield] [-moz-appearance:textfield]",
+                                  "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                )}
+                                aria-label="Edit amount MXN"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={patchExpenseRow.isPending}
+                                onClick={() => startEditingRegisteredAmount(r)}
+                                className="flex h-10 w-full items-center justify-end rounded-md border border-yellow-500/20 bg-[#141410] px-3 font-mono text-sm tabular-nums text-amber-200 transition-colors hover:border-yellow-500/40 hover:bg-yellow-500/10"
+                              >
+                                ${formatMoneyCompact(r.amount)}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 space-y-1">
+                            <Label className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                              Date
+                            </Label>
+                            {editingRegisteredDateId === r.id ? (
+                              <Input
+                                type="date"
+                                autoFocus
+                                disabled={patchExpenseRow.isPending}
+                                value={editingRegisteredDateDraft}
+                                onChange={(e) => setEditingRegisteredDateDraft(e.target.value)}
+                                onBlur={(e) => void commitRegisteredDateEdit(r, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void commitRegisteredDateEdit(r, e.currentTarget.value);
+                                  }
+                                  if (e.key === "Escape") {
+                                    setEditingRegisteredDateId(null);
+                                  }
+                                }}
+                                className="h-10 border-yellow-500/40 bg-[#141410] text-sm text-gray-200 [color-scheme:dark]"
+                                aria-label="Edit purchase date"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={patchExpenseRow.isPending}
+                                onClick={() => startEditingRegisteredDate(r)}
+                                className="flex h-10 w-full items-center rounded-md border border-yellow-500/20 bg-[#141410] px-3 text-left text-sm tabular-nums text-gray-300 transition-colors hover:border-yellow-500/40 hover:bg-yellow-500/10"
+                              >
+                                {r.dateIso ? formatMexicoDateShortEn(r.dateIso) : "-"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto border-t border-yellow-500/15 sm:block">
                     <table className="w-full min-w-[24rem] border-collapse text-left text-[11px] sm:text-xs">
                       <thead>
                         <tr className="border-b border-yellow-500/40 bg-yellow-500/20 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
@@ -2201,6 +2335,7 @@ export default function ShoppingList() {
                       </tfoot>
                     </table>
                   </div>
+                  </>
                 )}
               </>
             )}

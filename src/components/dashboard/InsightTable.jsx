@@ -76,23 +76,23 @@ export default function InsightTable({
   };
 
   return (
-    <div className={cn("rounded-2xl border border-yellow-500/20 bg-[#242424]", className)}>
+    <div className={cn("min-w-0 overflow-hidden rounded-2xl border border-yellow-500/20 bg-[#242424]", className)}>
       <div className="flex flex-col gap-3 border-b border-yellow-500/10 p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-yellow-400">{title}</h3>
             {sourceBadge ? sourceBadge : null}
           </div>
           {subtitle ? <p className="text-xs text-gray-400">{subtitle}</p> : null}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:w-auto">
+          <div className="relative min-w-0 flex-1 lg:flex-none">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={searchPlaceholder}
-              className="h-9 w-full rounded-lg border border-yellow-500/10 bg-[#1a1a1a] pl-9 pr-3 text-sm text-white outline-none transition-colors placeholder:text-gray-500 focus:border-yellow-400/40 sm:w-56"
+              className="h-9 w-full rounded-lg border border-yellow-500/10 bg-[#1a1a1a] pl-9 pr-3 text-sm text-white outline-none transition-colors placeholder:text-gray-500 focus:border-yellow-400/40 lg:w-56"
             />
           </div>
           <Button
@@ -100,7 +100,7 @@ export default function InsightTable({
             variant="outline"
             size="sm"
             onClick={exportCsv}
-            className="border-yellow-500/20 bg-[#1a1a1a] text-gray-200 hover:bg-[#2b2b2b] hover:text-white"
+            className="w-full border-yellow-500/20 bg-[#1a1a1a] text-gray-200 hover:bg-[#2b2b2b] hover:text-white sm:w-auto"
           >
             <Download className="h-3.5 w-3.5" />
             Export CSV
@@ -108,15 +108,40 @@ export default function InsightTable({
         </div>
       </div>
 
-      <Table className="min-w-full">
+      <div className="space-y-3 p-3 xl:hidden">
+        {filteredRows.length ? (
+          filteredRows.map((row, idx) => (
+            <div
+              key={row.id || row.source_system || idx}
+              className="rounded-xl border border-yellow-500/10 bg-[#1a1a1a] p-3"
+            >
+              {columns.map((column) => (
+                <div
+                  key={column.key}
+                  className="grid grid-cols-[minmax(5.5rem,38%)_minmax(0,1fr)] gap-3 border-b border-yellow-500/5 py-2 text-xs last:border-0"
+                >
+                  <span className="min-w-0 break-words uppercase tracking-[0.14em] text-gray-500">{column.label}</span>
+                  <span className="min-w-0 break-words text-right text-gray-200">
+                    {column.render ? column.render(row[column.key], row) : row[column.key]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
+        )}
+      </div>
+
+      <Table className="hidden w-full table-fixed xl:table">
         <TableHeader>
           <TableRow className="border-yellow-500/10 hover:bg-transparent">
             {columns.map((column) => (
-              <TableHead key={column.key} className="px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-gray-500">
+              <TableHead key={column.key} className="px-3 py-3 text-[10px] uppercase tracking-[0.12em] text-gray-500">
                 <button
                   type="button"
                   onClick={() => toggleSort(column.key)}
-                  className="inline-flex items-center gap-1 transition-colors hover:text-white"
+                  className="inline-flex max-w-full items-center gap-1 break-words text-left transition-colors hover:text-white"
                 >
                   {column.label}
                   {sortKey === column.key ? (
@@ -132,7 +157,7 @@ export default function InsightTable({
             filteredRows.map((row, idx) => (
               <TableRow key={row.id || row.source_system || idx} className="border-yellow-500/10 hover:bg-[#1f1f1f]">
                 {columns.map((column) => (
-                  <TableCell key={column.key} className="px-4 py-3 text-sm text-gray-200">
+                  <TableCell key={column.key} className="min-w-0 break-words px-3 py-3 align-top text-xs text-gray-200">
                     {column.render ? column.render(row[column.key], row) : row[column.key]}
                   </TableCell>
                 ))}

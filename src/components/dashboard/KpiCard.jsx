@@ -52,19 +52,19 @@ export default function KpiCard({ item, onOpenBreakdown }) {
 
   const cardBody = (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs uppercase tracking-[0.22em] text-gray-500">{item.label}</p>
             <Badge className={cn("border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em]", source.tone)}>
               {source.label}
             </Badge>
           </div>
-          <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{item.value}</p>
+          <p className="mt-3 break-words text-3xl font-semibold tracking-tight text-white">{item.value}</p>
         </div>
         <Badge
           className={cn(
-            "border px-2 py-1 text-[10px] uppercase tracking-[0.16em]",
+            "w-fit max-w-full shrink-0 whitespace-normal border px-2 py-1 text-[10px] uppercase tracking-[0.16em]",
             deltaTone === "positive"
               ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
               : "border-rose-400/25 bg-rose-400/10 text-rose-300"
@@ -79,7 +79,7 @@ export default function KpiCard({ item, onOpenBreakdown }) {
         <Sparkline values={item.sparkline} tone={item.sparkTone || deltaTone} />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2 text-xs">
+      <div className="mt-4 flex min-w-0 flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
         <span className="min-w-0 flex-1 text-gray-400">{item.comparisonLabel}</span>
         <span className="inline-flex shrink-0 items-center gap-1 text-yellow-400 transition-colors group-hover:text-yellow-300">
           {interactiveBreakdown ? "How it's calculated" : "View details"}
@@ -91,7 +91,7 @@ export default function KpiCard({ item, onOpenBreakdown }) {
 
   if (interactiveBreakdown) {
     return (
-      <div className="group block rounded-2xl border border-yellow-500/15 bg-[#242424] transition-all duration-300 hover:border-yellow-400/40 hover:bg-[#2b2b2b]">
+      <div className="group block min-w-0 overflow-hidden rounded-2xl border border-yellow-500/15 bg-[#242424] transition-all duration-300 hover:border-yellow-400/40 hover:bg-[#2b2b2b]">
         <button
           type="button"
           className="w-full rounded-2xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/40"
@@ -116,7 +116,7 @@ export default function KpiCard({ item, onOpenBreakdown }) {
   return (
     <Link
       to={href}
-      className="group block rounded-2xl border border-yellow-500/15 bg-[#242424] p-4 transition-all duration-300 hover:border-yellow-400/40 hover:bg-[#2b2b2b]"
+      className="group block min-w-0 overflow-hidden rounded-2xl border border-yellow-500/15 bg-[#242424] p-4 transition-all duration-300 hover:border-yellow-400/40 hover:bg-[#2b2b2b]"
     >
       {cardBody}
     </Link>

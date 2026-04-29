@@ -37,9 +37,14 @@ export function getClipPaymentAmount(payment) {
 }
 
 export function getReceiptTotal(receipt) {
-  return getMoneyValue(
+  const amount = getMoneyValue(
     receipt?.total_money ?? receipt?.total ?? receipt?.total_payment_money,
   );
+  const receiptType = String(receipt?.receipt_type || receipt?.type || "").toLowerCase();
+  if (amount > 0 && (receiptType.includes("refund") || receiptType.includes("return"))) {
+    return -amount;
+  }
+  return amount;
 }
 
 function normalizePaymentMethod(value) {
