@@ -239,15 +239,7 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <MexicoWallDatePicker
-        value={dateKey}
-        onChange={(k) => {
-          setDateKey(k);
-          dateKeyRef.current = k;
-        }}
-        onPopoverClose={commitIfChanged}
-      />
+    <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <MexicoWallTimePicker
         value={timeHHmm}
         onChange={(v) => {
@@ -260,7 +252,22 @@ function LedgerTimeCell({ row, ledgerDay, pendingEdit, onStageChange, onClearPen
           stageIfChanged(dateKeyRef.current, next);
         }}
         onPopoverClose={() => commitIfChanged()}
+        className="h-8 min-w-[5.25rem] text-xs"
       />
+      <MexicoWallDatePicker
+        value={dateKey}
+        onChange={(k) => {
+          setDateKey(k);
+          dateKeyRef.current = k;
+        }}
+        onPopoverClose={commitIfChanged}
+        className="h-8 w-8 min-w-0 px-0 [&>span]:sr-only"
+      />
+      {dateKey !== ledgerDay ? (
+        <span className="rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-200">
+          {dateKey}
+        </span>
+      ) : null}
     </div>
   );
 }
