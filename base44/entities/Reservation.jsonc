@@ -1,0 +1,50 @@
+{
+  "name": "Reservation",
+  "type": "object",
+  "properties": {
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_email": {
+      "type": "string",
+      "format": "email"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "time": {
+      "type": "string"
+    },
+    "number_of_guests": {
+      "type": "number"
+    },
+    "special_requests": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "confirmed",
+        "seated",
+        "completed",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "table_number": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "customer_name",
+    "customer_email",
+    "date",
+    "time",
+    "number_of_guests"
+  ]
+}

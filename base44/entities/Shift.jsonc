@@ -1,0 +1,59 @@
+{
+  "name": "Shift",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "employee_name": {
+      "type": "string",
+      "description": "Nombre del empleado"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del turno"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Hora de inicio"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "Hora de fin"
+    },
+    "hours_worked": {
+      "type": "number",
+      "description": "Horas trabajadas"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto a pagar"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "completed",
+        "cancelled",
+        "paid"
+      ],
+      "default": "scheduled",
+      "description": "Estado del turno"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas del turno"
+    },
+    "expense_id": {
+      "type": "string",
+      "description": "ID del gasto creado"
+    }
+  },
+  "required": [
+    "employee_id",
+    "employee_name",
+    "date"
+  ]
+}

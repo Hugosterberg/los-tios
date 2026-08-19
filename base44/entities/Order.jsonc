@@ -1,0 +1,116 @@
+{
+  "name": "Order",
+  "type": "object",
+  "properties": {
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "menu_item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "price": {
+            "type": "number"
+          },
+          "removed_ingredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ingredientes removidos / Removed ingredients"
+          },
+          "is_custom": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es un producto personalizado / If it's a custom item"
+          },
+          "extras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Nombre del extra / Extra name"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Precio del extra / Extra price"
+                }
+              }
+            },
+            "description": "Extras agregados al producto / Extras added to the item"
+          }
+        }
+      }
+    },
+    "total_amount": {
+      "type": "number"
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "dine-in",
+        "takeout",
+        "delivery"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "preparing",
+        "ready",
+        "delivered",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "special_instructions": {
+      "type": "string"
+    },
+    "table_number": {
+      "type": "string"
+    },
+    "delivery_address": {
+      "type": "string"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "card"
+      ],
+      "default": "cash",
+      "description": "M\u00e9todo de pago seleccionado"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "confirmed"
+      ],
+      "default": "pending",
+      "description": "Estado del pago - pending: esperando pago, paid: pagado online, confirmed: confirmado por cliente"
+    }
+  },
+  "required": [
+    "items",
+    "total_amount",
+    "order_type"
+  ]
+}

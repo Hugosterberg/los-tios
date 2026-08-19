@@ -1,0 +1,62 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del empleado / Employee name"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono / Phone"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email del empleado"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "cook",
+        "waiter",
+        "cashier",
+        "delivery",
+        "manager",
+        "cleaner",
+        "other"
+      ],
+      "default": "waiter",
+      "description": "Rol del empleado"
+    },
+    "hourly_rate": {
+      "type": "number",
+      "description": "Pago por hora en MXN"
+    },
+    "daily_rate": {
+      "type": "number",
+      "description": "Pago por d\u00eda en MXN"
+    },
+    "payment_type": {
+      "type": "string",
+      "enum": [
+        "hourly",
+        "daily"
+      ],
+      "default": "daily",
+      "description": "Tipo de pago"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el empleado est\u00e1 activo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "name",
+    "role"
+  ]
+}

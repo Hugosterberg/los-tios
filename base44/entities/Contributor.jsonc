@@ -1,0 +1,51 @@
+{
+  "name": "Contributor",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del contribuyente / Contributor name"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email del contribuyente"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono del contribuyente"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "partner",
+        "investor",
+        "employee"
+      ],
+      "default": "partner",
+      "description": "Rol en la empresa"
+    },
+    "total_contributed": {
+      "type": "number",
+      "default": 0,
+      "description": "Total contribuido hist\u00f3ricamente"
+    },
+    "total_withdrawn": {
+      "type": "number",
+      "default": 0,
+      "description": "Total retirado hist\u00f3ricamente"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el contribuyente est\u00e1 activo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas sobre el contribuyente"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

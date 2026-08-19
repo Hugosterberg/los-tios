@@ -1,0 +1,68 @@
+{
+  "name": "ManualCashCount",
+  "type": "object",
+  "properties": {
+    "count_day": {
+      "type": "string",
+      "description": "Mexico calendar day for this count (yyyy-MM-dd, America/Mexico_City)."
+    },
+    "logged_at_utc": {
+      "type": "string",
+      "description": "When the count was logged (UTC ISO-8601 instant)."
+    },
+    "entered_opening": {
+      "type": "number",
+      "description": "Physical MXN counted in the drawer."
+    },
+    "expected_end": {
+      "type": "number",
+      "description": "Expected drawer cash before the count (omit or NaN-equivalent handled client-side for unknown)."
+    },
+    "diff": {
+      "type": "number",
+      "description": "entered_opening minus expected_end when both known."
+    },
+    "comment": {
+      "type": "string",
+      "default": "",
+      "description": "Optional staff note."
+    },
+    "expected_source_label": {
+      "type": "string",
+      "default": "",
+      "description": "Human-readable source of expected_end (prior count / prior close)."
+    },
+    "prior_close_day_str": {
+      "type": "string",
+      "description": "Mexico yyyy-MM-dd of implied prior close day when applicable."
+    },
+    "previous_manual_count_id": {
+      "type": "string",
+      "description": "Id of the previous ManualCashCount row used for expectation chain."
+    },
+    "previous_manual_count_date_key": {
+      "type": "string",
+      "description": "Mexico date key of previous manual count."
+    },
+    "previous_manual_count_ts": {
+      "type": "string",
+      "description": "logged_at_utc of previous manual count in chain."
+    },
+    "has_expected_end": {
+      "type": "boolean",
+      "default": true,
+      "description": "False when expected_end was unknown (client stores null semantics)."
+    },
+    "has_diff": {
+      "type": "boolean",
+      "default": true,
+      "description": "False when diff was unknown."
+    }
+  },
+  "required": [
+    "count_day",
+    "logged_at_utc",
+    "entered_opening"
+  ],
+  "rls": {}
+}

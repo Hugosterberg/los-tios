@@ -1,0 +1,15 @@
+{
+  "name": "DailyCashLedger",
+  "type": "object",
+  "properties": {
+    "ledger_payload_json": {
+      "type": "string",
+      "default": "",
+      "description": "Full JSON blob for Daily Cash: openings, openingCountMeta, manualLines, detailOverrides, ledgerTimeOverrides, openingDiffEvents (same shape as legacy AppSettings.daily_cash_store_json). One row per app is enough; the client uses list(-created_date)[0]."
+    }
+  },
+  "required": [
+    "ledger_payload_json"
+  ],
+  "rls": {}
+}

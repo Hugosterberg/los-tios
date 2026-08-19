@@ -1,0 +1,95 @@
+{
+  "name": "ShoppingList",
+  "type": "object",
+  "properties": {
+    "item_name": {
+      "type": "string",
+      "description": "Nombre del producto / Item name"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Cantidad necesaria / Quantity needed"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "kg",
+        "g",
+        "l",
+        "ml",
+        "units",
+        "pieces",
+        "other"
+      ],
+      "default": "units",
+      "description": "Unidad de medida / Unit of measure"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ingredients",
+        "supplies",
+        "equipment",
+        "cleaning",
+        "other"
+      ],
+      "description": "Categor\u00eda del producto"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "urgent"
+      ],
+      "default": "medium",
+      "description": "Prioridad de compra"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "purchased"
+      ],
+      "default": "pending",
+      "description": "Estado del producto"
+    },
+    "estimated_cost": {
+      "type": "number",
+      "description": "Costo estimado en MXN"
+    },
+    "actual_cost": {
+      "type": "number",
+      "description": "Costo real pagado en MXN"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Proveedor recomendado"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "purchased_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de compra"
+    },
+    "converted_to_expense": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si ya se convirti\u00f3 a gasto"
+    },
+    "expense_id": {
+      "type": "string",
+      "description": "ID del gasto relacionado"
+    }
+  },
+  "required": [
+    "item_name",
+    "quantity",
+    "unit",
+    "category"
+  ]
+}

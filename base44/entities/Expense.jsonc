@@ -1,0 +1,121 @@
+{
+  "name": "Expense",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del gasto / Expense name"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ingredients",
+        "rent",
+        "utilities",
+        "salaries",
+        "equipment",
+        "marketing",
+        "other"
+      ],
+      "description": "Categor\u00eda del gasto"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto del gasto en MXN"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Cantidad de unidades o peso"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "kg",
+        "g",
+        "l",
+        "ml",
+        "units",
+        "pieces",
+        "months",
+        "other"
+      ],
+      "default": "units",
+      "description": "Unidad de medida"
+    },
+    "is_recurring": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es un gasto recurrente"
+    },
+    "recurring_frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly"
+      ],
+      "description": "Frecuencia si es recurrente"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del gasto"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Proveedor del producto/servicio"
+    },
+    "payment_source": {
+      "type": "string",
+      "enum": [
+        "company_cash",
+        "company_account",
+        "individual"
+      ],
+      "default": "company_cash",
+      "description": "Fuente de pago: efectivo empresa, cuenta empresa, o persona individual"
+    },
+    "paid_by_company": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si fue pagado desde la cuenta de la empresa"
+    },
+    "contributors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre del contribuyente / Contributor name"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto contribuido / Amount contributed"
+          }
+        }
+      },
+      "description": "Lista de contribuyentes y sus aportes / List of contributors and their contributions"
+    },
+    "from_shopping_list": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si proviene de la lista de compras"
+    },
+    "shopping_list_id": {
+      "type": "string",
+      "description": "ID del item de la lista de compras"
+    }
+  },
+  "required": [
+    "name",
+    "category",
+    "amount",
+    "date"
+  ]
+}
